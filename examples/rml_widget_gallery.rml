@@ -1,0 +1,988 @@
+<!-- ============================================================
+     rgui RML Showcase — Project Dashboard
+     A realistic, richly-styled example that exercises every
+     layout container, form widget, collection, overlay, and
+     primitive available in RML.
+     Run:  cargo run --features rml --example rml_widget_gallery
+     ============================================================ -->
+
+<Row key="app-shell" width="100%" height="100%" background="#0f1117">
+
+  <!-- ══════════════════════════════════════════════════════
+       SIDEBAR
+       ══════════════════════════════════════════════════════ -->
+  <Column key="sidebar"
+          width="220"
+          height="100%"
+          background="#181c24"
+          border="1 #2a2f3d"
+          padding="0"
+          gap="0">
+
+    <!-- Brand -->
+    <Row key="brand" padding="20 16 16 16" gap="10" align-items="center">
+      <Icon key="brand-icon" name="layers" />
+      <Text key="brand-name"
+            font-size="16"
+            font-weight="bold"
+            color="#e2e8f0">Horizon</Text>
+    </Row>
+
+    <Divider key="sidebar-divider-top" />
+
+    <!-- Nav sections -->
+    <Column key="nav-main" padding="8" gap="2">
+      <Text key="nav-label-main"
+            font-size="11"
+            font-weight="bold"
+            color="#64748b"
+            padding="8 8 4 8">WORKSPACE</Text>
+
+      <Button key="nav-dashboard"
+              variant="ghost"
+              width="100%"
+              on-click="nav:dashboard">
+        <Row gap="8" align-items="center">
+          <Icon name="home" />
+          Dashboard
+        </Row>
+      </Button>
+
+      <Button key="nav-tasks"
+              primary
+              width="100%"
+              on-click="nav:tasks">
+        <Row gap="8" align-items="center">
+          <Icon name="check-square" />
+          Tasks
+        </Row>
+      </Button>
+
+      <Button key="nav-projects"
+              variant="ghost"
+              width="100%"
+              on-click="nav:projects">
+        <Row gap="8" align-items="center">
+          <Icon name="folder" />
+          Projects
+        </Row>
+      </Button>
+
+      <Button key="nav-files"
+              variant="ghost"
+              width="100%"
+              on-click="nav:files">
+        <Row gap="8" align-items="center">
+          <Icon name="file-text" />
+          Files
+        </Row>
+      </Button>
+    </Column>
+
+    <Divider key="sidebar-divider-mid" />
+
+    <!-- Team section -->
+    <Column key="nav-team" padding="8" gap="2">
+      <Text key="nav-label-team"
+            font-size="11"
+            font-weight="bold"
+            color="#64748b"
+            padding="8 8 4 8">TEAM</Text>
+
+      <Button key="nav-members"
+              variant="ghost"
+              width="100%"
+              on-click="nav:members">
+        <Row gap="8" align-items="center">
+          <Icon name="users" />
+          Members
+        </Row>
+      </Button>
+
+      <Button key="nav-calendar"
+              variant="ghost"
+              width="100%"
+              on-click="nav:calendar">
+        <Row gap="8" align-items="center">
+          <Icon name="calendar" />
+          Calendar
+        </Row>
+      </Button>
+    </Column>
+
+    <!-- Spacer pushes settings to bottom -->
+    <Column key="sidebar-spacer" flex-grow="1" />
+
+    <Divider key="sidebar-divider-bottom" />
+
+    <!-- Settings & user -->
+    <Column key="nav-bottom" padding="8" gap="2">
+      <Button key="nav-settings"
+              variant="ghost"
+              width="100%"
+              on-click="nav:settings">
+        <Row gap="8" align-items="center">
+          <Icon name="settings" />
+          Settings
+        </Row>
+      </Button>
+
+      <Row key="user-row"
+           padding="8"
+           gap="10"
+           align-items="center">
+        <Column key="user-avatar"
+                width="32"
+                height="32"
+                background="#4f46e5"
+                radius="16"
+                align-items="center"
+                justify-content="center">
+          <Text color="#ffffff" font-weight="bold" font-size="13">A</Text>
+        </Column>
+        <Column gap="2">
+          <Text color="#e2e8f0" font-size="13" font-weight="bold">Alice Chen</Text>
+          <Text color="#64748b" font-size="11">Admin</Text>
+        </Column>
+      </Row>
+    </Column>
+  </Column>
+
+  <!-- ══════════════════════════════════════════════════════
+       MAIN CONTENT
+       ══════════════════════════════════════════════════════ -->
+  <ScrollArea key="main-content" flex-grow="1" height="100%">
+    <Column key="main-inner" padding="24" gap="24" width="100%">
+
+      <!-- ─── Page header ─── -->
+      <Row key="page-header" align-items="center" justify-content="space-between" width="100%">
+        <Column gap="4">
+          <Text key="page-title"
+                heading
+                color="#e2e8f0">Task Dashboard</Text>
+          <Text key="page-subtitle"
+                color="#64748b"
+                font-size="14">Sprint 12 · May 2026</Text>
+        </Column>
+
+        <Row gap="8" align-items="center">
+          <Button key="hdr-filter" variant="secondary" on-click="filter">
+            <Row gap="6" align-items="center">
+              <Icon name="filter" />
+              Filter
+            </Row>
+          </Button>
+          <Button key="hdr-new-task" primary on-click="new-task">
+            <Row gap="6" align-items="center">
+              <Icon name="plus" />
+              New Task
+            </Row>
+          </Button>
+        </Row>
+      </Row>
+
+      <!-- ─── KPI metric cards ─── -->
+      <Grid key="kpi-grid"
+            grid-template-columns="1fr 1fr 1fr 1fr"
+            gap="16"
+            width="100%">
+
+        <Column key="kpi-total"
+                padding="16"
+                gap="8"
+                background="#1e2333"
+                border="1 #2a2f3d"
+                radius="12">
+          <Row align-items="center" justify-content="space-between">
+            <Text color="#64748b" font-size="12" font-weight="bold">TOTAL TASKS</Text>
+            <Icon name="layers" />
+          </Row>
+          <Text color="#e2e8f0" font-size="28" font-weight="bold">48</Text>
+          <Text color="#22c55e" font-size="12">↑ 12% from last sprint</Text>
+        </Column>
+
+        <Column key="kpi-done"
+                padding="16"
+                gap="8"
+                background="#1e2333"
+                border="1 #2a2f3d"
+                radius="12">
+          <Row align-items="center" justify-content="space-between">
+            <Text color="#64748b" font-size="12" font-weight="bold">COMPLETED</Text>
+            <Icon name="check-circle" />
+          </Row>
+          <Text color="#e2e8f0" font-size="28" font-weight="bold">31</Text>
+          <Text color="#22c55e" font-size="12">↑ 8% from last sprint</Text>
+        </Column>
+
+        <Column key="kpi-progress"
+                padding="16"
+                gap="8"
+                background="#1e2333"
+                border="1 #2a2f3d"
+                radius="12">
+          <Row align-items="center" justify-content="space-between">
+            <Text color="#64748b" font-size="12" font-weight="bold">IN PROGRESS</Text>
+            <Icon name="activity" />
+          </Row>
+          <Text color="#e2e8f0" font-size="28" font-weight="bold">11</Text>
+          <Text color="#f59e0b" font-size="12">→ Steady pace</Text>
+        </Column>
+
+        <Column key="kpi-blocked"
+                padding="16"
+                gap="8"
+                background="#1e2333"
+                border="1 #2a2f3d"
+                radius="12">
+          <Row align-items="center" justify-content="space-between">
+            <Text color="#64748b" font-size="12" font-weight="bold">BLOCKED</Text>
+            <Icon name="alert-circle" />
+          </Row>
+          <Text color="#e2e8f0" font-size="28" font-weight="bold">6</Text>
+          <Text color="#ef4444" font-size="12">↑ Needs attention</Text>
+        </Column>
+      </Grid>
+
+      <!-- ─── Main two-column workspace ─── -->
+      <Row key="workspace" gap="16" width="100%" align-items="start">
+
+        <!-- Left column: task list + filters -->
+        <Column key="left-panel" flex-grow="1" gap="16">
+
+          <!-- View switcher tabs -->
+          <Column key="task-panel"
+                  background="#1e2333"
+                  border="1 #2a2f3d"
+                  radius="12"
+                  gap="0">
+
+            <Row key="task-panel-header"
+                 padding="16"
+                 align-items="center"
+                 justify-content="space-between">
+              <Tabs key="view-tabs" active-index="0">
+                <Tab label="All" />
+                <Tab label="My Tasks" />
+                <Tab label="Backlog" />
+              </Tabs>
+
+              <Row gap="8" align-items="center">
+                <Icon key="icon-search-tasks" name="search" />
+                <TextInput key="task-search"
+                           placeholder="Search tasks…"
+                           aria-label="Search tasks"
+                           width="180" />
+              </Row>
+            </Row>
+
+            <Divider key="task-panel-divider" />
+
+            <!-- Filters row -->
+            <Row key="filters-row" padding="12 16" gap="8" flex-wrap="wrap" align-items="center">
+              <Text color="#94a3b8" font-size="13">Filter by:</Text>
+
+              <Select key="priority-filter" placeholder="Priority">
+                <Option value="all">All Priorities</Option>
+                <Option value="critical">Critical</Option>
+                <Option value="high">High</Option>
+                <Option value="medium">Medium</Option>
+                <Option value="low">Low</Option>
+              </Select>
+
+              <Select key="assignee-filter" placeholder="Assignee">
+                <Option value="all">Anyone</Option>
+                <Option value="alice">Alice Chen</Option>
+                <Option value="bob">Bob Smith</Option>
+                <Option value="carol">Carol Jones</Option>
+              </Select>
+
+              <Select key="status-filter" placeholder="Status" default-value="active">
+                <Option value="all">All Statuses</Option>
+                <Option value="active">Active</Option>
+                <Option value="done">Done</Option>
+                <Option value="blocked">Blocked</Option>
+              </Select>
+
+              <Checkbox key="show-archived"
+                        label="Show archived"
+                        default-checked="false" />
+            </Row>
+
+            <Divider key="filters-divider" />
+
+            <!-- Task table -->
+            <Column key="task-table-wrap" padding="0 0 8 0">
+              <Table key="task-table"
+                     columns="Task,Assignee,Priority,Status,Due"
+                     selected-row="0">
+                <TableRow values="Redesign auth flow,Alice Chen,Critical,In Progress,May 24" />
+                <TableRow values="Write API docs,Bob Smith,High,In Progress,May 25" />
+                <TableRow values="Fix layout regressions,Alice Chen,Critical,Blocked,May 23" />
+                <TableRow values="Add dark-mode tokens,Carol Jones,Medium,Done,May 20" />
+                <TableRow values="Migrate CI pipeline,Bob Smith,High,Done,May 19" />
+                <TableRow values="Accessibility audit,Carol Jones,Medium,Backlog,May 30" />
+                <TableRow values="Performance profiling,Alice Chen,High,Backlog,Jun 2" />
+                <TableRow values="Write release notes,Bob Smith,Low,Backlog,Jun 5" />
+              </Table>
+            </Column>
+          </Column>
+
+          <!-- ─── Widget reference card ─── -->
+          <Column key="widget-ref"
+                  background="#1e2333"
+                  border="1 #2a2f3d"
+                  radius="12"
+                  padding="16"
+                  gap="16">
+            <Text heading color="#e2e8f0">Widget Reference</Text>
+            <Text color="#64748b" font-size="13">
+              Every widget and layout primitive available in RML, in one place.
+            </Text>
+
+            <!-- Forms subsection -->
+            <Column gap="12">
+              <Text color="#94a3b8" font-size="12" font-weight="bold">FORM CONTROLS</Text>
+
+              <!-- Buttons row -->
+              <Row gap="8" flex-wrap="wrap" align-items="center">
+                <Button key="btn-primary" primary on-click="action:primary">Primary</Button>
+                <Button key="btn-secondary" variant="secondary">Secondary</Button>
+                <Button key="btn-ghost" variant="ghost">Ghost</Button>
+                <Button key="btn-destructive" variant="destructive">Destructive</Button>
+                <Button key="btn-disabled" disabled>Disabled</Button>
+                <Button key="btn-loading" loading>Loading…</Button>
+              </Row>
+
+              <!-- Inputs -->
+              <Grid grid-template-columns="1fr 1fr" gap="8">
+                <TextInput key="ref-name"
+                           placeholder="Full name"
+                           default-value="Alice Chen"
+                           aria-label="Full name" />
+                <TextInput key="ref-email"
+                           placeholder="Email address"
+                           default-value="alice@horizon.dev" />
+                <TextInput key="ref-password"
+                           placeholder="Password"
+                           password />
+                <TextInput key="ref-disabled-input"
+                           placeholder="Read-only field"
+                           default-value="Cannot edit"
+                           disabled />
+              </Grid>
+
+              <!-- Textarea -->
+              <Textarea key="ref-notes"
+                        placeholder="Add a description…"
+                        default-value="This is a multi-line textarea that supports longer content. It auto-resizes with the rows attribute."
+                        rows="3" />
+
+              <!-- Checkboxes -->
+              <Row gap="16" flex-wrap="wrap" align-items="center">
+                <Checkbox key="ref-chk-on"   label="Notifications enabled"  default-checked="true" />
+                <Checkbox key="ref-chk-off"  label="Email digest"            default-checked="false" />
+                <Checkbox key="ref-chk-ind"  label="Partial selection"       indeterminate />
+                <Checkbox key="ref-chk-dis"  label="Locked option"           disabled />
+              </Row>
+
+              <!-- Radios -->
+              <Row gap="16" flex-wrap="wrap" align-items="center">
+                <Radio key="ref-radio-monthly"   value="monthly"   label="Monthly"   default-checked="true" />
+                <Radio key="ref-radio-quarterly" value="quarterly" label="Quarterly" />
+                <Radio key="ref-radio-annual"    value="annual"    label="Annual"    />
+                <Radio key="ref-radio-disabled"  value="never"     label="Never"     disabled />
+              </Row>
+
+              <!-- Selects -->
+              <Row gap="8" flex-wrap="wrap">
+                <Select key="ref-select-lang"
+                        placeholder="Language"
+                        default-value="en">
+                  <Option value="en">English</Option>
+                  <Option value="fr">Français</Option>
+                  <Option value="de">Deutsch</Option>
+                  <Option value="ja">日本語</Option>
+                  <Option value="zh">中文</Option>
+                </Select>
+
+                <Select key="ref-select-theme"
+                        placeholder="Theme"
+                        default-value="dark">
+                  <Option value="dark">Dark</Option>
+                  <Option value="light">Light</Option>
+                  <Option value="system">System</Option>
+                </Select>
+
+                <Select key="ref-select-role" placeholder="Role">
+                  <Option value="admin">Admin</Option>
+                  <Option value="editor">Editor</Option>
+                  <Option value="viewer">Viewer</Option>
+                  <Option value="guest" disabled>Guest (disabled)</Option>
+                </Select>
+              </Row>
+            </Column>
+
+            <Divider key="ref-div-1" />
+
+            <!-- Collections subsection -->
+            <Column gap="12">
+              <Text color="#94a3b8" font-size="12" font-weight="bold">COLLECTIONS</Text>
+
+              <!-- Tabs -->
+              <Tabs key="ref-tabs" active-index="1">
+                <Tab label="Overview" />
+                <Tab label="Activity" />
+                <Tab label="Settings" />
+                <Tab label="Integrations" />
+              </Tabs>
+
+              <!-- List -->
+              <Row gap="16" align-items="start">
+                <Column gap="4" flex-grow="1">
+                  <Text color="#64748b" font-size="12">List</Text>
+                  <List key="ref-list" selected-index="0">
+                    <ListItem>Inbox (12)</ListItem>
+                    <ListItem>Today</ListItem>
+                    <ListItem>Upcoming</ListItem>
+                    <ListItem>Done</ListItem>
+                    <ListItem>Archived</ListItem>
+                  </List>
+                </Column>
+
+                <!-- Tree -->
+                <Column gap="4" flex-grow="1">
+                  <Text color="#64748b" font-size="12">Tree</Text>
+                  <Tree key="ref-tree">
+                    <TreeItem label="horizon/" expanded>
+                      <TreeItem label="src/" expanded>
+                        <TreeItem label="core/" expanded>
+                          <TreeItem label="element.rs" />
+                          <TreeItem label="theme.rs" />
+                        </TreeItem>
+                        <TreeItem label="widgets/" expanded>
+                          <TreeItem label="forms.rs" />
+                          <TreeItem label="spec.rs" />
+                        </TreeItem>
+                        <TreeItem label="runtime/" />
+                        <TreeItem label="rml/" />
+                      </TreeItem>
+                      <TreeItem label="examples/">
+                        <TreeItem label="rml_widget_gallery.rml" />
+                        <TreeItem label="rml_widget_gallery.rs" />
+                      </TreeItem>
+                      <TreeItem label="Cargo.toml" />
+                    </TreeItem>
+                  </Tree>
+                </Column>
+              </Row>
+
+              <!-- Table (detailed form) -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Table — detailed column syntax</Text>
+                <Table key="ref-table-detailed" selected-row="1">
+                  <Columns>
+                    <ColumnDef>Package</ColumnDef>
+                    <ColumnDef>Version</ColumnDef>
+                    <ColumnDef>License</ColumnDef>
+                    <ColumnDef>Status</ColumnDef>
+                  </Columns>
+                  <Row>
+                    <Cell>winit</Cell>
+                    <Cell>0.30</Cell>
+                    <Cell>Apache-2.0</Cell>
+                    <Cell>Up to date</Cell>
+                  </Row>
+                  <Row>
+                    <Cell>wgpu</Cell>
+                    <Cell>22.1</Cell>
+                    <Cell>MIT/Apache-2.0</Cell>
+                    <Cell>Up to date</Cell>
+                  </Row>
+                  <Row>
+                    <Cell>pollster</Cell>
+                    <Cell>0.3</Cell>
+                    <Cell>MIT/Apache-2.0</Cell>
+                    <Cell>Up to date</Cell>
+                  </Row>
+                  <Row>
+                    <Cell>kurbo</Cell>
+                    <Cell>0.11</Cell>
+                    <Cell>Apache-2.0</Cell>
+                    <Cell>Update available</Cell>
+                  </Row>
+                </Table>
+              </Column>
+
+              <!-- Menu -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Menu with shortcuts</Text>
+                <Menu key="ref-menu">
+                  <MenuItem key="m-new"       on-click="file:new"     shortcut="Ctrl+N">New File</MenuItem>
+                  <MenuItem key="m-open"      on-click="file:open"    shortcut="Ctrl+O">Open…</MenuItem>
+                  <MenuItem key="m-save"      on-click="file:save"    shortcut="Ctrl+S">Save</MenuItem>
+                  <MenuItem key="m-save-as"   on-click="file:save-as" shortcut="Ctrl+Shift+S">Save As…</MenuItem>
+                  <MenuItem key="m-export"    on-click="file:export"  shortcut="Ctrl+E">Export</MenuItem>
+                  <MenuItem key="m-delete-op" shortcut="Del"          disabled>Delete (no permission)</MenuItem>
+                </Menu>
+              </Column>
+
+              <!-- Context menu demo -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Context menu — right-click the button</Text>
+                <Button key="ctx-host" variant="secondary">
+                  Right-click me for context menu
+                  <ContextMenu slot="context-menu" key="ctx-menu">
+                    <MenuItem key="ctx-copy"      action="copy"      shortcut="Ctrl+C">Copy</MenuItem>
+                    <MenuItem key="ctx-cut"       action="cut"       shortcut="Ctrl+X">Cut</MenuItem>
+                    <MenuItem key="ctx-paste"     action="paste"     shortcut="Ctrl+V">Paste</MenuItem>
+                    <MenuItem key="ctx-duplicate" action="duplicate" shortcut="Ctrl+D">Duplicate</MenuItem>
+                    <MenuItem key="ctx-delete"    action="delete"    shortcut="Del">Delete</MenuItem>
+                  </ContextMenu>
+                </Button>
+              </Column>
+            </Column>
+
+            <Divider key="ref-div-2" />
+
+            <!-- Overlays subsection -->
+            <Column gap="12">
+              <Text color="#94a3b8" font-size="12" font-weight="bold">OVERLAYS</Text>
+
+              <Row gap="8" flex-wrap="wrap" align-items="center">
+
+                <!-- Popover -->
+                <Button key="popover-btn">
+                  Open Popover
+                  <Popover slot="popover" key="ref-popover">
+                    <Column padding="12" gap="8" width="200">
+                      <Text font-weight="bold" color="#e2e8f0">Quick Actions</Text>
+                      <Divider />
+                      <Button key="pop-profile"  variant="ghost" width="100%" on-click="goto:profile">
+                        <Row gap="8" align-items="center"><Icon name="user" />View Profile</Row>
+                      </Button>
+                      <Button key="pop-settings" variant="ghost" width="100%" on-click="goto:settings">
+                        <Row gap="8" align-items="center"><Icon name="settings" />Settings</Row>
+                      </Button>
+                      <Divider />
+                      <Button key="pop-logout" variant="destructive" width="100%" on-click="auth:logout">
+                        <Row gap="8" align-items="center"><Icon name="log-out" />Log Out</Row>
+                      </Button>
+                    </Column>
+                  </Popover>
+                </Button>
+
+                <!-- Tooltip -->
+                <Tooltip key="ref-tooltip" text="Tooltips attach to any element and appear on hover. Use them for non-obvious controls." />
+
+                <!-- Modal trigger -->
+                <Button key="modal-trigger" variant="secondary" on-click="modal:open">
+                  Open Modal
+                </Button>
+              </Row>
+
+              <!-- Modal (initially closed) -->
+              <Modal key="ref-modal"
+                     open="false"
+                     title="Confirm Action"
+                     close-on-escape
+                     close-on-outside-click>
+                <Column padding="16" gap="16" width="400">
+                  <Text heading color="#e2e8f0">Delete Project?</Text>
+                  <Text color="#94a3b8">
+                    This will permanently delete the project and all associated
+                    tasks, comments, and files. This action cannot be undone.
+                  </Text>
+                  <TextInput key="modal-confirm-input"
+                             placeholder="Type DELETE to confirm"
+                             aria-label="Confirmation input" />
+                  <Row gap="8" justify-content="end">
+                    <Button key="modal-cancel"  variant="secondary" on-click="modal:cancel">Cancel</Button>
+                    <Button key="modal-confirm" variant="destructive" on-click="modal:confirm">Delete Project</Button>
+                  </Row>
+                </Column>
+              </Modal>
+            </Column>
+
+            <Divider key="ref-div-3" />
+
+            <!-- Layout subsection -->
+            <Column gap="12">
+              <Text color="#94a3b8" font-size="12" font-weight="bold">LAYOUT PRIMITIVES</Text>
+
+              <!-- Stack demo -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Stack — layers rendered on top of each other</Text>
+                <Stack key="stack-demo" width="300" height="100" background="#0f1117" radius="8" border="1 #2a2f3d">
+                  <Column padding="12" gap="4">
+                    <Text color="#64748b" font-size="13">Background layer</Text>
+                    <Text color="#475569" font-size="11">Additional content here</Text>
+                  </Column>
+                  <Button key="stack-badge"
+                          z-index="2"
+                          position="absolute"
+                          inset="8 8 auto auto"
+                          variant="secondary">Badge</Button>
+                </Stack>
+              </Column>
+
+              <!-- Absolute demo -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Absolute — free-positioned children</Text>
+                <Absolute key="abs-demo" width="300" height="80" background="#0f1117" radius="8" border="1 #2a2f3d">
+                  <Button key="abs-tl" position="absolute" inset="8 auto auto 8"  variant="ghost">Top-Left</Button>
+                  <Button key="abs-br" position="absolute" inset="auto 8 8 auto"  variant="ghost">Bottom-Right</Button>
+                  <Button key="abs-c"  position="absolute" inset="28 auto auto 110" primary>Center</Button>
+                </Absolute>
+              </Column>
+
+              <!-- Grid demo -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Grid — template columns with mixed units</Text>
+                <Grid key="grid-demo"
+                      grid-template-columns="2fr 1fr 1fr"
+                      gap="8"
+                      padding="12"
+                      background="#0f1117"
+                      radius="8"
+                      border="1 #2a2f3d">
+                  <Column padding="8" background="#1e2333" radius="6">
+                    <Text color="#e2e8f0" font-size="13" font-weight="bold">Wide column (2fr)</Text>
+                    <Text color="#64748b" font-size="11">Spans two fractional units</Text>
+                  </Column>
+                  <Column padding="8" background="#1e2333" radius="6" align-items="center">
+                    <Text color="#e2e8f0" font-size="22" font-weight="bold">31</Text>
+                    <Text color="#64748b" font-size="11">Done</Text>
+                  </Column>
+                  <Column padding="8" background="#1e2333" radius="6" align-items="center">
+                    <Text color="#e2e8f0" font-size="22" font-weight="bold">11</Text>
+                    <Text color="#64748b" font-size="11">Active</Text>
+                  </Column>
+                  <Column padding="8" background="#2a1f3d" radius="6">
+                    <Text color="#a78bfa" font-size="13" font-weight="bold">Spans row 2</Text>
+                  </Column>
+                  <Column padding="8" background="#1f2a1f" radius="6" align-items="center">
+                    <Text color="#4ade80" font-size="22" font-weight="bold">6</Text>
+                    <Text color="#64748b" font-size="11">New</Text>
+                  </Column>
+                  <Column padding="8" background="#2a1f1f" radius="6" align-items="center">
+                    <Text color="#f87171" font-size="22" font-weight="bold">6</Text>
+                    <Text color="#64748b" font-size="11">Blocked</Text>
+                  </Column>
+                </Grid>
+              </Column>
+
+              <!-- Scroll area -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">ScrollArea — overflowing content</Text>
+                <ScrollArea key="scroll-demo"
+                            height="130"
+                            background="#0f1117"
+                            radius="8"
+                            border="1 #2a2f3d">
+                  <Column gap="1" padding="4">
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Fix navigation flicker on scroll</Text>
+                      <Text color="#f59e0b" font-size="11">In Progress</Text>
+                    </Row>
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Add keyboard shortcuts to menu</Text>
+                      <Text color="#22c55e" font-size="11">Done</Text>
+                    </Row>
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Implement drag-and-drop reorder</Text>
+                      <Text color="#94a3b8" font-size="11">Backlog</Text>
+                    </Row>
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Write unit tests for layout engine</Text>
+                      <Text color="#ef4444" font-size="11">Blocked</Text>
+                    </Row>
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Accessibility pass on all widgets</Text>
+                      <Text color="#94a3b8" font-size="11">Backlog</Text>
+                    </Row>
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Performance profiling pass</Text>
+                      <Text color="#94a3b8" font-size="11">Backlog</Text>
+                    </Row>
+                    <Row padding="8 12" align-items="center" justify-content="space-between">
+                      <Text color="#e2e8f0" font-size="13">Set up error telemetry</Text>
+                      <Text color="#94a3b8" font-size="11">Backlog</Text>
+                    </Row>
+                  </Column>
+                </ScrollArea>
+              </Column>
+
+              <!-- Canvas placeholder -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Canvas — custom painted surface</Text>
+                <Canvas key="chart-canvas"
+                        name="sprint-burndown"
+                        width="100%"
+                        height="120" />
+              </Column>
+            </Column>
+
+            <Divider key="ref-div-4" />
+
+            <!-- Primitives subsection -->
+            <Column gap="12">
+              <Text color="#94a3b8" font-size="12" font-weight="bold">PRIMITIVES</Text>
+
+              <!-- Icons -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Icons</Text>
+                <Row gap="12" align-items="center" flex-wrap="wrap">
+                  <Icon key="ico-home"        name="home" />
+                  <Icon key="ico-search"      name="search" />
+                  <Icon key="ico-settings"    name="settings" />
+                  <Icon key="ico-user"        name="user" />
+                  <Icon key="ico-users"       name="users" />
+                  <Icon key="ico-folder"      name="folder" />
+                  <Icon key="ico-file"        name="file-text" />
+                  <Icon key="ico-calendar"    name="calendar" />
+                  <Icon key="ico-check"       name="check-circle" />
+                  <Icon key="ico-alert"       name="alert-circle" />
+                  <Icon key="ico-activity"    name="activity" />
+                  <Icon key="ico-filter"      name="filter" />
+                  <Icon key="ico-plus"        name="plus" />
+                  <Icon key="ico-layers"      name="layers" />
+                  <Icon key="ico-logout"      name="log-out" />
+                </Row>
+              </Column>
+
+              <!-- Text styles -->
+              <Column gap="4">
+                <Text color="#64748b" font-size="12">Text styles</Text>
+                <Column gap="6">
+                  <Text heading color="#e2e8f0">Heading (24px bold)</Text>
+                  <Text color="#e2e8f0" font-size="16">Body large (16px)</Text>
+                  <Text color="#94a3b8" font-size="14">Body regular (14px)</Text>
+                  <Text color="#64748b" font-size="12">Caption (12px)</Text>
+                  <Text color="#4ade80" font-weight="bold">Success — bold colored</Text>
+                  <Text color="#f87171" font-style="italic">Error — italic colored</Text>
+                  <Text color="#f59e0b" font-size="11">Warning — small</Text>
+                </Column>
+              </Column>
+
+              <!-- Dividers -->
+              <Column gap="8">
+                <Text color="#64748b" font-size="12">Dividers</Text>
+                <Column gap="4">
+                  <Text color="#94a3b8">Above divider</Text>
+                  <Divider key="ref-divider-a" />
+                  <Text color="#94a3b8">Between dividers</Text>
+                  <Divider key="ref-divider-b" />
+                  <Text color="#94a3b8">Below divider</Text>
+                </Column>
+              </Column>
+            </Column>
+          </Column>
+        </Column>
+
+        <!-- Right column: activity feed + quick actions -->
+        <Column key="right-panel" width="280" gap="16">
+
+          <!-- Quick-add task form -->
+          <Column key="quick-add"
+                  background="#1e2333"
+                  border="1 #2a2f3d"
+                  radius="12"
+                  padding="16"
+                  gap="12">
+            <Text font-weight="bold" color="#e2e8f0">Quick Add Task</Text>
+
+            <TextInput key="quick-title"
+                       placeholder="Task title"
+                       aria-label="Task title" />
+
+            <Textarea key="quick-desc"
+                      placeholder="Description (optional)"
+                      rows="2" />
+
+            <Select key="quick-priority" placeholder="Priority" default-value="medium">
+              <Option value="critical">🔴 Critical</Option>
+              <Option value="high">🟠 High</Option>
+              <Option value="medium">🟡 Medium</Option>
+              <Option value="low">🟢 Low</Option>
+            </Select>
+
+            <Select key="quick-assignee" placeholder="Assignee">
+              <Option value="alice">Alice Chen</Option>
+              <Option value="bob">Bob Smith</Option>
+              <Option value="carol">Carol Jones</Option>
+            </Select>
+
+            <Row gap="8">
+              <Checkbox key="quick-notify"
+                        label="Notify assignee"
+                        default-checked="true" />
+            </Row>
+
+            <Button key="quick-submit" primary width="100%" on-click="task:create">
+              <Row gap="6" align-items="center" justify-content="center">
+                <Icon name="plus" />
+                Add Task
+              </Row>
+            </Button>
+          </Column>
+
+          <!-- Activity feed -->
+          <Column key="activity"
+                  background="#1e2333"
+                  border="1 #2a2f3d"
+                  radius="12"
+                  padding="16"
+                  gap="12">
+            <Row align-items="center" justify-content="space-between">
+              <Text font-weight="bold" color="#e2e8f0">Recent Activity</Text>
+              <Button key="activity-clear" variant="ghost" on-click="activity:clear">
+                Clear
+              </Button>
+            </Row>
+
+            <ScrollArea key="activity-feed" height="320">
+              <Column gap="0">
+
+                <Row key="act-1" padding="10 0" gap="10" align-items="start">
+                  <Column key="act-1-avatar"
+                          width="28" height="28"
+                          background="#4f46e5"
+                          radius="14"
+                          align-items="center"
+                          justify-content="center">
+                    <Text color="#fff" font-size="11" font-weight="bold">A</Text>
+                  </Column>
+                  <Column gap="2" flex-grow="1">
+                    <Row gap="4">
+                      <Text color="#e2e8f0" font-size="13" font-weight="bold">Alice</Text>
+                      <Text color="#e2e8f0" font-size="13">completed "Add dark-mode tokens"</Text>
+                    </Row>
+                    <Text color="#64748b" font-size="11">2 minutes ago</Text>
+                  </Column>
+                </Row>
+
+                <Divider />
+
+                <Row key="act-2" padding="10 0" gap="10" align-items="start">
+                  <Column key="act-2-avatar"
+                          width="28" height="28"
+                          background="#0891b2"
+                          radius="14"
+                          align-items="center"
+                          justify-content="center">
+                    <Text color="#fff" font-size="11" font-weight="bold">B</Text>
+                  </Column>
+                  <Column gap="2" flex-grow="1">
+                    <Row gap="4">
+                      <Text color="#e2e8f0" font-size="13" font-weight="bold">Bob</Text>
+                      <Text color="#e2e8f0" font-size="13">left a comment on "API docs"</Text>
+                    </Row>
+                    <Text color="#64748b" font-size="11">18 minutes ago</Text>
+                  </Column>
+                </Row>
+
+                <Divider />
+
+                <Row key="act-3" padding="10 0" gap="10" align-items="start">
+                  <Column key="act-3-avatar"
+                          width="28" height="28"
+                          background="#059669"
+                          radius="14"
+                          align-items="center"
+                          justify-content="center">
+                    <Text color="#fff" font-size="11" font-weight="bold">C</Text>
+                  </Column>
+                  <Column gap="2" flex-grow="1">
+                    <Row gap="4">
+                      <Text color="#e2e8f0" font-size="13" font-weight="bold">Carol</Text>
+                      <Text color="#e2e8f0" font-size="13">assigned you "Accessibility audit"</Text>
+                    </Row>
+                    <Text color="#64748b" font-size="11">1 hour ago</Text>
+                  </Column>
+                </Row>
+
+                <Divider />
+
+                <Row key="act-4" padding="10 0" gap="10" align-items="start">
+                  <Column key="act-4-avatar"
+                          width="28" height="28"
+                          background="#4f46e5"
+                          radius="14"
+                          align-items="center"
+                          justify-content="center">
+                    <Text color="#fff" font-size="11" font-weight="bold">A</Text>
+                  </Column>
+                  <Column gap="2" flex-grow="1">
+                    <Row gap="4">
+                      <Text color="#e2e8f0" font-size="13" font-weight="bold">Alice</Text>
+                      <Text color="#e2e8f0" font-size="13">marked "Fix layout regressions" as Blocked</Text>
+                    </Row>
+                    <Text color="#64748b" font-size="11">3 hours ago</Text>
+                  </Column>
+                </Row>
+
+                <Divider />
+
+                <Row key="act-5" padding="10 0" gap="10" align-items="start">
+                  <Column key="act-5-avatar"
+                          width="28" height="28"
+                          background="#0891b2"
+                          radius="14"
+                          align-items="center"
+                          justify-content="center">
+                    <Text color="#fff" font-size="11" font-weight="bold">B</Text>
+                  </Column>
+                  <Column gap="2" flex-grow="1">
+                    <Row gap="4">
+                      <Text color="#e2e8f0" font-size="13" font-weight="bold">Bob</Text>
+                      <Text color="#e2e8f0" font-size="13">completed "Migrate CI pipeline"</Text>
+                    </Row>
+                    <Text color="#64748b" font-size="11">Yesterday</Text>
+                  </Column>
+                </Row>
+
+              </Column>
+            </ScrollArea>
+          </Column>
+
+          <!-- Team status panel -->
+          <Column key="team-status"
+                  background="#1e2333"
+                  border="1 #2a2f3d"
+                  radius="12"
+                  padding="16"
+                  gap="12">
+            <Text font-weight="bold" color="#e2e8f0">Team Status</Text>
+
+            <Column gap="8">
+              <Row align-items="center" justify-content="space-between">
+                <Row gap="8" align-items="center">
+                  <Column width="8" height="8" background="#22c55e" radius="4" />
+                  <Text color="#e2e8f0" font-size="13">Alice Chen</Text>
+                </Row>
+                <Text color="#64748b" font-size="11">3 tasks</Text>
+              </Row>
+
+              <Row align-items="center" justify-content="space-between">
+                <Row gap="8" align-items="center">
+                  <Column width="8" height="8" background="#22c55e" radius="4" />
+                  <Text color="#e2e8f0" font-size="13">Bob Smith</Text>
+                </Row>
+                <Text color="#64748b" font-size="11">2 tasks</Text>
+              </Row>
+
+              <Row align-items="center" justify-content="space-between">
+                <Row gap="8" align-items="center">
+                  <Column width="8" height="8" background="#f59e0b" radius="4" />
+                  <Text color="#e2e8f0" font-size="13">Carol Jones</Text>
+                </Row>
+                <Text color="#64748b" font-size="11">Away</Text>
+              </Row>
+            </Column>
+          </Column>
+        </Column>
+      </Row>
+    </Column>
+  </ScrollArea>
+</Row>

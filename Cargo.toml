@@ -1,0 +1,42 @@
+[package]
+name = "rgui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bytemuck = { version = "1.25", features = ["derive"] }
+image = "0.25"
+kurbo = "0.11"
+pollster = "0.4"
+quick-xml = { version = "0.37", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+taffy = "0.10.1"
+thiserror = "2"
+glyphon = "0.11.0"
+wgpu = "29"
+winit = "0.30"
+arboard = "3.4.0"
+
+[features]
+default = ["text", "images", "accessibility", "debug"]
+text = []
+images = []
+svg = []
+accessibility = []
+accesskit = []
+serde = ["dep:serde"]
+debug = []
+html = []
+rml = ["dep:quick-xml"]
+tailwind = []
+css = []
+canvas = []
+bitmap-text-fallback = []
+
+[[example]]
+name = "rml_showcase"
+required-features = ["rml"]
+
+[[example]]
+name = "rml_widget_gallery"
+required-features = ["rml"]
