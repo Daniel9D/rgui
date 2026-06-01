@@ -52,6 +52,8 @@ pub fn role_for_widget_kind(kind: WidgetKind) -> Role {
         WidgetKind::Link => Role::Link,
         WidgetKind::Alert => Role::Alert,
         WidgetKind::Card => Role::Card,
+        WidgetKind::Menu => Role::Menu,
+        WidgetKind::MenuItem => Role::MenuItem,
         _ => Role::Group,
     }
 }

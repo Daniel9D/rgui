@@ -180,6 +180,7 @@ impl Element {
                 WidgetSpec::Button(bs) => bs.label = Some(value),
                 WidgetSpec::Checkbox(cs) => cs.label = Some(value),
                 WidgetSpec::Radio(rs) => rs.label = Some(value),
+                WidgetSpec::MenuItem(mi) => mi.label = value,
                 _ => {}
             }
         }

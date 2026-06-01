@@ -63,16 +63,13 @@ pub fn context_menu() -> Element {
 
 /// Creates a single menu item element backed by a [`MenuItemSpec`].
 ///
-/// Use [`Element::on_click`] to attach an action and [`Element::variant`]
-/// or style overrides to control appearance.
+/// Use [`Element::on_click`] to attach an action, [`Element::label`] to
+/// change the label, and `.disabled(true)` to disable it.
 pub fn menu_item(label: impl Into<String>) -> Element {
     let label = label.into();
-    Element::new(ElementKind::Widget(WidgetKind::Menu))
-        .widget_spec(WidgetSpec::Menu(MenuSpec {
-            items: vec![MenuItemSpec {
-                label: label.clone(),
-                ..Default::default()
-            }],
+    Element::new(ElementKind::Widget(WidgetKind::MenuItem))
+        .widget_spec(WidgetSpec::MenuItem(MenuItemSpec {
+            label,
+            ..Default::default()
         }))
-        .child(Element::text(label))
 }

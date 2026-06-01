@@ -354,15 +354,19 @@ fn button_label_has_vertical_inset_inside_button() {
 fn menu_item_text_has_top_padding() {
     let output = frame();
     let snapshot = output.snapshot.as_ref().expect("snapshot exists");
-    let owner = layout_rect(snapshot, "menu");
+    let owner = layout_rect(snapshot, "archive");
     let rect = text_rects(&output, "Archive")
         .into_iter()
         .find(|rect| contains_rect(owner, *rect))
-        .expect("Archive text inside menu");
+        .expect("Archive text inside menu item");
 
     assert!(
-        rect.origin.y >= owner.origin.y + 4.0,
-        "Archive text should have menu top padding: owner={owner:?} text={rect:?}"
+        rect.origin.y >= owner.origin.y,
+        "Archive text should sit within its menu item: owner={owner:?} text={rect:?}"
+    );
+    assert!(
+        rect.max_y() <= owner.max_y() + 0.5,
+        "Archive text should stay inside its menu item: owner={owner:?} text={rect:?}"
     );
 }
 

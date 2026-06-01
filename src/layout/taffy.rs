@@ -680,6 +680,7 @@ fn base_taffy_style(
                 | WidgetKind::Modal
                 | WidgetKind::Popover
                 | WidgetKind::Tooltip
+                | WidgetKind::Menu
         );
         if is_hug_kind {
             if style.display.is_none() {
@@ -702,6 +703,14 @@ fn base_taffy_style(
             taffy_style.padding.top,
             theme.widgets.metrics.tabs.tab_height,
         );
+    }
+    if matches!(node.kind, ElementKind::Widget(WidgetKind::Menu)) {
+        let item_padding = theme.widgets.metrics.menu.item_padding;
+        taffy_style.padding.top = max_length_percentage(taffy_style.padding.top, item_padding);
+        taffy_style.padding.bottom =
+            max_length_percentage(taffy_style.padding.bottom, item_padding);
+        taffy_style.padding.left = max_length_percentage(taffy_style.padding.left, item_padding);
+        taffy_style.padding.right = max_length_percentage(taffy_style.padding.right, item_padding);
     }
     if node.parent.is_none() {
         let is_overlay = matches!(

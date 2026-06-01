@@ -163,6 +163,7 @@ pub struct WidgetMetrics {
     pub table: TableMetrics,
     pub list: ListMetrics,
     pub menu: MenuMetrics,
+    pub menu_item: MenuItemTheme,
     pub icon: IconMetrics,
     pub divider: DividerMetrics,
     pub canvas: CanvasMetrics,
@@ -246,6 +247,12 @@ pub struct MenuMetrics {
     pub min_size: Size,
     pub item_height: f32,
     pub item_padding: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MenuItemTheme {
+    pub default_size: Size,
+    pub padding: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -427,6 +434,10 @@ impl Default for WidgetMetrics {
                 item_height: 22.0,
                 item_padding: 8.0,
             },
+            menu_item: MenuItemTheme {
+                default_size: Size::new(120.0, 22.0),
+                padding: 8.0,
+            },
             icon: IconMetrics {
                 default_size: Size::new(24.0, 24.0),
             },
@@ -508,6 +519,7 @@ impl WidgetMetrics {
             WidgetKind::Table => self.table.min_size,
             WidgetKind::List => self.list.min_size,
             WidgetKind::Menu => self.menu.min_size,
+            WidgetKind::MenuItem => self.menu_item.default_size,
             WidgetKind::Icon => self.icon.default_size,
             WidgetKind::Divider => self.divider.default_size,
             WidgetKind::Canvas => self.canvas.default_size,
@@ -583,6 +595,7 @@ pub enum WidgetKind {
     Popover,
     Tooltip,
     Menu,
+    MenuItem,
     ScrollArea,
     List,
     Canvas,

@@ -447,19 +447,25 @@ mod rml_tests {
         "#,
         );
         assert!(matches!(el.widget_spec, Some(WidgetSpec::Menu(_))));
-        if let Some(WidgetSpec::Menu(ref spec)) = el.widget_spec {
-            assert_eq!(spec.items.len(), 2);
-            assert_eq!(spec.items[0].label, "Archive");
-            assert_eq!(spec.items[0].action.as_deref(), Some("archive"));
-            assert_eq!(spec.items[0].shortcut.as_deref(), Some("Ctrl+A"));
-            assert!(!spec.items[0].disabled);
-            assert_eq!(spec.items[1].action.as_deref(), Some("delete"));
-            assert!(spec.items[1].disabled);
-        }
         assert_eq!(el.children.len(), 2);
-        let item = &el.children[0];
+        let first = &el.children[0];
+        let Some(WidgetSpec::MenuItem(ref archive_spec)) = first.widget_spec else {
+            panic!("expected first child to be a MenuItem spec");
+        };
+        assert_eq!(archive_spec.label, "Archive");
+        assert_eq!(archive_spec.action.as_deref(), Some("archive"));
+        assert_eq!(archive_spec.shortcut.as_deref(), Some("Ctrl+A"));
+        assert!(!archive_spec.disabled);
+
+        let second = &el.children[1];
+        let Some(WidgetSpec::MenuItem(ref delete_spec)) = second.widget_spec else {
+            panic!("expected second child to be a MenuItem spec");
+        };
+        assert_eq!(delete_spec.action.as_deref(), Some("delete"));
+        assert!(delete_spec.disabled);
+
         assert_eq!(
-            item.event_handlers.on_click_action.as_deref(),
+            first.event_handlers.on_click_action.as_deref(),
             Some("archive")
         );
     }
@@ -473,14 +479,14 @@ mod rml_tests {
             </ContextMenu>
         "#,
         );
-        if let Some(WidgetSpec::Menu(ref spec)) = el.widget_spec {
-            assert_eq!(spec.items.len(), 1);
-            assert_eq!(spec.items[0].label, "Copy");
-            assert_eq!(spec.items[0].action.as_deref(), Some("copy"));
-            assert_eq!(spec.items[0].shortcut.as_deref(), Some("Ctrl+C"));
-        } else {
-            panic!("expected context menu to lower as menu spec");
-        }
+        assert!(matches!(el.widget_spec, Some(WidgetSpec::Menu(_))));
+        assert_eq!(el.children.len(), 1);
+        let Some(WidgetSpec::MenuItem(ref copy_spec)) = el.children[0].widget_spec else {
+            panic!("expected MenuItem child");
+        };
+        assert_eq!(copy_spec.label, "Copy");
+        assert_eq!(copy_spec.action.as_deref(), Some("copy"));
+        assert_eq!(copy_spec.shortcut.as_deref(), Some("Ctrl+C"));
     }
 
     // ── Phase 4: Overlays ─────────────────────────────────────────────────────

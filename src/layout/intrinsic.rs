@@ -27,6 +27,14 @@ pub fn intrinsic_widget_size(input: WidgetIntrinsicInput, metrics: &WidgetMetric
         }
         WidgetKind::Tabs => metrics.tabs.min_size,
         WidgetKind::Menu => metrics.menu.min_size,
+        WidgetKind::MenuItem => {
+            let item = metrics.menu_item;
+            let width = input
+                .label_width
+                .map(|w| w + item.padding * 2.0)
+                .unwrap_or(item.default_size.width);
+            Size::new(width.max(item.default_size.width), item.default_size.height)
+        }
         kind => metrics.min_size_for(kind),
     };
 

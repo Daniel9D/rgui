@@ -13,6 +13,7 @@ pub enum WidgetSpec {
     Table(TableSpec),
     List(ListSpec),
     Menu(MenuSpec),
+    MenuItem(MenuItemSpec),
     Modal(ModalSpec),
     Popover(PopoverSpec),
     Tooltip(TooltipSpec),
@@ -44,6 +45,7 @@ impl WidgetSpec {
             WidgetSpec::Table(_) => WidgetKind::Table,
             WidgetSpec::List(_) => WidgetKind::List,
             WidgetSpec::Menu(_) => WidgetKind::Menu,
+            WidgetSpec::MenuItem(_) => WidgetKind::MenuItem,
             WidgetSpec::Modal(_) => WidgetKind::Modal,
             WidgetSpec::Popover(_) => WidgetKind::Popover,
             WidgetSpec::Tooltip(_) => WidgetKind::Tooltip,
@@ -200,9 +202,7 @@ pub struct ListSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
-pub struct MenuSpec {
-    pub items: Vec<MenuItemSpec>,
-}
+pub struct MenuSpec {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
@@ -368,6 +368,7 @@ pub fn spec_label(spec: &WidgetSpec) -> Option<String> {
         WidgetSpec::Tooltip(ts) => ts.text.clone(),
         WidgetSpec::Icon(is) => Some(is.name.clone()),
         WidgetSpec::Modal(ms) => ms.title.clone(),
+        WidgetSpec::MenuItem(mi) => Some(mi.label.clone()),
         _ => None,
     }
 }
@@ -382,6 +383,7 @@ pub fn spec_label_str(spec: &WidgetSpec) -> Option<&str> {
         WidgetSpec::Tooltip(ts) => ts.text.as_deref(),
         WidgetSpec::Icon(is) => Some(is.name.as_str()),
         WidgetSpec::Modal(ms) => ms.title.as_deref(),
+        WidgetSpec::MenuItem(mi) => Some(mi.label.as_str()),
         _ => None,
     }
 }

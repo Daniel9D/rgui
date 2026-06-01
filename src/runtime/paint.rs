@@ -401,6 +401,7 @@ fn widget_painter_for(kind: WidgetKind) -> Box<dyn WidgetPainter> {
         WidgetKind::List         => Box::new(ListPainter),
         WidgetKind::ScrollArea   => Box::new(ScrollAreaPainter),
         WidgetKind::Menu         => Box::new(MenuPainter),
+        WidgetKind::MenuItem     => Box::new(MenuItemPainter),
         WidgetKind::Tooltip      => Box::new(TooltipPainter),
         WidgetKind::Icon         => Box::new(IconPainter),
         WidgetKind::Divider      => Box::new(DividerPainter),
@@ -1176,60 +1177,61 @@ impl WidgetPainter for MenuPainter {
         ctx.theme.colors.background
     }
 
-    /// Menu items with optional keyboard shortcut hints.
-    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
-        let mut spec_items: &Vec<crate::MenuItemSpec> = &vec![];
-        if let Some(crate::WidgetSpec::Menu(ref menu_spec)) = ctx.node.widget_spec {
-            spec_items = &menu_spec.items;
-        }
-        let default_items = vec![
-            crate::MenuItemSpec {
-                label: "Open".to_string(),
-                action: None,
-                disabled: false,
-                shortcut: None,
-            },
-            crate::MenuItemSpec {
-                label: "Save".to_string(),
-                action: None,
-                disabled: false,
-                shortcut: None,
-            },
-            crate::MenuItemSpec {
-                label: "Exit".to_string(),
-                action: None,
-                disabled: false,
-                shortcut: None,
-            },
-        ];
-        let items: &Vec<crate::MenuItemSpec> =
-            if spec_items.is_empty() { &default_items } else { spec_items };
+    /// The Menu container only paints its own backdrop. Each `MenuItem` child
+    /// is a separate `WidgetKind::MenuItem` node and is painted by
+    /// `MenuItemPainter` as part of the normal tree walk. An empty menu
+    /// (no `MenuItem` children) renders just the surface.
+    fn paint_content(&self, _ctx: &mut PaintCtx<'_>, _cmds: &mut Vec<PaintedCommand>) {}
+}
 
-        for (i, item) in items.iter().enumerate() {
-            let y = ctx.rect.origin.y
-                + ctx.metrics.metrics.menu.item_padding
-                + i as f32 * ctx.metrics.metrics.menu.item_height;
-            let text_color =
-                if item.disabled { ctx.style.text_muted_color } else { ctx.style.text_color };
-            let text_y =
-                y + ctx.metrics.metrics.menu.item_height * 0.5 + ctx.style.font_size * 0.3;
+// ── MenuItem ──────────────────────────────────────────────────────────────────
+
+struct MenuItemPainter;
+impl WidgetPainter for MenuItemPainter {
+    /// Items are transparent against the parent Menu's background unless the
+    /// theme provides a hover/selection variant via `ResolvedWidgetStyle`.
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        if ctx.state.hovered {
+            ctx.theme.colors.surface_hover
+        } else {
+            ctx.theme.colors.background
+        }
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    /// Paint label on the left, optional shortcut hint on the right.
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        let item_height = ctx.metrics.metrics.menu.item_height;
+        let padding = ctx.metrics.metrics.menu.item_padding;
+        let (label, shortcut, disabled) =
+            if let Some(crate::WidgetSpec::MenuItem(ref spec)) = ctx.node.widget_spec {
+                (spec.label.clone(), spec.shortcut.clone(), spec.disabled)
+            } else {
+                (String::new(), None, false)
+            };
+        let text_color = if disabled { ctx.style.text_muted_color } else { ctx.style.text_color };
+        let baseline = ctx.rect.origin.y
+            + (ctx.rect.size.height.max(item_height)) * 0.5
+            + ctx.style.font_size * 0.3;
+        cmds.push(text_at(
+            label,
+            Point::new(ctx.rect.origin.x + padding, baseline),
+            text_color,
+            ctx.z_index + 2,
+        ));
+        if let Some(shortcut) = shortcut {
             cmds.push(text_at(
-                item.label.clone(),
-                Point::new(ctx.rect.origin.x + ctx.metrics.metrics.menu.item_padding, text_y),
-                text_color,
+                shortcut,
+                Point::new(
+                    ctx.rect.max_x() - padding * 6.0,
+                    baseline,
+                ),
+                ctx.style.text_muted_color,
                 ctx.z_index + 2,
             ));
-            if let Some(ref shortcut) = item.shortcut {
-                cmds.push(text_at(
-                    shortcut.clone(),
-                    Point::new(
-                        ctx.rect.max_x() - ctx.metrics.metrics.menu.item_padding * 6.0,
-                        text_y,
-                    ),
-                    ctx.style.text_muted_color,
-                    ctx.z_index + 2,
-                ));
-            }
         }
     }
 }

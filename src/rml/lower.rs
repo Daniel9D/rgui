@@ -12,7 +12,7 @@ use crate::widgets::{
     slider, spinner, switch, tab, table, tabs, text, textarea, tooltip, tree, tree_item,
 };
 use crate::{
-    Background, Border, Element, Length, MenuItemSpec, Overflow, Paint, Radius, SelectOption,
+    Background, Border, Element, Length, Overflow, Paint, Radius, SelectOption,
     Style, TextStyle, WidgetSpec,
 };
 
@@ -924,11 +924,7 @@ fn lower_menu(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<Element,
     for child in &node.children {
         if let RmlChild::Element(item_node) = child {
             if item_node.tag == "MenuItem" {
-                let item_spec = lower_menu_item_spec(item_node)?;
                 let item_el = lower_menu_item(item_node, warnings)?;
-                if let Some(WidgetSpec::Menu(ref mut spec)) = el.widget_spec {
-                    spec.items.push(item_spec);
-                }
                 el = el.child(item_el);
             } else {
                 warnings.push(RmlWarning {
@@ -948,11 +944,7 @@ fn lower_context_menu(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<
     for child in &node.children {
         if let RmlChild::Element(item_node) = child {
             if item_node.tag == "MenuItem" {
-                let item_spec = lower_menu_item_spec(item_node)?;
                 let item_el = lower_menu_item(item_node, warnings)?;
-                if let Some(WidgetSpec::Menu(ref mut spec)) = el.widget_spec {
-                    spec.items.push(item_spec);
-                }
                 el = el.child(item_el);
             } else {
                 warnings.push(RmlWarning {
@@ -968,19 +960,6 @@ fn lower_context_menu(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<
     Ok(el)
 }
 
-fn lower_menu_item_spec(node: &RmlNode) -> Result<MenuItemSpec, RmlError> {
-    let span = node.span;
-    let label = menu_item_label(node);
-    let action =
-        attr_str(&node.attributes, "action").or_else(|| attr_str(&node.attributes, "on-click"));
-    Ok(MenuItemSpec {
-        label,
-        action: action.map(str::to_string),
-        disabled: attr_bool(&node.attributes, "disabled", span)?.unwrap_or(false),
-        shortcut: attr_str(&node.attributes, "shortcut").map(str::to_string),
-    })
-}
-
 fn lower_menu_item(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<Element, RmlError> {
     let span = node.span;
     let label = menu_item_label(node);
@@ -990,11 +969,20 @@ fn lower_menu_item(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<Ele
     let action =
         attr_str(&node.attributes, "action").or_else(|| attr_str(&node.attributes, "on-click"));
     if let Some(a) = action {
-        el = el.on_click(a);
+        let action_str = a.to_string();
+        if let Some(WidgetSpec::MenuItem(ref mut spec)) = el.widget_spec {
+            spec.action = Some(action_str.clone());
+        }
+        el = el.on_click(action_str);
     }
     if let Some(d) = attr_bool(&node.attributes, "disabled", span)? {
-        if let Some(WidgetSpec::Button(ref mut spec)) = el.widget_spec {
+        if let Some(WidgetSpec::MenuItem(ref mut spec)) = el.widget_spec {
             spec.disabled = d;
+        }
+    }
+    if let Some(shortcut) = attr_str(&node.attributes, "shortcut") {
+        if let Some(WidgetSpec::MenuItem(ref mut spec)) = el.widget_spec {
+            spec.shortcut = Some(shortcut.to_string());
         }
     }
     Ok(el)
