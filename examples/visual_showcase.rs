@@ -104,7 +104,7 @@ fn primitives_section() -> Element {
         .child(icon("home").key("pr-home"))
         .child(icon("info").key("pr-info"))
         .child(divider().key("pr-divider"))
-        .child(canvas().named("chart-v2").build().key("pr-canvas"))
+        .child(canvas("chart-v2").key("pr-canvas"))
         .child(text("Canvas widget with named identifier").key("pr-canvas-label"))
 }
 

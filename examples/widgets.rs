@@ -344,7 +344,7 @@ fn media_section() -> Element {
                 .child(icon("settings").key("icon-settings"))
                 .child(icon("home").key("icon-home"))
                 .child(divider().key("divider"))
-                .child(canvas().named("chart").build().key("chart")),
+                .child(canvas("chart").key("chart")),
         )
 }
 

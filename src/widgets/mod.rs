@@ -7,14 +7,14 @@ pub mod navigation;
 pub mod overlays;
 pub mod primitives;
 pub mod spec;
-pub use canvas::{CanvasBuilder, canvas};
+pub use canvas::canvas;
 pub use collections::{context_menu, list, menu, menu_item, table, tabs, tree, tree_item};
 pub use feedback::{alert, progress_bar, spinner};
 pub use forms::{
     ButtonVariant, InputVariant, IntoSelectOption, SelectStylesBuilder, button, checkbox, input,
-    option, radio, scroll_area, select, select_options, slider, switch, textarea,
+    option, radio, select, select_options, slider, switch, textarea,
 };
-pub use layouts::card;
+pub use layouts::{card, scroll_area};
 pub use navigation::link;
 pub use overlays::{modal, popover, tooltip};
 pub use primitives::{avatar, badge, divider, icon, image, text};

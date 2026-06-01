@@ -87,10 +87,10 @@ mod rml_tests {
             </ScrollArea>
         "#,
         );
-        // scroll_area() is column + overflow scroll
+        // scroll_area() lowers to a ScrollArea primitive
         assert!(matches!(
             el.kind,
-            rgui::ElementKind::Primitive(rgui::PrimitiveKind::Column)
+            rgui::ElementKind::Primitive(rgui::PrimitiveKind::ScrollArea)
         ));
         assert_eq!(el.style.overflow_y, Some(Overflow::Scroll));
         assert_eq!(el.style.height, Some(Length::Px(160.0)));

@@ -273,7 +273,7 @@ fn lower_canvas(node: &RmlNode) -> Result<Element, RmlError> {
             "<Canvas> requires a `name` attribute",
         )
     })?;
-    let mut el = canvas().named(name).build();
+    let mut el = canvas(name);
     // Apply common style attributes (width, height, key, etc.)
     // Canvas doesn't use the full common set but we allow layout attrs.
     if let Some(k) = attr_str(&node.attributes, "key") {

@@ -154,10 +154,6 @@ pub fn textarea() -> Element {
         .widget_spec(WidgetSpec::Textarea(TextareaSpec::default()))
 }
 
-pub fn scroll_area() -> Element {
-    Element::column().overflow(crate::core::Overflow::Scroll)
-}
-
 /// Creates a switch (toggle) element.
 pub fn switch() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Switch))

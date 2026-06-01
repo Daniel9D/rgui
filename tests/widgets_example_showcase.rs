@@ -190,7 +190,7 @@ fn primitive_helpers_emit_visible_paint_commands() {
         root: Element::column()
             .child(icon("search").key("icon"))
             .child(divider().key("divider"))
-            .child(canvas().named("chart").build().key("chart")),
+            .child(canvas("chart").key("chart")),
         viewport: Size::new(320.0, 200.0),
         ..Default::default()
     });

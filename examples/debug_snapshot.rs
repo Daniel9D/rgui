@@ -225,6 +225,6 @@ fn debug_panel() -> Element {
                     ),
                 )
                 .child(tooltip().key("tooltip"))
-                .child(canvas().named("graph").build().key("canvas")),
+                .child(canvas("graph").key("canvas")),
         )
 }
