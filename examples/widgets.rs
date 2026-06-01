@@ -2,7 +2,7 @@ use rgui::render::wgpu::{RendererOptions, SurfaceRenderer};
 use rgui::runtime::{FrameInput, UiRuntime};
 use rgui::widgets::{
     button, canvas, checkbox, context_menu, divider, icon, input, list, menu, menu_item, modal,
-    option, popover, radio, scroll_area, select, tab, table, tabs, text, textarea, tooltip, tree,
+    option, popover, radio, scroll_area, select, table, tabs, text, textarea, tooltip, tree,
     tree_item,
 };
 use rgui::{
@@ -280,8 +280,8 @@ fn data_section() -> Element {
                         .key("tabs")
                         .tabs(["General", "Advanced"])
                         .default_active_index(0)
-                        .child(tab("General"))
-                        .child(tab("Advanced")),
+                        .child(text("General"))
+                        .child(text("Advanced")),
                 ),
         )
         .child(

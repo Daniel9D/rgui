@@ -2,7 +2,7 @@ use rgui::render::wgpu::{RendererOptions, SurfaceRenderer};
 use rgui::runtime::{FrameInput, UiRuntime};
 use rgui::widgets::{
     button, canvas, checkbox, divider, icon, input, list, menu, option, popover, radio, select,
-    tab, table, tabs, text, textarea, tooltip, tree,
+    table, tabs, text, textarea, tooltip, tree,
 };
 use rgui::{Element, Overflow, Size, SizeU32, Theme};
 use winit::{
@@ -132,8 +132,8 @@ fn collections_section() -> Element {
             tabs()
                 .key("col-tabs")
                 .tabs(["Overview", "Details"])
-                .child(tab("Overview"))
-                .child(tab("Details")),
+                .child(text("Overview"))
+                .child(text("Details")),
         )
         .child(tree().key("col-tree"))
         .child(

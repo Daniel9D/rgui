@@ -1,5 +1,5 @@
 use rgui::runtime::{FrameInput, UiCommand, UiRuntime};
-use rgui::widgets::{button, list, menu, option, select, tab, table, tabs, tree};
+use rgui::widgets::{button, list, menu, option, select, table, tabs, text, tree};
 use rgui::{
     Element, LayerKind, ListSpec, Point, PointerButton, PointerEvent, SelectSpec, Size, TableSpec,
     TabsSpec, TreeItemSpec, TreeSpec, UiEvent, WidgetSpec,
@@ -129,8 +129,8 @@ fn tabs_update_active_tab() {
             tabs: vec!["A".into(), "B".into()],
             active_index: None,
         }))
-        .child(tab("A"))
-        .child(tab("B"));
+        .child(text("A"))
+        .child(text("B"));
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let hit = output.hit_test.entries()[0].rect;

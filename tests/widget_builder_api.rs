@@ -1,5 +1,5 @@
 use rgui::runtime::{FrameInput, UiRuntime};
-use rgui::widgets::{list, menu, menu_item, option, select, tab, table, tabs, tree, tree_item};
+use rgui::widgets::{list, menu, menu_item, option, select, table, tabs, text, tree, tree_item};
 use rgui::{Size, WidgetSpec};
 
 #[test]
@@ -21,8 +21,8 @@ fn public_widget_builders_cover_common_app_code() {
                 .key("settings")
                 .tabs(["General", "Advanced"])
                 .default_active_index(0)
-                .child(tab("General"))
-                .child(tab("Advanced")),
+                .child(text("General"))
+                .child(text("Advanced")),
         )
         .child(
             tree()

@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use crate::widgets::{
     alert, avatar, badge, button, canvas, card, checkbox, context_menu, divider, icon, image,
     input, link, list, menu, menu_item, modal, popover, progress_bar, radio, scroll_area, select,
-    slider, spinner, switch, tab, table, tabs, text, textarea, tooltip, tree, tree_item,
+    slider, spinner, switch, table, tabs, text, textarea, tooltip, tree, tree_item,
 };
 use crate::{
     Background, Border, Element, Length, Overflow, Paint, Radius, SelectOption,
@@ -656,7 +656,7 @@ fn lower_tabs(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<Element,
         let tab_labels: Vec<&str> = tabs_str.split(',').map(str::trim).collect();
         el = el.tabs(tab_labels.iter().copied());
         for label in tab_labels {
-            el = el.child(tab(label));
+            el = el.child(text(label));
         }
     }
 
@@ -682,7 +682,7 @@ fn lower_tabs(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<Element,
                     })
                     .unwrap_or_default();
                 tab_labels_from_children.push(label.clone());
-                el = el.child(tab(label));
+                el = el.child(text(label));
             } else {
                 warnings.push(RmlWarning {
                     message: format!("unexpected child `<{}>` inside <Tabs>", tab_node.tag),
@@ -980,9 +980,9 @@ fn lower_menu_item(node: &RmlNode, warnings: &mut Vec<RmlWarning>) -> Result<Ele
             spec.disabled = d;
         }
     }
-    if let Some(shortcut) = attr_str(&node.attributes, "shortcut") {
+    if let Some(s) = attr_str(&node.attributes, "shortcut") {
         if let Some(WidgetSpec::MenuItem(ref mut spec)) = el.widget_spec {
-            spec.shortcut = Some(shortcut.to_string());
+            spec.shortcut = Some(s.to_string());
         }
     }
     Ok(el)

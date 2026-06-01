@@ -1,7 +1,7 @@
 use rgui::runtime::{FrameInput, UiRuntime};
 use rgui::widgets::{
     button, checkbox, context_menu, input, list, menu, menu_item, option, radio, scroll_area,
-    select, tab, table, tabs, text, textarea, tree, tree_item,
+    select, table, tabs, text, textarea, tree, tree_item,
 };
 use rgui::{Element, FontWeight, LayoutBoxSnapshot, PaintCommand, Rect, Size, Style};
 
@@ -85,8 +85,8 @@ fn data_section() -> Element {
                         .key("tabs")
                         .tabs(["General", "Advanced"])
                         .default_active_index(0)
-                        .child(tab("General Content"))
-                        .child(tab("Advanced Content")),
+                        .child(text("General Content"))
+                        .child(text("Advanced Content")),
                 ),
         )
         .child(

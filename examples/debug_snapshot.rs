@@ -1,7 +1,7 @@
 use rgui::runtime::{FrameInput, UiRuntime};
 use rgui::widgets::{
     button, canvas, checkbox, divider, icon, input, list, menu, option, popover, radio, select,
-    tab, table, tabs, text, textarea, tooltip, tree,
+    table, tabs, text, textarea, tooltip, tree,
 };
 use rgui::{Element, KeyEvent, Overflow, Size, Theme, UiEvent, Vec2};
 
@@ -167,8 +167,8 @@ fn debug_panel() -> Element {
                     tabs()
                         .key("tabs")
                         .tabs(["General", "Advanced"])
-                        .child(tab("General"))
-                        .child(tab("Advanced")),
+                        .child(text("General"))
+                        .child(text("Advanced")),
                 )
                 .child(menu().key("menu")),
         )
