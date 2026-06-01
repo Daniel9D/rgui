@@ -23,5 +23,5 @@ pub use spec::{
     CardSpec, CheckboxSpec, IconSpec, ImageFit, ImageSpec, InputSpec, LinkSpec, ListSpec,
     MenuItemSpec, MenuSpec, ModalSpec, PopoverSpec, ProgressBarSpec, RadioSpec, SelectOption,
     SelectPartStyles, SelectSpec, SliderSpec, SpinnerSpec, SwitchSpec, TableSpec, TabsSpec,
-    TextareaSpec, TooltipSpec, TreeItemSpec, TreeSpec, WidgetSpec,
+    TextareaSpec, TooltipSpec, TreeItemSpec, TreeSpec, WidgetSpec, spec_label, spec_label_str,
 };

@@ -3,17 +3,18 @@ use std::collections::{HashMap, HashSet};
 use crate::core::{
     ClipSpec, DisplayList, ElementKind, HitTestEntry, HitTestTree, LayerKind, LayoutBoxSnapshot,
     MeasureSnapshot, NodeId, Overflow, OverlaySnapshot, PaintCommand, PerformanceMetrics, Point,
-    Rect, RenderStats, ResolvedStyleSnapshot, ResourceStore, Role, SemanticNode, SemanticSnapshot,
-    SemanticStates, SemanticTree, SemanticValue, Size, Theme, UiEvent, UiSnapshot, Vec2,
-    WidgetKind,
+    Rect, RenderStats, ResolvedStyleSnapshot, ResourceStore, Role, SCROLLBAR_THUMB_Z_OFFSET,
+    SemanticNode, SemanticSnapshot, SemanticStates, SemanticTree, SemanticValue, Size, Theme,
+    UiEvent, UiSnapshot, Vec2, WidgetKind,
 };
 use crate::layout::{LAYOUT_ENGINE_NAME, LayoutCx, TaffyLayoutBackend};
 use crate::state::{ButtonState, CheckboxState, InputState, StateArena};
 use crate::text_engine::TextSystem;
 
 use super::{
-    CommandQueue, FocusSystem, FrameInput, FrameOutput, Reconciler, UiCommand, UiNode, UiTree,
-    paint, stable_portal_child_id,
+    BoolState, CommandQueue, DragState, FocusSystem, FrameInput, FrameOutput, OpenOverlay,
+    PointerCapture, Reconciler, ScrollState, UiCommand, UiNode, UiTree, paint,
+    stable_portal_child_id,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -97,9 +98,7 @@ pub struct UiRuntime {
     tree: Option<UiTree>,
     key_to_node: HashMap<String, NodeId>,
     node_to_key: HashMap<NodeId, String>,
-    scroll_offsets_by_key: HashMap<String, crate::core::Vec2>,
-    scroll_bounds_by_key: HashMap<String, crate::core::Vec2>,
-    scroll_rects_by_key: HashMap<String, Rect>,
+    scroll_state: ScrollState,
     viewport: Size,
     last_hit_test: HitTestTree,
     active_key: Option<String>,
@@ -119,18 +118,15 @@ pub struct UiRuntime {
     disabled_select_options_by_key: HashMap<String, HashSet<usize>>,
     command_queue: CommandQueue,
     command_handlers: HashMap<String, Box<dyn Fn(&str) + Send + Sync>>,
-    bool_state_by_key: HashMap<String, bool>,
-    bool_state_by_node: HashMap<NodeId, bool>,
+    bool_state: BoolState,
     focused_node: Option<NodeId>,
     active_node: Option<NodeId>,
     hovered_key: Option<String>,
     hovered_node: Option<NodeId>,
-    pointer_capture: Option<NodeId>,
-    pointer_capture_key: Option<String>,
+    pointer_capture: PointerCapture,
     open_context_menu_key: Option<String>,
     context_menu_anchor: Option<Point>,
-    open_overlay_keys: Vec<String>,
-    open_overlay_rects: Vec<(String, Rect)>,
+    open_overlays: Vec<OpenOverlay>,
     has_open_modal: bool,
     dismissed_overlay_keys: HashSet<String>,
     opened_overlay_keys: HashSet<String>,
@@ -140,34 +136,29 @@ pub struct UiRuntime {
     state_arena: StateArena,
     pub a11y_backend: Option<Box<dyn crate::core::AccessibilityBackend>>,
     a11y_update_count: usize,
-    drag_source_key: Option<String>,
-    drag_source_node: Option<NodeId>,
-    drag_payload: Option<String>,
-    drag_origin: Option<Point>,
-    drag_started: bool,
+    drag: Option<DragState>,
 }
 
 impl UiRuntime {
     pub fn set_scroll_offset_for_key(&mut self, key: impl Into<String>, offset: crate::core::Vec2) {
-        self.scroll_offsets_by_key.insert(key.into(), offset);
+        self.scroll_state.set_offset(key.into(), offset);
     }
 
     pub fn scroll_offset(&self, key: &str) -> Option<crate::core::Vec2> {
-        self.scroll_offsets_by_key.get(key).copied()
+        self.scroll_state.offset(key)
     }
 
     pub fn capture_pointer(&mut self, key: &str) {
-        self.pointer_capture_key = Some(key.to_string());
-        self.pointer_capture = self.node_for_key(key);
+        let node = self.node_for_key(key);
+        self.pointer_capture.set(key.to_string(), node);
     }
 
     pub fn release_pointer(&mut self) {
-        self.pointer_capture = None;
-        self.pointer_capture_key = None;
+        self.pointer_capture.clear();
     }
 
     pub fn pointer_capture_key(&self) -> Option<String> {
-        self.pointer_capture_key.clone()
+        self.pointer_capture.key.clone()
     }
 
     pub fn node_for_key(&self, key: &str) -> Option<NodeId> {
@@ -282,13 +273,13 @@ impl UiRuntime {
 
     pub fn bool_state(&self, key: &str) -> Option<bool> {
         self.node_for_key(key)
-            .and_then(|node| self.bool_state_by_node.get(&node).copied())
+            .and_then(|node| self.bool_state.get_by_node(node))
             .or_else(|| {
                 self.node_for_key(key)
                     .and_then(|node| self.state_arena.get::<CheckboxState>(node))
                     .map(|state| state.checked)
             })
-            .or_else(|| self.bool_state_by_key.get(key).copied())
+            .or_else(|| self.bool_state.get_by_key(key))
     }
 
     pub fn text_state(&self, key: &str) -> Option<String> {
@@ -364,11 +355,11 @@ impl UiRuntime {
                     return;
                 }
             } else if pointer.button == Some(crate::core::PointerButton::Primary)
-                && !self.open_overlay_rects.is_empty()
+                && !self.open_overlays.is_empty()
                 && self
-                    .open_overlay_rects
+                    .open_overlays
                     .iter()
-                    .all(|(_, rect)| !rect.contains(pointer.position))
+                    .all(|overlay| !overlay.rect.contains(pointer.position))
             {
                 self.open_context_menu_key = None;
                 self.context_menu_anchor = None;
@@ -435,21 +426,24 @@ impl UiRuntime {
         if let Some(hit) = self.last_hit_test.hit(pointer.position) {
             if let Some(node) = self.tree.as_ref().and_then(|tree| tree.get(hit.node)) {
                 if node.handlers.draggable_payload.is_some() {
-                    self.drag_source_key = hit.key.clone();
-                    self.drag_source_node = Some(hit.node);
-                    self.drag_payload = node.handlers.draggable_payload.clone();
-                    self.drag_origin = Some(pointer.position);
-                    self.drag_started = false;
+                    self.drag = Some(DragState {
+                        source_key: hit.key.clone(),
+                        source_node: Some(hit.node),
+                        payload: node.handlers.draggable_payload.clone(),
+                        origin: Some(pointer.position),
+                        started: false,
+                    });
                 }
             }
         }
-        if !self.open_overlay_rects.is_empty()
+        if !self.open_overlays.is_empty()
             && self
-                .open_overlay_rects
+                .open_overlays
                 .iter()
-                .all(|(_, rect)| !rect.contains(pointer.position))
+                .all(|overlay| !overlay.rect.contains(pointer.position))
         {
-            for (key, _) in &self.open_overlay_rects {
+            for overlay in &self.open_overlays {
+                let key = &overlay.key;
                 let can_close = self
                     .modal_policy_for_key(key)
                     .map(|(_, close_on_outside_click)| close_on_outside_click)
@@ -464,7 +458,7 @@ impl UiRuntime {
     }
 
     fn handle_pointer_up(&mut self, pointer: crate::core::PointerEvent) {
-        if self.pointer_capture_key.is_some() {
+        if self.pointer_capture.is_active() {
             self.release_pointer();
             return;
         }
@@ -524,13 +518,11 @@ impl UiRuntime {
                             }
                             Some(WidgetKind::Checkbox) => {
                                 let current = self
-                                    .bool_state_by_node
-                                    .get(&hit_node)
-                                    .copied()
-                                    .or_else(|| self.bool_state_by_key.get(&key).copied())
+                                    .bool_state
+                                    .get_by_node(hit_node)
+                                    .or_else(|| self.bool_state.get_by_key(&key))
                                     .unwrap_or(false);
-                                self.bool_state_by_node.insert(hit_node, !current);
-                                self.bool_state_by_key.insert(key.clone(), !current);
+                                self.bool_state.set(key.clone(), hit_node, !current);
 
                                 // Also update arena state
                                 if let Some(state) =
@@ -552,40 +544,45 @@ impl UiRuntime {
         self.active_key = None;
         self.active_node = None;
         // Emit drag end and clear drag state
-        if self.drag_origin.is_some() {
+        if self.drag.as_ref().is_some_and(|d| d.origin.is_some()) {
+            let source_key = self.drag.as_ref().and_then(|d| d.source_key.clone());
             self.command_queue.push(UiCommand::DragEnd {
-                key: self.drag_source_key.clone(),
+                key: source_key,
                 position: pointer.position,
             });
-            self.drag_source_key = None;
-            self.drag_source_node = None;
-            self.drag_payload = None;
-            self.drag_origin = None;
-            self.drag_started = false;
+            self.drag = None;
         }
     }
 
     fn handle_pointer_move(&mut self, pointer: crate::core::PointerEvent) {
-        if let Some(key) = self.pointer_capture_key.clone() {
+        if let Some(key) = self.pointer_capture.key.clone() {
             if let Some(scroll_key) = key.strip_suffix("::__scrollbar_thumb") {
                 self.drag_scrollbar_to(scroll_key, pointer.position);
                 return;
             }
         }
         // Emit drag events when pointer moves far enough from drag origin
-        if let Some(origin) = self.drag_origin {
+        if let Some(origin) = self.drag.as_ref().and_then(|d| d.origin) {
             let dx = pointer.position.x - origin.x;
             let dy = pointer.position.y - origin.y;
             if dx.abs() > 4.0 || dy.abs() > 4.0 {
-                if !self.drag_started {
-                    self.command_queue.push(UiCommand::DragStart {
-                        key: self.drag_source_key.clone(),
-                        payload: self.drag_payload.clone(),
-                    });
-                    self.drag_started = true;
+                if !self.drag.as_ref().is_some_and(|d| d.started) {
+                    let (key, payload) = self
+                        .drag
+                        .as_ref()
+                        .map(|d| (d.source_key.clone(), d.payload.clone()))
+                        .unwrap_or((None, None));
+                    self.command_queue.push(UiCommand::DragStart { key, payload });
+                    if let Some(d) = self.drag.as_mut() {
+                        d.started = true;
+                    }
                 }
+                let key = self
+                    .drag
+                    .as_ref()
+                    .and_then(|d| d.source_key.clone());
                 self.command_queue.push(UiCommand::DragMove {
-                    key: self.drag_source_key.clone(),
+                    key,
                     position: pointer.position,
                 });
                 return;
@@ -706,7 +703,7 @@ impl UiRuntime {
             }
             "Escape" => {
                 // Dismiss only the topmost overlay (last painted)
-                if let Some(topmost) = self.open_overlay_keys.last().cloned() {
+                if let Some(topmost) = self.open_overlays.last().map(|o| o.key.clone()) {
                     let can_close = self
                         .modal_policy_for_key(&topmost)
                         .map(|(close_on_escape, _)| close_on_escape)
@@ -778,12 +775,10 @@ impl UiRuntime {
                             WidgetKind::Checkbox => {
                                 if let Some(node) = self.node_for_key(&key) {
                                     let current = self
-                                        .bool_state_by_node
-                                        .get(&node)
-                                        .copied()
+                                        .bool_state
+                                        .get_by_node(node)
                                         .unwrap_or(false);
-                                    self.bool_state_by_node.insert(node, !current);
-                                    self.bool_state_by_key.insert(key.clone(), !current);
+                                    self.bool_state.set(key.clone(), node, !current);
                                     if let Some(state) =
                                         self.state_arena.get_mut::<CheckboxState>(node)
                                     {
@@ -826,12 +821,14 @@ impl UiRuntime {
                             ),
                         };
                         let max_scroll = self
-                            .scroll_bounds_by_key
+                            .scroll_state
+                            .bounds
                             .get(key.as_str())
                             .copied()
                             .unwrap_or_default();
                         let entry = self
-                            .scroll_offsets_by_key
+                            .scroll_state
+                            .offsets
                             .entry(key.as_str().to_string())
                             .or_default();
                         entry.x = (entry.x + normalized.x).clamp(0.0, max_scroll.x);
@@ -887,7 +884,7 @@ impl UiRuntime {
 
         let layout_cx = LayoutCx {
             active_tab_by_key: Some(&self.active_index_by_key),
-            scroll_offsets_by_key: Some(&self.scroll_offsets_by_key),
+            scroll_offsets_by_key: Some(&self.scroll_state.offsets),
         };
         let taffy_layout = Some(self.layout_backend.compute_incremental_with_cx(
             &tree,
@@ -902,11 +899,10 @@ impl UiRuntime {
             &mut self.text_system,
             input.viewport,
             taffy_layout.as_ref(),
-            &self.scroll_offsets_by_key,
+            &self.scroll_state.offsets,
             &self.dismissed_overlay_keys,
             &self.opened_overlay_keys,
-            &self.bool_state_by_key,
-            &self.bool_state_by_node,
+            &self.bool_state,
             &self.selected_index_by_key,
             &self.tree_expanded_by_key,
             &self.table_selected_row_by_key,
@@ -971,10 +967,9 @@ impl UiRuntime {
         self.click_action_by_key = builder.click_action_by_key.clone();
         self.widget_rect_by_key = builder.widget_rect_by_key.clone();
         self.has_open_modal = builder.has_open_modal;
-        self.open_overlay_keys = builder.open_overlay_keys.clone();
-        self.open_overlay_rects = builder.open_overlay_rects.clone();
-        self.scroll_bounds_by_key = builder.scroll_bounds_by_key.clone();
-        self.scroll_rects_by_key = builder.scroll_rects_by_key.clone();
+        self.open_overlays = builder.open_overlays.clone();
+        self.scroll_state.bounds = builder.scroll_state.bounds.clone();
+        self.scroll_state.rects = builder.scroll_state.rects.clone();
         for semantic_node in builder.semantics.nodes() {
             if let Some(key) = semantic_node.key.as_ref() {
                 self.key_to_node
@@ -1013,7 +1008,7 @@ impl UiRuntime {
             snapshot: Some(builder.snapshot),
         };
         let open_now: std::collections::HashSet<String> =
-            self.open_overlay_keys.iter().cloned().collect();
+            self.open_overlays.iter().map(|o| o.key.clone()).collect();
         self.dismissed_overlay_keys
             .retain(|key| open_now.contains(key));
         if std::env::var_os("RGUI_DUMP_FRAME").is_some() {
@@ -1251,11 +1246,12 @@ impl UiRuntime {
     }
 
     fn drag_scrollbar_to(&mut self, scroll_key: &str, position: Point) {
-        let Some(rect) = self.scroll_rects_by_key.get(scroll_key).copied() else {
+        let Some(rect) = self.scroll_state.rects.get(scroll_key).copied() else {
             return;
         };
         let max_scroll = self
-            .scroll_bounds_by_key
+            .scroll_state
+            .bounds
             .get(scroll_key)
             .copied()
             .unwrap_or_default();
@@ -1263,7 +1259,8 @@ impl UiRuntime {
         let track_y = track.origin.y;
         let track_h = track.size.height;
         let ratio = ((position.y - track_y) / track_h).clamp(0.0, 1.0);
-        self.scroll_offsets_by_key
+        self.scroll_state
+            .offsets
             .insert(scroll_key.to_string(), Vec2::new(0.0, max_scroll.y * ratio));
     }
 
@@ -1308,11 +1305,8 @@ impl UiRuntime {
             // Use `default_checked` as the uncontrolled seed value.
             // `checked` is the controlled override and is applied at render time.
             if let Some(seed) = node.default_checked.or(node.checked) {
-                self.bool_state_by_node.entry(node.id).or_insert(seed);
                 if let Some(key) = node.key.as_ref() {
-                    self.bool_state_by_key
-                        .entry(key.as_str().to_string())
-                        .or_insert(seed);
+                    self.bool_state.get_or_init(key.as_str(), node.id, seed);
                 }
             }
 
@@ -1446,13 +1440,10 @@ struct FrameBuilder<'a> {
     snapshot: UiSnapshot,
     paint_order: u64,
     portal_tree: super::PortalTree,
-    scroll_offsets_by_key: &'a HashMap<String, crate::core::Vec2>,
-    scroll_bounds_by_key: HashMap<String, crate::core::Vec2>,
-    scroll_rects_by_key: HashMap<String, Rect>,
+    scroll_state: ScrollState,
     dismissed_overlay_keys: &'a HashSet<String>,
     opened_overlay_keys: &'a HashSet<String>,
-    bool_state_by_key: &'a HashMap<String, bool>,
-    bool_state_by_node: &'a HashMap<NodeId, bool>,
+    bool_state: &'a BoolState,
     selected_index_by_key: &'a HashMap<String, usize>,
     tree_expanded_by_key: &'a HashMap<String, HashMap<usize, bool>>,
     table_selected_row_by_key: &'a HashMap<String, usize>,
@@ -1471,8 +1462,7 @@ struct FrameBuilder<'a> {
     widget_kind_by_key: HashMap<String, WidgetKind>,
     click_action_by_key: HashMap<String, String>,
     widget_rect_by_key: HashMap<String, Rect>,
-    open_overlay_keys: Vec<String>,
-    open_overlay_rects: Vec<(String, Rect)>,
+    open_overlays: Vec<OpenOverlay>,
     has_open_modal: bool,
 }
 
@@ -1484,8 +1474,7 @@ impl<'a> FrameBuilder<'a> {
         scroll_offsets_by_key: &'a HashMap<String, crate::core::Vec2>,
         dismissed_overlay_keys: &'a HashSet<String>,
         opened_overlay_keys: &'a HashSet<String>,
-        bool_state_by_key: &'a HashMap<String, bool>,
-        bool_state_by_node: &'a HashMap<NodeId, bool>,
+        bool_state: &'a BoolState,
         selected_index_by_key: &'a HashMap<String, usize>,
         tree_expanded_by_key: &'a HashMap<String, HashMap<usize, bool>>,
         table_selected_row_by_key: &'a HashMap<String, usize>,
@@ -1510,13 +1499,14 @@ impl<'a> FrameBuilder<'a> {
             snapshot: UiSnapshot::default(),
             paint_order: 0,
             portal_tree: super::PortalTree::default(),
-            scroll_offsets_by_key,
-            scroll_bounds_by_key: HashMap::new(),
-            scroll_rects_by_key: HashMap::new(),
+            scroll_state: ScrollState {
+                offsets: scroll_offsets_by_key.clone(),
+                bounds: HashMap::new(),
+                rects: HashMap::new(),
+            },
             dismissed_overlay_keys,
             opened_overlay_keys,
-            bool_state_by_key,
-            bool_state_by_node,
+            bool_state,
             selected_index_by_key,
             tree_expanded_by_key,
             table_selected_row_by_key,
@@ -1535,8 +1525,7 @@ impl<'a> FrameBuilder<'a> {
             widget_kind_by_key: HashMap::new(),
             click_action_by_key: HashMap::new(),
             widget_rect_by_key: HashMap::new(),
-            open_overlay_keys: Vec::new(),
-            open_overlay_rects: Vec::new(),
+            open_overlays: Vec::new(),
             has_open_modal: false,
         }
     }
@@ -1634,7 +1623,7 @@ impl<'a> FrameBuilder<'a> {
                         layout.scroll_offset,
                     );
                     self.hit_test.push(
-                        HitTestEntry::new(node.id, thumb_rect, z_index + 3, LayerKind::Document)
+                        HitTestEntry::new(node.id, thumb_rect, z_index + SCROLLBAR_THUMB_Z_OFFSET, LayerKind::Document)
                             .with_key(Some(format!("{}::__scrollbar_thumb", key.as_str())))
                             .with_order(order as usize + 1),
                     );
@@ -1730,18 +1719,19 @@ impl<'a> FrameBuilder<'a> {
             tree.get(node_id).expect("runtime node exists in tree"),
             rect,
             content_size,
-            self.scroll_offsets_by_key,
+            &self.scroll_state.offsets,
         );
         if let Some(key) = tree.get(node_id).and_then(|node| node.key.as_ref()) {
             if clips_overflow_node(tree.get(node_id).expect("runtime node exists in tree")) {
-                self.scroll_bounds_by_key.insert(
+                self.scroll_state.bounds.insert(
                     key.as_str().to_string(),
                     Vec2::new(
                         (content_size.width - rect.size.width).max(0.0),
                         (content_size.height - rect.size.height).max(0.0),
                     ),
                 );
-                self.scroll_rects_by_key
+                self.scroll_state
+                    .rects
                     .insert(key.as_str().to_string(), rect);
             }
         }
@@ -1933,10 +1923,9 @@ impl<'a> FrameBuilder<'a> {
     }
 
     fn widget_bool_state(&self, node: &UiNode, key: &str) -> Option<bool> {
-        self.bool_state_by_node
-            .get(&node.id)
-            .copied()
-            .or_else(|| self.bool_state_by_key.get(key).copied())
+        self.bool_state
+            .get_by_node(node.id)
+            .or_else(|| self.bool_state.get_by_key(key))
     }
 
     fn semantic_value_for_node(&self, tree: &UiTree, node: &UiNode) -> Option<SemanticValue> {
@@ -2025,8 +2014,10 @@ impl<'a> FrameBuilder<'a> {
             }
             if let Some(key) = &root.key {
                 if key != "__modal_backdrop" {
-                    self.open_overlay_keys.push(key.clone());
-                    self.open_overlay_rects.push((key.clone(), root.rect));
+                    self.open_overlays.push(OpenOverlay {
+                        key: key.clone(),
+                        rect: root.rect,
+                    });
                 }
             }
             self.snapshot.overlays.push(OverlaySnapshot {
@@ -2284,25 +2275,7 @@ fn append_overlay_layout_snapshots(
 fn role_for_node(node: &UiNode) -> Role {
     match &node.kind {
         ElementKind::Text(_) => Role::Text,
-        ElementKind::Widget(WidgetKind::Button) => Role::Button,
-        ElementKind::Widget(WidgetKind::Input | WidgetKind::Textarea) => Role::TextInput,
-        ElementKind::Widget(WidgetKind::Checkbox) => Role::Checkbox,
-        ElementKind::Widget(WidgetKind::Radio) => Role::Radio,
-        ElementKind::Widget(WidgetKind::List) => Role::List,
-        ElementKind::Widget(WidgetKind::Table) => Role::Table,
-        ElementKind::Widget(WidgetKind::Modal) => Role::Dialog,
-        ElementKind::Widget(WidgetKind::Tooltip) => Role::Tooltip,
-        ElementKind::Widget(WidgetKind::ScrollArea) => Role::ScrollArea,
-        ElementKind::Widget(WidgetKind::Image) => Role::Image,
-        ElementKind::Widget(WidgetKind::Switch) => Role::Switch,
-        ElementKind::Widget(WidgetKind::Slider) => Role::Slider,
-        ElementKind::Widget(WidgetKind::ProgressBar) => Role::ProgressBar,
-        ElementKind::Widget(WidgetKind::Spinner) => Role::Spinner,
-        ElementKind::Widget(WidgetKind::Badge) => Role::Badge,
-        ElementKind::Widget(WidgetKind::Avatar) => Role::Avatar,
-        ElementKind::Widget(WidgetKind::Link) => Role::Link,
-        ElementKind::Widget(WidgetKind::Alert) => Role::Alert,
-        ElementKind::Widget(WidgetKind::Card) => Role::Card,
+        ElementKind::Widget(kind) => crate::core::role_for_widget_kind(*kind),
         _ => Role::Group,
     }
 }
@@ -2310,21 +2283,8 @@ fn role_for_node(node: &UiNode) -> Role {
 fn label_for_node(node: &UiNode, tree: &UiTree) -> Option<String> {
     // Prioritize widget_spec labels (clean separation from semantic.label)
     if let Some(ref spec) = node.widget_spec {
-        match spec {
-            crate::widgets::WidgetSpec::Button(bs) if bs.label.is_some() => {
-                return bs.label.clone();
-            }
-            crate::widgets::WidgetSpec::Checkbox(cs) if cs.label.is_some() => {
-                return cs.label.clone();
-            }
-            crate::widgets::WidgetSpec::Radio(rs) if rs.label.is_some() => return rs.label.clone(),
-            crate::widgets::WidgetSpec::Input(is) if is.aria_label.is_some() => {
-                return is.aria_label.clone();
-            }
-            crate::widgets::WidgetSpec::Tooltip(ts) if ts.text.is_some() => return ts.text.clone(),
-            crate::widgets::WidgetSpec::Icon(is) => return Some(is.name.clone()),
-            crate::widgets::WidgetSpec::Modal(ms) if ms.title.is_some() => return ms.title.clone(),
-            _ => {}
+        if let Some(label) = crate::widgets::spec_label(spec) {
+            return Some(label);
         }
     }
 

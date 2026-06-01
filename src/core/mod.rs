@@ -13,10 +13,11 @@ pub mod snapshot;
 pub mod style;
 pub mod text;
 pub mod theme;
+pub mod theme_base;
 
 pub use a11y::{
     AccessibilityBackend, KeyboardNav, Role, SemanticAction, SemanticNode, SemanticStates,
-    SemanticTree, SemanticValue,
+    SemanticTree, SemanticValue, role_for_widget_kind,
 };
 pub use component::{
     CommandQueue as ComponentCommandQueue, Component, ComponentCx, PaintCx, StateStore, Widget,
@@ -67,4 +68,9 @@ pub use theme::{
     ShadowTokens, SpacingTokens, TableMetrics, TabsMetrics, TextareaMetrics, Theme, ThemeMode,
     ThemeScope, TooltipMetrics, TreeMetrics, TypographyTokens, VariantId, WidgetKind,
     WidgetMetrics, WidgetThemes,
+};
+pub use theme_base::{
+    MODAL_CONTENT_Z_BASE, MODAL_PANEL_Z_BASE, OVERLAY_BACKDROP_HIT_TEST_ORDER,
+    OVERLAY_CONTENT_Z_BASE, OVERLAY_HIT_TEST_ORDER, OVERLAY_PANEL_HIT_TEST_ORDER,
+    OVERLAY_PANEL_Z_BASE, SCROLLBAR_THUMB_Z_OFFSET,
 };

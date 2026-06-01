@@ -1,3 +1,57 @@
+###### src/layout/intrinsic.rs
+
+use crate::core::{Size, WidgetKind, WidgetMetrics};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WidgetIntrinsicInput {
+    pub widget_kind: WidgetKind,
+    pub label_width: Option<f32>,
+    pub known_width: Option<f32>,
+    pub known_height: Option<f32>,
+}
+
+pub fn intrinsic_widget_size(input: WidgetIntrinsicInput, metrics: &WidgetMetrics) -> Size {
+    let default = match input.widget_kind {
+        WidgetKind::Button => {
+            let width = input
+                .label_width
+                .map(|width| width + metrics.button.horizontal_padding)
+                .unwrap_or(metrics.button.min_width);
+            Size::new(width.max(metrics.button.min_width), metrics.button.height)
+        }
+        WidgetKind::Checkbox | WidgetKind::Radio => {
+            let control = metrics.input.min_size.height.min(24.0);
+            let width = input
+                .label_width
+                .map(|w| control + 6.0 + w)
+                .unwrap_or(control);
+            Size::new(width, control)
+        }
+        WidgetKind::Tabs => metrics.tabs.min_size,
+        WidgetKind::Menu => metrics.menu.min_size,
+        kind => metrics.min_size_for(kind),
+    };
+
+    Size::new(
+        input.known_width.unwrap_or(default.width),
+        input.known_height.unwrap_or(default.height),
+    )
+}
+
+
+###### src/layout/mod.rs
+
+pub mod intrinsic;
+pub mod taffy;
+pub mod taffy_mapping;
+
+pub use intrinsic::{WidgetIntrinsicInput, intrinsic_widget_size};
+pub use taffy::{LAYOUT_ENGINE_NAME, LayoutCx, TaffyLayoutBackend};
+pub use taffy_mapping::to_taffy_style;
+
+
+###### src/layout/taffy.rs
+
 use std::collections::{HashMap, HashSet};
 use taffy::prelude::TaffyGridLine;
 
@@ -8,7 +62,7 @@ use crate::core::{
 use crate::text_engine::TextSystem;
 
 use super::intrinsic::{WidgetIntrinsicInput, intrinsic_widget_size};
-use super::taffy_mapping::{to_taffy_overflow, to_taffy_style};
+use super::taffy_mapping::to_taffy_style;
 
 pub const LAYOUT_ENGINE_NAME: &str = "taffy_first";
 
@@ -58,26 +112,15 @@ impl Default for TaffyLayoutBackend {
 
 impl TaffyLayoutBackend {
     pub fn new() -> Self {
-        let mut backend = Self {
-            taffy: taffy::TaffyTree::new(),
+        let mut taffy = taffy::TaffyTree::new();
+        taffy.disable_rounding();
+        Self {
+            taffy,
             node_map: HashMap::new(),
             inverse_map: HashMap::new(),
             child_map: HashMap::new(),
             dirty_layout_nodes: std::collections::HashSet::new(),
-        };
-        backend.init_taffy_tree();
-        backend
-    }
-
-    /// Initializes a fresh Taffy tree and disables rounding. Centralized so
-    /// that any future Taffy setup flags (rounding, debugging, etc.) are
-    /// applied in one place. See report #9.
-    fn init_taffy_tree(&mut self) {
-        // `TaffyTree::new()` is the current stable API; if Taffy ever
-        // exposes a `clear()` method we can switch to it without changing
-        // call sites.
-        self.taffy = taffy::TaffyTree::new();
-        self.taffy.disable_rounding();
+        }
     }
 
     pub fn compute_incremental(
@@ -108,15 +151,6 @@ impl TaffyLayoutBackend {
         dirty_nodes: &[NodeId],
     ) -> LayoutResult {
         let sync_dirty_nodes: HashSet<NodeId> = dirty_nodes.iter().copied().collect();
-        // `propagated_dirty_nodes` is the dirty set expanded to include every
-        // ancestor. It's only used to populate the debug counter — see report
-        // #2. The sync itself only marks the explicit dirty set because
-        // `sync_node_incremental` already propagates changes upward through
-        // the `children_changed` comparison: a replaced leaf returns a new
-        // taffy id, which makes the parent's child list differ from its
-        // `child_map` entry, which forces a re-sync of the parent. We
-        // therefore pass only the explicit set here; the debug counter is the
-        // only place where the expanded set is reported.
         let propagated_dirty_nodes = expand_dirty_with_ancestors(tree, dirty_nodes);
         self.dirty_layout_nodes = sync_dirty_nodes.clone();
         self.sync_incremental_tree(
@@ -156,7 +190,8 @@ impl TaffyLayoutBackend {
     }
 
     fn clear_taffy_state(&mut self) {
-        self.init_taffy_tree();
+        self.taffy = taffy::TaffyTree::new();
+        self.taffy.disable_rounding();
         self.node_map.clear();
         self.inverse_map.clear();
         self.child_map.clear();
@@ -322,21 +357,10 @@ impl TaffyLayoutBackend {
 
         for node in tree.nodes() {
             if matches!(node.style.position, Some(crate::core::Position::Fixed)) {
-                // Deduplicate per frame — see report #7. A single warning is
-                // emitted if any fixed-position node exists, regardless of how
-                // many such nodes there are.
-                if !result
+                result
                     .diagnostics
                     .layout_warnings
-                    .iter()
-                    .any(|w| w == "position=fixed currently behaves like absolute")
-                {
-                    result
-                        .diagnostics
-                        .layout_warnings
-                        .push("position=fixed currently behaves like absolute".to_string());
-                }
-                break;
+                    .push("position=fixed currently behaves like absolute".to_string());
             }
         }
         let enriched = enrich_world_rects(tree, &result, tree.root());
@@ -380,7 +404,7 @@ impl TaffyLayoutBackend {
         if let Some(existing) = self.node_map.get(&node.id).copied() {
             if should_taffy_layout_children(node) {
                 if dirty || children_changed {
-                    let style = contextual_taffy_style(tree, node, viewport, theme);
+                    let style = compute_taffy_style_for_node(tree, node, viewport, theme);
                     self.taffy
                         .set_style(existing, style)
                         .expect("update taffy style");
@@ -392,7 +416,7 @@ impl TaffyLayoutBackend {
                 return existing;
             }
             if dirty {
-                let style = contextual_taffy_style(tree, node, viewport, theme);
+                let style = compute_taffy_style_for_node(tree, node, viewport, theme);
                 let ctx = measure_context_for_node(tree, node, theme);
                 let replacement = self
                     .taffy
@@ -401,19 +425,11 @@ impl TaffyLayoutBackend {
                 self.node_map.insert(node.id, replacement);
                 self.inverse_map.remove(&existing);
                 self.inverse_map.insert(replacement, node.id);
-                // INVARIANT (report #1): the new `taffy::NodeId` flows back to
-                // our parent via the return value of this function. The parent
-                // collects it inside `sync_taffy_children` and compares it to
-                // its previous `child_map` entry, which makes
-                // `children_changed = true` and forces the parent to call
-                // `set_children` with the new id. This means a replaced leaf
-                // always gets re-attached to its parent — the parent does not
-                // need to be in the dirty set for this to work.
                 return replacement;
             }
             existing
         } else if should_taffy_layout_children(node) {
-            let style = contextual_taffy_style(tree, node, viewport, theme);
+            let style = compute_taffy_style_for_node(tree, node, viewport, theme);
             let taffy_id = self
                 .taffy
                 .new_with_children(style, &child_taffy_nodes)
@@ -423,7 +439,7 @@ impl TaffyLayoutBackend {
             self.child_map.insert(node.id, child_taffy_nodes);
             taffy_id
         } else {
-            let style = contextual_taffy_style(tree, node, viewport, theme);
+            let style = compute_taffy_style_for_node(tree, node, viewport, theme);
             let ctx = measure_context_for_node(tree, node, theme);
             let taffy_id = self
                 .taffy
@@ -473,7 +489,7 @@ impl TaffyLayoutBackend {
     ) -> taffy::NodeId {
         let measure_ctx = measure_context_for_node(tree, node, theme);
 
-        let taffy_style = contextual_taffy_style(tree, node, _viewport, theme);
+        let taffy_style = compute_taffy_style_for_node(tree, node, _viewport, theme);
 
         let taffy_id = if should_taffy_layout_children(node) {
             let children: Vec<taffy::NodeId> = layout_child_ids_for_node(node, layout_cx)
@@ -622,11 +638,7 @@ fn apply_scroll_content_sizes(
     out
 }
 
-/// Builds a `taffy::Style` for a node using only its own properties and the
-/// theme — no parent context is consulted. For parent-aware mutations
-/// (scroll shrink, stack grid placement, etc.) use [`contextual_taffy_style`]
-/// instead. See report #3.
-fn base_taffy_style(
+fn taffy_style_for_node(
     node: &crate::runtime::UiNode,
     viewport: Size,
     theme: &crate::Theme,
@@ -721,18 +733,13 @@ fn base_taffy_style(
     taffy_style
 }
 
-/// Builds a `taffy::Style` for a node taking parent context into account.
-/// This wraps [`base_taffy_style`] and adds the parent-dependent mutations:
-/// - children of scrollable containers are not shrunk
-/// - children of a `Stack` (grid) are placed unless explicitly absolute
-/// See report #3.
-fn contextual_taffy_style(
+fn compute_taffy_style_for_node(
     tree: &crate::runtime::UiTree,
     node: &crate::runtime::UiNode,
     viewport: Size,
     theme: &crate::Theme,
 ) -> taffy::Style {
-    let mut taffy_style = base_taffy_style(node, viewport, theme);
+    let mut taffy_style = taffy_style_for_node(node, viewport, theme);
 
     if let Some(parent_id) = node.parent {
         if let Some(parent) = tree.get(parent_id) {
@@ -785,26 +792,19 @@ fn max_length_percentage(
     current: taffy::LengthPercentage,
     minimum: f32,
 ) -> taffy::LengthPercentage {
-    // Clamp a `taffy::LengthPercentage` to a pixel minimum. Percentages are
-    // left untouched (they are parent-relative and can't be clamped to a
-    // pixel minimum safely); the previous implementation used a fragile
-    // `resolve_to_option` heuristic that detected percents indirectly — see
-    // report #5. We now inspect the underlying `CompactLength` tag directly.
-    let raw = current.into_raw();
-    if raw.tag() == taffy::style::CompactLength::PERCENT_TAG {
-        // SAFETY: A LengthPercentage constructed from a PERCENT_TAG raw value
-        // is a valid LengthPercentage.
-        return unsafe { taffy::LengthPercentage::from_raw(raw) };
+    let current_auto = taffy::LengthPercentageAuto::from(current);
+    let current_is_percent = current_auto
+        .resolve_to_option(100.0, |_, _| 0.0)
+        .zip(current_auto.resolve_to_option(200.0, |_, _| 0.0))
+        .is_some_and(|(a, b)| (a - b).abs() > f32::EPSILON);
+
+    if current_is_percent {
+        return current;
     }
-    // Treat everything else (length, calc, etc.) as a length; the
-    // existing taffy::LengthPercentage::length() does not accept an
-    // `f32::NAN` etc., so this is safe for any value the user could supply
-    // through the rgui API.
-    let current_value = if raw.tag() == taffy::style::CompactLength::LENGTH_TAG {
-        raw.value()
-    } else {
-        0.0
-    };
+
+    let current_value = current_auto
+        .resolve_to_option(0.0, |_, _| 0.0)
+        .unwrap_or(0.0);
     taffy::LengthPercentage::length(current_value.max(minimum))
 }
 
@@ -865,47 +865,42 @@ fn measure_context_for_node(
 }
 
 fn clips_overflow_node(node: &crate::runtime::UiNode) -> bool {
-    // Single source of truth lives in `to_taffy_overflow`; a node clips if
-    // either axis resolves to anything other than `Visible`.
-    to_taffy_overflow(node.style.overflow_x).1 || to_taffy_overflow(node.style.overflow_y).1
+    matches!(
+        (node.style.overflow_x, node.style.overflow_y),
+        (
+            Some(
+                crate::core::Overflow::Hidden
+                    | crate::core::Overflow::Clip
+                    | crate::core::Overflow::Scroll
+                    | crate::core::Overflow::Auto
+            ),
+            _
+        ) | (
+            _,
+            Some(
+                crate::core::Overflow::Hidden
+                    | crate::core::Overflow::Clip
+                    | crate::core::Overflow::Scroll
+                    | crate::core::Overflow::Auto
+            )
+        )
+    )
 }
 
 fn scrollable_content_size(
-    tree: &crate::runtime::UiTree,
+    _tree: &crate::runtime::UiTree,
     node: &crate::runtime::UiNode,
     layout_box: &LayoutBox,
     result: &LayoutResult,
 ) -> Size {
-    // Walk the full subtree under this node so nested scroll extents are
-    // counted. We translate each descendant's world rect into the local
-    // coordinate system of `layout_box` so the result is comparable to
-    // `content_size` (which is local). Direct-only inspection (the previous
-    // behavior) would underestimate the scroll extent whenever children had
-    // their own children — see report #6.
     let mut bounds: Option<Rect> = None;
-    for descendant_id in subtree_ids(tree, node.id) {
-        if descendant_id == node.id {
-            continue;
+    for child_id in &node.children {
+        if let Some(child) = result.box_for_node(*child_id) {
+            bounds = Some(match bounds {
+                Some(current) => current.union(child.local_rect),
+                None => child.local_rect,
+            });
         }
-        let Some(descendant_box) = result.box_for_node(descendant_id) else {
-            continue;
-        };
-        let world = descendant_box.world_rect;
-        let local_origin_x = world.origin.x - layout_box.world_rect.origin.x;
-        let local_origin_y = world.origin.y - layout_box.world_rect.origin.y;
-        // Take the max of the descendant's world rect and its own scroll
-        // content size, so an inner scrollable that overflows its own box
-        // still contributes to the outer scroll extent.
-        let max_x_local = local_origin_x + descendant_box.content_size.width.max(world.size.width);
-        let max_y_local = local_origin_y + descendant_box.content_size.height.max(world.size.height);
-        let descendant_local = Rect::new(
-            Point::new(local_origin_x, local_origin_y),
-            Size::new(max_x_local - local_origin_x, max_y_local - local_origin_y),
-        );
-        bounds = Some(match bounds {
-            Some(current) => current.union(descendant_local),
-            None => descendant_local,
-        });
     }
     let Some(bounds) = bounds else {
         return layout_box.content_size;
@@ -914,21 +909,6 @@ fn scrollable_content_size(
         bounds.max_x().max(layout_box.content_size.width).max(0.0),
         bounds.max_y().max(layout_box.content_size.height).max(0.0),
     )
-}
-
-/// Returns the node id and every descendant id under it in tree order.
-fn subtree_ids(tree: &crate::runtime::UiTree, root: NodeId) -> Vec<NodeId> {
-    let mut out = Vec::new();
-    let mut stack = vec![root];
-    while let Some(id) = stack.pop() {
-        out.push(id);
-        if let Some(node) = tree.get(id) {
-            for child in &node.children {
-                stack.push(*child);
-            }
-        }
-    }
-    out
 }
 
 fn measure_callback(
@@ -1039,34 +1019,42 @@ fn label_text_for_node<'a>(
     node: &'a crate::runtime::UiNode,
 ) -> Option<&'a str> {
     if let Some(ref spec) = node.widget_spec {
-        if let Some(label) = crate::widgets::spec_label_str(spec) {
-            return Some(label);
+        match spec {
+            crate::widgets::WidgetSpec::Button(bs) => {
+                if let Some(ref l) = bs.label {
+                    return Some(l.as_str());
+                }
+            }
+            crate::widgets::WidgetSpec::Checkbox(cs) => {
+                if let Some(ref l) = cs.label {
+                    return Some(l.as_str());
+                }
+            }
+            crate::widgets::WidgetSpec::Radio(rs) => {
+                if let Some(ref l) = rs.label {
+                    return Some(l.as_str());
+                }
+            }
+            crate::widgets::WidgetSpec::Tooltip(ts) => {
+                if let Some(ref l) = ts.text {
+                    return Some(l.as_str());
+                }
+            }
+            crate::widgets::WidgetSpec::Icon(is) => {
+                return Some(is.name.as_str());
+            }
+            crate::widgets::WidgetSpec::Modal(ms) => {
+                if let Some(ref l) = ms.title {
+                    return Some(l.as_str());
+                }
+            }
+            _ => {}
         }
     }
     if let Some(ref label) = node.semantic.label {
         return Some(label.as_str());
     }
-    // Fallback is only for intrinsic sizing of legacy builder patterns where
-    // child text was historically the label. Restricted to widget kinds that
-    // explicitly use child text as their label (see report #4) so that
-    // containers like Card/Alert/Spinner don't accidentally size against an
-    // arbitrary description child.
-    let widget_kind = match &node.kind {
-        ElementKind::Widget(kind) => Some(*kind),
-        _ => None,
-    };
-    let uses_child_text_as_label = matches!(
-        widget_kind,
-        Some(
-            WidgetKind::Button
-                | WidgetKind::Checkbox
-                | WidgetKind::Radio
-                | WidgetKind::Switch
-        )
-    );
-    if !uses_child_text_as_label {
-        return None;
-    }
+    // Fallback is only for intrinsic sizing of legacy builder patterns. Prefer explicit widget labels.
     node.children
         .iter()
         .filter_map(|id| tree.get(*id))
@@ -1078,3 +1066,307 @@ fn label_text_for_node<'a>(
             }
         })
 }
+
+
+###### src/layout/taffy_mapping.rs
+
+use crate::core::{
+    Align, Display, FlexDirection, FlexWrap, GridPlacement, GridTrack, Length, Style,
+};
+use taffy::prelude::TaffyAuto as _;
+use taffy::prelude::TaffyFitContent as _;
+use taffy::prelude::TaffyMaxContent as _;
+use taffy::prelude::TaffyMinContent as _;
+use taffy::prelude::TaffyZero as _;
+use taffy::style_helpers::{FromFr as _, FromLength as _, TaffyGridLine as _};
+
+pub fn to_taffy_dimension(length: Option<&Length>) -> taffy::Dimension {
+    match length {
+        None => taffy::Dimension::AUTO,
+        Some(Length::Px(px)) => taffy::Dimension::length(*px),
+        Some(Length::Percent(pct)) => taffy::Dimension::percent(*pct),
+        Some(Length::Auto) => taffy::Dimension::AUTO,
+        Some(Length::MinContent) => {
+            // SAFETY: CompactLength::min_content constructs a valid Dimension compact tag.
+            unsafe { taffy::Dimension::from_raw(taffy::style::CompactLength::min_content()) }
+        }
+        Some(Length::MaxContent) => {
+            // SAFETY: CompactLength::max_content constructs a valid Dimension compact tag.
+            unsafe { taffy::Dimension::from_raw(taffy::style::CompactLength::max_content()) }
+        }
+        Some(Length::FitContent(inner)) => match inner.as_ref() {
+            Length::Px(px) => {
+                // SAFETY: CompactLength::fit_content_px constructs a valid Dimension compact tag.
+                unsafe {
+                    taffy::Dimension::from_raw(taffy::style::CompactLength::fit_content_px(*px))
+                }
+            }
+            Length::Percent(pct) => {
+                // SAFETY: CompactLength::fit_content_percent constructs a valid Dimension compact tag.
+                unsafe {
+                    taffy::Dimension::from_raw(taffy::style::CompactLength::fit_content_percent(
+                        *pct,
+                    ))
+                }
+            }
+            _ => taffy::Dimension::AUTO,
+        },
+        _ => taffy::Dimension::AUTO,
+    }
+}
+
+pub fn to_taffy_length_pct(length: Option<&Length>) -> taffy::LengthPercentage {
+    match length {
+        Some(Length::Px(px)) => taffy::LengthPercentage::length(*px),
+        Some(Length::Percent(pct)) => taffy::LengthPercentage::percent(*pct),
+        _ => taffy::LengthPercentage::ZERO,
+    }
+}
+
+pub fn to_taffy_dim_auto(length: Option<&Length>) -> taffy::LengthPercentageAuto {
+    match length {
+        Some(Length::Px(px)) => taffy::LengthPercentageAuto::length(*px),
+        Some(Length::Percent(pct)) => taffy::LengthPercentageAuto::percent(*pct),
+        Some(Length::Auto) => taffy::LengthPercentageAuto::auto(),
+        _ => taffy::LengthPercentageAuto::ZERO,
+    }
+}
+
+pub fn to_taffy_align(align: Option<Align>) -> Option<taffy::AlignItems> {
+    match align {
+        Some(Align::Start) => Some(taffy::AlignItems::Start),
+        Some(Align::Center) => Some(taffy::AlignItems::Center),
+        Some(Align::End) => Some(taffy::AlignItems::End),
+        Some(Align::Stretch) => Some(taffy::AlignItems::Stretch),
+        None => None,
+    }
+}
+
+pub fn to_taffy_align_self(align: Option<Align>) -> Option<taffy::AlignSelf> {
+    match align {
+        Some(Align::Start) => Some(taffy::AlignSelf::Start),
+        Some(Align::Center) => Some(taffy::AlignSelf::Center),
+        Some(Align::End) => Some(taffy::AlignSelf::End),
+        Some(Align::Stretch) => Some(taffy::AlignSelf::Stretch),
+        None => None,
+    }
+}
+
+pub fn to_taffy_align_content(align: Option<Align>) -> Option<taffy::AlignContent> {
+    match align {
+        Some(Align::Start) => Some(taffy::AlignContent::Start),
+        Some(Align::Center) => Some(taffy::AlignContent::Center),
+        Some(Align::End) => Some(taffy::AlignContent::End),
+        Some(Align::Stretch) => Some(taffy::AlignContent::Stretch),
+        None => None,
+    }
+}
+
+pub fn to_taffy_justify(justify: Option<crate::Justify>) -> Option<taffy::JustifyContent> {
+    match justify {
+        Some(crate::Justify::Start) => Some(taffy::JustifyContent::Start),
+        Some(crate::Justify::Center) => Some(taffy::JustifyContent::Center),
+        Some(crate::Justify::End) => Some(taffy::JustifyContent::End),
+        Some(crate::Justify::SpaceBetween) => Some(taffy::JustifyContent::SpaceBetween),
+        Some(crate::Justify::SpaceAround) => Some(taffy::JustifyContent::SpaceAround),
+        None => None,
+    }
+}
+
+pub fn to_taffy_display(display: Option<Display>) -> taffy::Display {
+    match display {
+        Some(Display::Flex) => taffy::Display::Flex,
+        Some(Display::Grid) => taffy::Display::Grid,
+        Some(Display::Block) => taffy::Display::Block,
+        Some(Display::None) => taffy::Display::None,
+        Some(Display::Stack) => taffy::Display::Block,
+        None => taffy::Display::Block,
+    }
+}
+
+pub fn to_taffy_flex_direction(dir: Option<FlexDirection>) -> taffy::FlexDirection {
+    // Taffy/CSS default is row. Container primitives override this before mapping.
+    match dir {
+        Some(FlexDirection::Row) | None => taffy::FlexDirection::Row,
+        Some(FlexDirection::RowReverse) => taffy::FlexDirection::RowReverse,
+        Some(FlexDirection::Column) => taffy::FlexDirection::Column,
+        Some(FlexDirection::ColumnReverse) => taffy::FlexDirection::ColumnReverse,
+    }
+}
+
+pub fn to_taffy_flex_wrap(wrap: Option<FlexWrap>) -> taffy::FlexWrap {
+    match wrap {
+        Some(FlexWrap::Wrap) => taffy::FlexWrap::Wrap,
+        Some(FlexWrap::WrapReverse) => taffy::FlexWrap::WrapReverse,
+        Some(FlexWrap::NoWrap) | None => taffy::FlexWrap::NoWrap,
+    }
+}
+
+fn to_taffy_grid_track(track: &GridTrack) -> taffy::TrackSizingFunction {
+    match track {
+        GridTrack::Fixed(Length::Px(px)) => taffy::TrackSizingFunction::from_length(*px),
+        GridTrack::Fixed(Length::Percent(percent)) => {
+            taffy::TrackSizingFunction::from(taffy::LengthPercentage::percent(*percent))
+        }
+        GridTrack::Fixed(Length::Auto) | GridTrack::Auto => taffy::TrackSizingFunction::AUTO,
+        GridTrack::Fixed(Length::MinContent) => taffy::TrackSizingFunction::MIN_CONTENT,
+        GridTrack::Fixed(Length::MaxContent) => taffy::TrackSizingFunction::MAX_CONTENT,
+        GridTrack::Fixed(Length::FitContent(inner)) => match inner.as_ref() {
+            Length::Px(px) => {
+                taffy::TrackSizingFunction::fit_content(taffy::LengthPercentage::length(*px))
+            }
+            Length::Percent(percent) => {
+                taffy::TrackSizingFunction::fit_content(taffy::LengthPercentage::percent(*percent))
+            }
+            _ => taffy::TrackSizingFunction::AUTO,
+        },
+        GridTrack::Fixed(Length::Fr(fr)) | GridTrack::Fraction(fr) => {
+            taffy::TrackSizingFunction::from_fr(*fr)
+        }
+    }
+}
+
+fn to_taffy_grid_template(
+    tracks: Option<&Vec<GridTrack>>,
+) -> Vec<taffy::GridTemplateComponent<String>> {
+    tracks
+        .map(|tracks| {
+            tracks
+                .iter()
+                .map(|track| taffy::GridTemplateComponent::Single(to_taffy_grid_track(track)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn to_grid_line(value: i32) -> taffy::GridPlacement<String> {
+    taffy::GridPlacement::from_line_index(value.clamp(i16::MIN as i32, i16::MAX as i32) as i16)
+}
+
+fn to_taffy_grid_placement(
+    placement: Option<&GridPlacement>,
+) -> taffy::Line<taffy::GridPlacement<String>> {
+    let Some(placement) = placement else {
+        return taffy::Line::default();
+    };
+
+    match (placement.start, placement.end, placement.span) {
+        (Some(start), Some(end), _) => taffy::Line {
+            start: to_grid_line(start),
+            end: to_grid_line(end),
+        },
+        (Some(start), None, Some(span)) => taffy::Line {
+            start: to_grid_line(start),
+            end: taffy::GridPlacement::Span(span.min(u16::MAX as u32) as u16),
+        },
+        (Some(start), None, None) => taffy::Line {
+            start: to_grid_line(start),
+            end: taffy::GridPlacement::Auto,
+        },
+        (None, Some(end), Some(span)) => taffy::Line {
+            start: taffy::GridPlacement::Span(span.min(u16::MAX as u32) as u16),
+            end: to_grid_line(end),
+        },
+        (None, Some(end), None) => taffy::Line {
+            start: taffy::GridPlacement::Auto,
+            end: to_grid_line(end),
+        },
+        (None, None, Some(span)) => taffy::Line {
+            start: taffy::GridPlacement::Span(span.min(u16::MAX as u32) as u16),
+            end: taffy::GridPlacement::Auto,
+        },
+        (None, None, None) => taffy::Line::default(),
+    }
+}
+
+pub fn to_taffy_style(style: &Style) -> taffy::Style {
+    taffy::Style {
+        display: to_taffy_display(style.display),
+        position: match style.position {
+            Some(crate::core::Position::Absolute) => taffy::Position::Absolute,
+            Some(crate::core::Position::Fixed) => taffy::Position::Absolute,
+            _ => taffy::Position::Relative,
+        },
+        inset: taffy::Rect {
+            left: to_taffy_dim_auto(style.inset.as_ref().map(|e| &e.left)),
+            right: to_taffy_dim_auto(style.inset.as_ref().map(|e| &e.right)),
+            top: to_taffy_dim_auto(style.inset.as_ref().map(|e| &e.top)),
+            bottom: to_taffy_dim_auto(style.inset.as_ref().map(|e| &e.bottom)),
+        },
+        flex_direction: to_taffy_flex_direction(style.flex_direction),
+        flex_wrap: to_taffy_flex_wrap(style.flex_wrap),
+        align_items: to_taffy_align(style.align_items),
+        align_self: to_taffy_align_self(style.align_self),
+        align_content: to_taffy_align_content(style.align_content),
+        justify_content: to_taffy_justify(style.justify_content),
+        overflow: taffy::Point {
+            x: match style.overflow_x {
+                Some(crate::core::Overflow::Hidden | crate::core::Overflow::Clip) => {
+                    taffy::Overflow::Hidden
+                }
+                Some(crate::core::Overflow::Scroll | crate::core::Overflow::Auto) => {
+                    taffy::Overflow::Scroll
+                }
+                _ => taffy::Overflow::Visible,
+            },
+            y: match style.overflow_y {
+                Some(crate::core::Overflow::Hidden | crate::core::Overflow::Clip) => {
+                    taffy::Overflow::Hidden
+                }
+                Some(crate::core::Overflow::Scroll | crate::core::Overflow::Auto) => {
+                    taffy::Overflow::Scroll
+                }
+                _ => taffy::Overflow::Visible,
+            },
+        },
+        size: taffy::Size {
+            width: to_taffy_dimension(style.width.as_ref()),
+            height: to_taffy_dimension(style.height.as_ref()),
+        },
+        min_size: taffy::Size {
+            width: to_taffy_dimension(style.min_width.as_ref()),
+            height: to_taffy_dimension(style.min_height.as_ref()),
+        },
+        max_size: taffy::Size {
+            width: to_taffy_dimension(style.max_width.as_ref()),
+            height: to_taffy_dimension(style.max_height.as_ref()),
+        },
+        aspect_ratio: style.aspect_ratio,
+        padding: taffy::Rect {
+            left: to_taffy_length_pct(style.padding.as_ref().map(|e| &e.left)),
+            right: to_taffy_length_pct(style.padding.as_ref().map(|e| &e.right)),
+            top: to_taffy_length_pct(style.padding.as_ref().map(|e| &e.top)),
+            bottom: to_taffy_length_pct(style.padding.as_ref().map(|e| &e.bottom)),
+        },
+        border: style
+            .border
+            .map(|border| taffy::Rect {
+                left: taffy::LengthPercentage::length(border.width),
+                right: taffy::LengthPercentage::length(border.width),
+                top: taffy::LengthPercentage::length(border.width),
+                bottom: taffy::LengthPercentage::length(border.width),
+            })
+            .unwrap_or_else(taffy::Rect::zero),
+        margin: taffy::Rect {
+            left: to_taffy_dim_auto(style.margin.as_ref().map(|e| &e.left)),
+            right: to_taffy_dim_auto(style.margin.as_ref().map(|e| &e.right)),
+            top: to_taffy_dim_auto(style.margin.as_ref().map(|e| &e.top)),
+            bottom: to_taffy_dim_auto(style.margin.as_ref().map(|e| &e.bottom)),
+        },
+        // RGUI currently exposes one logical gap value. Map it to both axes until
+        // Style grows row_gap/column_gap.
+        gap: taffy::Size {
+            width: to_taffy_length_pct(style.gap.as_ref()),
+            height: to_taffy_length_pct(style.gap.as_ref()),
+        },
+        grid_template_columns: to_taffy_grid_template(style.grid_template_columns.as_ref()),
+        grid_template_rows: to_taffy_grid_template(style.grid_template_rows.as_ref()),
+        grid_column: to_taffy_grid_placement(style.grid_column.as_ref()),
+        grid_row: to_taffy_grid_placement(style.grid_row.as_ref()),
+        flex_grow: style.flex_grow.unwrap_or(0.0),
+        flex_shrink: style.flex_shrink.unwrap_or(1.0),
+        flex_basis: to_taffy_dimension(style.flex_basis.as_ref()),
+        ..Default::default()
+    }
+}
+

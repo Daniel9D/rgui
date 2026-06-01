@@ -1,4 +1,4 @@
-use crate::{NodeId, Rect};
+use crate::{NodeId, Rect, WidgetKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
@@ -29,6 +29,31 @@ pub enum Role {
     Link,
     Alert,
     Card,
+}
+
+pub fn role_for_widget_kind(kind: WidgetKind) -> Role {
+    match kind {
+        WidgetKind::Button => Role::Button,
+        WidgetKind::Input | WidgetKind::Textarea => Role::TextInput,
+        WidgetKind::Checkbox => Role::Checkbox,
+        WidgetKind::Radio => Role::Radio,
+        WidgetKind::List => Role::List,
+        WidgetKind::Table => Role::Table,
+        WidgetKind::Modal => Role::Dialog,
+        WidgetKind::Tooltip => Role::Tooltip,
+        WidgetKind::ScrollArea => Role::ScrollArea,
+        WidgetKind::Image => Role::Image,
+        WidgetKind::Switch => Role::Switch,
+        WidgetKind::Slider => Role::Slider,
+        WidgetKind::ProgressBar => Role::ProgressBar,
+        WidgetKind::Spinner => Role::Spinner,
+        WidgetKind::Badge => Role::Badge,
+        WidgetKind::Avatar => Role::Avatar,
+        WidgetKind::Link => Role::Link,
+        WidgetKind::Alert => Role::Alert,
+        WidgetKind::Card => Role::Card,
+        _ => Role::Group,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

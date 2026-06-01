@@ -357,3 +357,31 @@ pub enum AlertVariant {
 pub struct CardSpec {
     pub title: Option<String>,
 }
+
+pub fn spec_label(spec: &WidgetSpec) -> Option<String> {
+    match spec {
+        WidgetSpec::Button(bs) => bs.label.clone(),
+        WidgetSpec::Checkbox(cs) => cs.label.clone(),
+        WidgetSpec::Radio(rs) => rs.label.clone(),
+        WidgetSpec::Switch(sw) => sw.label.clone(),
+        WidgetSpec::Input(is) => is.aria_label.clone(),
+        WidgetSpec::Tooltip(ts) => ts.text.clone(),
+        WidgetSpec::Icon(is) => Some(is.name.clone()),
+        WidgetSpec::Modal(ms) => ms.title.clone(),
+        _ => None,
+    }
+}
+
+pub fn spec_label_str(spec: &WidgetSpec) -> Option<&str> {
+    match spec {
+        WidgetSpec::Button(bs) => bs.label.as_deref(),
+        WidgetSpec::Checkbox(cs) => cs.label.as_deref(),
+        WidgetSpec::Radio(rs) => rs.label.as_deref(),
+        WidgetSpec::Switch(sw) => sw.label.as_deref(),
+        WidgetSpec::Input(is) => is.aria_label.as_deref(),
+        WidgetSpec::Tooltip(ts) => ts.text.as_deref(),
+        WidgetSpec::Icon(is) => Some(is.name.as_str()),
+        WidgetSpec::Modal(ms) => ms.title.as_deref(),
+        _ => None,
+    }
+}

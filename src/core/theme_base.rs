@@ -1,0 +1,8 @@
+pub const OVERLAY_PANEL_Z_BASE: i32 = 1000;
+pub const OVERLAY_CONTENT_Z_BASE: i32 = OVERLAY_PANEL_Z_BASE + 1;
+pub const MODAL_PANEL_Z_BASE: i32 = OVERLAY_PANEL_Z_BASE + 1;
+pub const MODAL_CONTENT_Z_BASE: i32 = OVERLAY_PANEL_Z_BASE + 3;
+pub const SCROLLBAR_THUMB_Z_OFFSET: i32 = 3;
+pub const OVERLAY_HIT_TEST_ORDER: usize = usize::MAX;
+pub const OVERLAY_PANEL_HIT_TEST_ORDER: usize = usize::MAX - 1;
+pub const OVERLAY_BACKDROP_HIT_TEST_ORDER: usize = usize::MAX - 2;

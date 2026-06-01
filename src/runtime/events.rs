@@ -379,3 +379,11 @@ impl FocusSystem {
             .and_then(|scope| scope.advance_prev())
     }
 }
+
+pub fn normalize_key(key: impl Into<String>, modifiers: u32, repeat: bool) -> UiEvent {
+    UiEvent::KeyDown(crate::core::KeyEvent {
+        key: key.into(),
+        modifiers,
+        repeat,
+    })
+}

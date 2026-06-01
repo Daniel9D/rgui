@@ -1,9 +1,10 @@
 use crate::core::{
-    BorderCmd, Element, ElementKind, EventHandlers, HitTestEntry, HitTestTree, LayerKind, NodeId,
-    PaintCommand, Point, Rect, RectCmd, SemanticNode, SemanticStates, SemanticTree, ShadowCmd,
-    Size, Theme, ThemeMode, WidgetKind,
+    BorderCmd, Color, Element, ElementKind, EventHandlers, HitTestEntry, HitTestTree, LayerKind,
+    MODAL_CONTENT_Z_BASE, MODAL_PANEL_Z_BASE, NodeId, OVERLAY_BACKDROP_HIT_TEST_ORDER,
+    OVERLAY_CONTENT_Z_BASE, OVERLAY_HIT_TEST_ORDER, OVERLAY_PANEL_HIT_TEST_ORDER,
+    OVERLAY_PANEL_Z_BASE, Paint, PaintCommand, Point, Rect, RectCmd, SemanticNode, SemanticStates,
+    SemanticTree, ShadowCmd, Size, Theme, ThemeMode, WidgetKind,
 };
-use crate::core::{Color, Paint};
 
 use super::{UiNode, UiTree};
 #[derive(Clone, Debug)]
@@ -147,7 +148,7 @@ impl PortalTree {
                 hit_test.push(
                     HitTestEntry::new(root.owner, root.rect, -1, root.layer)
                         .with_key(root.key.clone())
-                        .with_order(usize::MAX),
+                        .with_order(OVERLAY_HIT_TEST_ORDER),
                 );
                 continue;
             }
@@ -163,7 +164,7 @@ impl PortalTree {
                     paint: Paint::Solid(Color::rgba(0, 0, 0, 80)),
                     radius: 0.0,
                     opacity: 1.0,
-                    z_index: 1000,
+                    z_index: OVERLAY_PANEL_Z_BASE,
                 }));
                 // Centered modal panel
                 let panel = root
@@ -171,12 +172,12 @@ impl PortalTree {
                     .as_ref()
                     .map(|c| c.panel_rect)
                     .unwrap_or(root.rect);
-                paint_panel(display_list, panel, 1001, root.modal, theme);
+                paint_panel(display_list, panel, MODAL_PANEL_Z_BASE, root.modal, theme);
                 // Hit-test for modal panel
                 hit_test.push(
-                    HitTestEntry::new(root.owner, panel, 1001, root.layer)
+                    HitTestEntry::new(root.owner, panel, MODAL_PANEL_Z_BASE, root.layer)
                         .with_key(root.key.clone())
-                        .with_order(usize::MAX - 1),
+                        .with_order(OVERLAY_PANEL_HIT_TEST_ORDER),
                 );
                 // Paint children inside panel
                 let content_rect = root
@@ -191,7 +192,7 @@ impl PortalTree {
                         &computed.layout,
                         content_rect.origin,
                         true, // skip_self = true
-                        1003,
+                        MODAL_CONTENT_Z_BASE,
                         display_list,
                         hit_test,
                         semantics,
@@ -209,12 +210,12 @@ impl PortalTree {
                     .as_ref()
                     .map(|c| c.panel_rect)
                     .unwrap_or(root.rect);
-                paint_panel(display_list, panel, 1000, root.modal, theme);
+                paint_panel(display_list, panel, OVERLAY_PANEL_Z_BASE, root.modal, theme);
                 // Hit-test for non-modal panel
                 hit_test.push(
-                    HitTestEntry::new(root.owner, panel, 1000, root.layer)
+                    HitTestEntry::new(root.owner, panel, OVERLAY_PANEL_Z_BASE, root.layer)
                         .with_key(root.key.clone())
-                        .with_order(usize::MAX - 1),
+                        .with_order(OVERLAY_PANEL_HIT_TEST_ORDER),
                 );
                 let content_rect = root
                     .computed
@@ -228,7 +229,7 @@ impl PortalTree {
                         &computed.layout,
                         content_rect.origin,
                         true, // skip_self = true
-                        1001,
+                        OVERLAY_CONTENT_Z_BASE,
                         display_list,
                         hit_test,
                         semantics,
@@ -371,28 +372,13 @@ fn push_portal_interaction(
         hit_test.push(
             HitTestEntry::new(node.id, rect, base_z, layer)
                 .with_key(Some(key.clone()))
-                .with_order(usize::MAX - 2),
+                .with_order(OVERLAY_BACKDROP_HIT_TEST_ORDER),
         );
     }
 
-    let role = match node.kind {
+    let role = match &node.kind {
         ElementKind::Text(_) => crate::core::Role::Text,
-        ElementKind::Widget(WidgetKind::Button) => crate::core::Role::Button,
-        ElementKind::Widget(WidgetKind::Input | WidgetKind::Textarea) => {
-            crate::core::Role::TextInput
-        }
-        ElementKind::Widget(WidgetKind::Checkbox) => crate::core::Role::Checkbox,
-        ElementKind::Widget(WidgetKind::Radio) => crate::core::Role::Radio,
-        ElementKind::Widget(WidgetKind::Image) => crate::core::Role::Image,
-        ElementKind::Widget(WidgetKind::Switch) => crate::core::Role::Switch,
-        ElementKind::Widget(WidgetKind::Slider) => crate::core::Role::Slider,
-        ElementKind::Widget(WidgetKind::ProgressBar) => crate::core::Role::ProgressBar,
-        ElementKind::Widget(WidgetKind::Spinner) => crate::core::Role::Spinner,
-        ElementKind::Widget(WidgetKind::Badge) => crate::core::Role::Badge,
-        ElementKind::Widget(WidgetKind::Avatar) => crate::core::Role::Avatar,
-        ElementKind::Widget(WidgetKind::Link) => crate::core::Role::Link,
-        ElementKind::Widget(WidgetKind::Alert) => crate::core::Role::Alert,
-        ElementKind::Widget(WidgetKind::Card) => crate::core::Role::Card,
+        ElementKind::Widget(kind) => crate::core::role_for_widget_kind(*kind),
         _ => crate::core::Role::Group,
     };
     let focusable = matches!(

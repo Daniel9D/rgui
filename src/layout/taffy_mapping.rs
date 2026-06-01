@@ -1,5 +1,5 @@
 use crate::core::{
-    Align, Display, FlexDirection, FlexWrap, GridPlacement, GridTrack, Length, Style,
+    Align, Display, FlexDirection, FlexWrap, GridPlacement, GridTrack, Length, Overflow, Style,
 };
 use taffy::prelude::TaffyAuto as _;
 use taffy::prelude::TaffyFitContent as _;
@@ -40,6 +40,20 @@ pub fn to_taffy_dimension(length: Option<&Length>) -> taffy::Dimension {
             _ => taffy::Dimension::AUTO,
         },
         _ => taffy::Dimension::AUTO,
+    }
+}
+
+/// Maps an `rgui::core::Overflow` into a `taffy::Overflow` and reports whether
+/// the value clips its content (i.e. anything other than `Visible`).
+///
+/// This is the single source of truth used by both `to_taffy_style` and the
+/// `clips_overflow_node` helper in `taffy.rs`, so adding a new `Overflow`
+/// variant only needs to be handled here.
+pub fn to_taffy_overflow(overflow: Option<Overflow>) -> (taffy::Overflow, bool) {
+    match overflow {
+        Some(Overflow::Hidden | Overflow::Clip) => (taffy::Overflow::Hidden, true),
+        Some(Overflow::Scroll | Overflow::Auto) => (taffy::Overflow::Scroll, true),
+        _ => (taffy::Overflow::Visible, false),
     }
 }
 
@@ -228,24 +242,8 @@ pub fn to_taffy_style(style: &Style) -> taffy::Style {
         align_content: to_taffy_align_content(style.align_content),
         justify_content: to_taffy_justify(style.justify_content),
         overflow: taffy::Point {
-            x: match style.overflow_x {
-                Some(crate::core::Overflow::Hidden | crate::core::Overflow::Clip) => {
-                    taffy::Overflow::Hidden
-                }
-                Some(crate::core::Overflow::Scroll | crate::core::Overflow::Auto) => {
-                    taffy::Overflow::Scroll
-                }
-                _ => taffy::Overflow::Visible,
-            },
-            y: match style.overflow_y {
-                Some(crate::core::Overflow::Hidden | crate::core::Overflow::Clip) => {
-                    taffy::Overflow::Hidden
-                }
-                Some(crate::core::Overflow::Scroll | crate::core::Overflow::Auto) => {
-                    taffy::Overflow::Scroll
-                }
-                _ => taffy::Overflow::Visible,
-            },
+            x: to_taffy_overflow(style.overflow_x).0,
+            y: to_taffy_overflow(style.overflow_y).0,
         },
         size: taffy::Size {
             width: to_taffy_dimension(style.width.as_ref()),
