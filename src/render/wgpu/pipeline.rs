@@ -81,28 +81,10 @@ impl PipelineCache {
         });
 
         let mut pipelines = HashMap::new();
-        for kind in [
-            PipelineKind::SolidRect,
-            PipelineKind::Border,
-            PipelineKind::Path,
-        ] {
+        for (kind, fragment_entry) in pipeline_table() {
             pipelines.insert(
                 kind,
-                create_pipeline(device, &layout, &shader, format, "fs_main"),
-            );
-        }
-        pipelines.insert(
-            PipelineKind::RoundedRect,
-            create_pipeline(device, &layout, &shader, format, "fs_rounded"),
-        );
-        pipelines.insert(
-            PipelineKind::TextGlyph,
-            create_pipeline(device, &layout, &shader, format, "fs_main"),
-        );
-        for kind in [PipelineKind::Image, PipelineKind::Svg] {
-            pipelines.insert(
-                kind,
-                create_pipeline(device, &layout, &shader, format, "fs_textured"),
+                create_pipeline(device, &layout, &shader, format, fragment_entry),
             );
         }
 
@@ -113,14 +95,37 @@ impl PipelineCache {
     }
 
     pub fn pipeline(&self, kind: PipelineKind) -> &wgpu::RenderPipeline {
-        self.pipelines
-            .get(&kind)
-            .expect("pipeline is created for every PipelineKind")
+        // `pipeline_table()` enumerates every `PipelineKind` variant, so a
+        // missing entry would indicate a programming error (a new variant
+        // added without updating the table). The table is the single source
+        // of truth, so this panic is unreachable in correct code.
+        match self.pipelines.get(&kind) {
+            Some(p) => p,
+            None => unreachable!(
+                "PipelineKind::{kind:?} missing from pipeline_table(); \
+                 add it to render::wgpu::pipeline::pipeline_table"
+            ),
+        }
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
     }
+}
+
+/// Single source of truth mapping each `PipelineKind` to the fragment entry
+/// point in `SHADER_SOURCE` that should be used for it. Keeping this in one
+/// place makes it easy to audit which shader entry every pipeline runs.
+fn pipeline_table() -> [(PipelineKind, &'static str); 7] {
+    [
+        (PipelineKind::SolidRect, "fs_main"),
+        (PipelineKind::Border, "fs_main"),
+        (PipelineKind::Path, "fs_main"),
+        (PipelineKind::RoundedRect, "fs_rounded"),
+        (PipelineKind::TextGlyph, "fs_main"),
+        (PipelineKind::Image, "fs_textured"),
+        (PipelineKind::Svg, "fs_textured"),
+    ]
 }
 
 fn create_pipeline(

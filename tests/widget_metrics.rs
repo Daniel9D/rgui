@@ -341,3 +341,52 @@ fn collection_painters_use_theme_row_metrics() {
         .expect("list layout");
     assert!(list_selection.origin.x >= list_layout.x + 14.0);
 }
+
+#[test]
+fn min_size_for_leaf_widgets_returns_nonzero() {
+    let metrics = Theme::light().widgets.metrics;
+
+    for kind in [
+        WidgetKind::Image,
+        WidgetKind::Switch,
+        WidgetKind::Slider,
+        WidgetKind::ProgressBar,
+        WidgetKind::Spinner,
+        WidgetKind::Badge,
+        WidgetKind::Avatar,
+    ] {
+        let size = metrics.min_size_for(kind);
+        assert!(
+            size.width > 0.0 && size.height > 0.0,
+            "{kind:?} min_size_for returned {size:?}, expected > 0 on both axes"
+        );
+    }
+}
+
+#[test]
+fn min_size_for_container_widgets_returns_sensible_default() {
+    let metrics = Theme::light().widgets.metrics;
+
+    for kind in [
+        WidgetKind::Card,
+        WidgetKind::Alert,
+        WidgetKind::Modal,
+        WidgetKind::Popover,
+    ] {
+        let size = metrics.min_size_for(kind);
+        assert!(
+            size.width > 0.0 && size.height > 0.0,
+            "{kind:?} min_size_for returned {size:?}, expected > 0 on both axes"
+        );
+    }
+}
+
+#[test]
+fn link_default_size_is_line_height() {
+    let metrics = Theme::light().widgets.metrics;
+    let size = metrics.min_size_for(WidgetKind::Link);
+    // Link is a leaf widget whose width comes from its label intrinsic
+    // measurement, so the default is 0 wide with a single line height.
+    assert_eq!(size.width, 0.0);
+    assert!(size.height >= 14.0, "link fallback height {size:?} should fit a line of text");
+}

@@ -2,8 +2,11 @@ pub mod atlas;
 pub mod batch;
 #[cfg(feature = "bitmap-text-fallback")]
 mod bitmap_text;
+pub mod color;
+pub mod constants;
 pub mod context;
 pub mod debug;
+pub mod debug_env;
 pub mod error;
 mod glyphon_text;
 pub mod item;
@@ -22,7 +25,7 @@ pub use error::{RendererError, RendererResult};
 pub use glyphon_text::{GlyphonTextBridge, GlyphonTextStats};
 pub use item::{MAX_RENDER_ITEMS_PER_FRAME, RenderItem, build_render_items};
 pub use offscreen::OffscreenTarget;
-pub use options::RendererOptions;
+pub use options::{RenderConfig, RendererOptions};
 pub use pipeline::{InstanceRaw, PipelineCache, PipelineKind};
 pub use readback::read_rgba8_texture;
 pub use shaders::SHADER_SOURCE;
@@ -68,7 +71,7 @@ impl WgpuRenderer {
             atlas,
             text_bridge,
             instance_buffer,
-            instance_capacity: 1,
+            instance_capacity: constants::INITIAL_INSTANCE_CAPACITY,
         })
     }
 
@@ -111,8 +114,17 @@ impl WgpuRenderer {
         resources: &ResourceStore,
         target: &wgpu::TextureView,
     ) -> RendererResult<RenderStats> {
-        // Step 3a: Prepare resources (upload images/SVGs) before lowering render items
-        // TODO: implement prepare_resources() - currently a no-op placeholder
+        // Resource uploads are host-driven: the host is expected to call
+        // `WgpuRenderer::upload_atlas_rgba8` (and the SVG/glyph equivalents)
+        // before issuing frames. Items whose atlas entry is missing are
+        // rendered via `missing_resource_item` (a magenta placeholder) so a
+        // missing upload is visible during development rather than a silent
+        // black hole.
+        //
+        // We do not auto-scan `display_list` here for missing images, because
+        // (a) the ResourceStore does not always own the raw bytes (they may
+        // live in the host's own cache), and (b) the host usually wants to
+        // own the upload timing to avoid uploading every frame.
         let items = build_render_items(display_list, resources, &mut self.atlas)?;
         let batches = build_batches_from_items(&items);
         let text_stats = self.text_bridge.prepare(
@@ -121,10 +133,10 @@ impl WgpuRenderer {
             display_list,
             self.context.size(),
         )?;
-        if std::env::var_os("RGUI_DEBUG_RENDER_ITEMS").is_some() {
+        if debug_env::dump_render_items() {
             eprintln!("{}", debug::format_render_items(&items));
         }
-        if std::env::var_os("RGUI_DEBUG_BATCHES").is_some() {
+        if debug_env::dump_batches() {
             eprintln!("{}", debug::format_render_batches(&batches));
         }
         let instances = self.instances_for_items(&items);
@@ -250,6 +262,18 @@ fn scissor_rect(clip_rect: Option<crate::Rect>, viewport: SizeU32) -> Option<(u3
         return Some((0, 0, viewport.width, viewport.height));
     };
 
+    // Reject non-finite geometry: a NaN/inf rect would otherwise produce a
+    // bogus scissor (e.g. u32::MAX from `inf as u32`) that wgpu would either
+    // reject outright or render as garbage. Returning `None` causes the
+    // entire batch to be skipped, which matches the existing empty-clip path.
+    if !rect.origin.x.is_finite()
+        || !rect.origin.y.is_finite()
+        || !rect.size.width.is_finite()
+        || !rect.size.height.is_finite()
+    {
+        return None;
+    }
+
     let x0 = rect.origin.x.max(0.0).floor() as u32;
     let y0 = rect.origin.y.max(0.0).floor() as u32;
     let x1 = rect.max_x().min(viewport.width as f32).ceil().max(0.0) as u32;
@@ -262,15 +286,35 @@ fn scissor_rect(clip_rect: Option<crate::Rect>, viewport: SizeU32) -> Option<(u3
     Some((x0, y0, width, height))
 }
 
+impl WgpuRenderer {
+    /// Like `RendererBackend::render` but surfaces render-time errors instead
+    /// of panicking. Prefer this in long-running hosts that can recover.
+    pub fn try_render(
+        &mut self,
+        display_list: &DisplayList,
+        resources: &ResourceStore,
+    ) -> RendererResult<RenderStats> {
+        let target_size = self.context.size();
+        let target = OffscreenTarget::new(&self.context, target_size);
+        self.render_to_target(display_list, resources, target.view())
+    }
+}
+
 impl RendererBackend for WgpuRenderer {
     fn resize(&mut self, size: SizeU32) {
         self.context.resize(size);
     }
 
     fn render(&mut self, display_list: &DisplayList, resources: &ResourceStore) -> RenderStats {
-        let target_size = self.context.size();
-        let target = OffscreenTarget::new(&self.context, target_size);
-        self.render_to_target(display_list, resources, target.view())
-            .expect("offscreen render succeeds")
+        // Trait contract returns `RenderStats`, not `Result`. Log the error
+        // and return zeroed stats so the host can keep running. Callers that
+        // care about the error should use `WgpuRenderer::try_render` instead.
+        match self.try_render(display_list, resources) {
+            Ok(stats) => stats,
+            Err(err) => {
+                eprintln!("WgpuRenderer::render failed: {err}");
+                RenderStats::default()
+            }
+        }
     }
 }

@@ -1,3 +1,21 @@
+//! Single WGSL shader module containing every fragment entry point used by
+//! the render pipelines.
+//!
+//! The fragment entry points are wired to `PipelineKind` in
+//! `render::wgpu::pipeline::pipeline_table()`. Keep the table in sync if you
+//! add, remove, or rename a fragment entry.
+//!
+//! Entry summary:
+//! - `vs_main` — shared vertex shader for every pipeline.
+//! - `fs_main` — solid color output (SolidRect, Border, Path, TextGlyph).
+//! - `fs_rounded` — rounded-rect SDF output (RoundedRect). The `0.5` cutoff
+//!   here is mirrored in `render::wgpu::constants::ROUNDED_RECT_RADIUS_THRESHOLD`
+//!   on the CPU side; the CPU uses it to decide which pipeline a rect goes to.
+//! - `fs_textured` — atlas-textured color output (Image, Svg).
+//!
+//! All three fragment entries share `VertexOut`; the `radius` and `uv` fields
+//! are only meaningful for the entries that read them.
+
 pub const SHADER_SOURCE: &str = r#"
 struct VertexOut {
     @builtin(position) position: vec4<f32>,

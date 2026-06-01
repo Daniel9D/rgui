@@ -65,6 +65,23 @@ pub enum LayerKind {
     Debug,
 }
 
+impl LayerKind {
+    /// Stable ordering used by both the GPU render path (`item::sort_by_key`)
+    /// and the event dispatch hit-test path. Lower values are drawn first /
+    /// hit-tested first.
+    pub const fn order(self) -> i32 {
+        match self {
+            LayerKind::Document => 0,
+            LayerKind::Floating => 1,
+            LayerKind::Popover => 2,
+            LayerKind::Tooltip => 3,
+            LayerKind::ContextMenu => 4,
+            LayerKind::Modal => 5,
+            LayerKind::Debug => 6,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct LayerSpec {
     pub kind: LayerKind,

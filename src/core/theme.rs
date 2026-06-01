@@ -169,6 +169,18 @@ pub struct WidgetMetrics {
     pub tooltip: TooltipMetrics,
     pub overlay: OverlayMetrics,
     pub scrollbar: ScrollbarMetrics,
+    pub card: CardTheme,
+    pub alert: AlertTheme,
+    pub modal: ModalTheme,
+    pub popover: PopoverTheme,
+    pub image: ImageTheme,
+    pub switch: SwitchTheme,
+    pub slider: SliderTheme,
+    pub progress_bar: ProgressBarTheme,
+    pub spinner: SpinnerTheme,
+    pub badge: BadgeTheme,
+    pub avatar: AvatarTheme,
+    pub link: LinkTheme,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -275,6 +287,66 @@ pub struct ScrollbarMetrics {
     pub width: f32,
     pub padding: f32,
     pub min_thumb_height: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CardTheme {
+    pub min_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AlertTheme {
+    pub min_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ModalTheme {
+    pub min_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PopoverTheme {
+    pub min_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ImageTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SwitchTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SliderTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ProgressBarTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SpinnerTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BadgeTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AvatarTheme {
+    pub default_size: Size,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LinkTheme {
+    pub default_size: Size,
 }
 
 impl ScrollbarMetrics {
@@ -384,6 +456,42 @@ impl Default for WidgetMetrics {
                 padding: 4.0,
                 min_thumb_height: 20.0,
             },
+            card: CardTheme {
+                min_size: Size::new(200.0, 100.0),
+            },
+            alert: AlertTheme {
+                min_size: Size::new(200.0, 60.0),
+            },
+            modal: ModalTheme {
+                min_size: Size::new(240.0, 120.0),
+            },
+            popover: PopoverTheme {
+                min_size: Size::new(180.0, 80.0),
+            },
+            image: ImageTheme {
+                default_size: Size::new(100.0, 100.0),
+            },
+            switch: SwitchTheme {
+                default_size: Size::new(44.0, 24.0),
+            },
+            slider: SliderTheme {
+                default_size: Size::new(200.0, 24.0),
+            },
+            progress_bar: ProgressBarTheme {
+                default_size: Size::new(200.0, 8.0),
+            },
+            spinner: SpinnerTheme {
+                default_size: Size::new(24.0, 24.0),
+            },
+            badge: BadgeTheme {
+                default_size: Size::new(60.0, 20.0),
+            },
+            avatar: AvatarTheme {
+                default_size: Size::new(40.0, 40.0),
+            },
+            link: LinkTheme {
+                default_size: Size::new(0.0, 16.0),
+            },
         }
     }
 }
@@ -404,7 +512,22 @@ impl WidgetMetrics {
             WidgetKind::Divider => self.divider.default_size,
             WidgetKind::Canvas => self.canvas.default_size,
             WidgetKind::Tooltip => self.tooltip.min_size,
-            _ => Size::new(0.0, 0.0),
+            WidgetKind::Card => self.card.min_size,
+            WidgetKind::Alert => self.alert.min_size,
+            WidgetKind::Modal => self.modal.min_size,
+            WidgetKind::Popover => self.popover.min_size,
+            WidgetKind::Image => self.image.default_size,
+            WidgetKind::Switch => self.switch.default_size,
+            WidgetKind::Slider => self.slider.default_size,
+            WidgetKind::ProgressBar => self.progress_bar.default_size,
+            WidgetKind::Spinner => self.spinner.default_size,
+            WidgetKind::Badge => self.badge.default_size,
+            WidgetKind::Avatar => self.avatar.default_size,
+            WidgetKind::Link => self.link.default_size,
+            WidgetKind::ScrollArea
+            | WidgetKind::Checkbox
+            | WidgetKind::Radio
+            | WidgetKind::Text => Size::new(0.0, 0.0),
         }
     }
 }

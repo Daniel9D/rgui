@@ -419,3 +419,111 @@ fn checked_checkbox_mark_is_inset_from_outer_box() {
         "checked mark should not fill the checkbox: checkbox={checkbox:?} mark={mark:?}"
     );
 }
+
+#[test]
+fn siblings_in_column_do_not_overlap() {
+    // Regression test: a sequence of distinct widgets in a Column should
+    // each get a non-zero, non-overlapping y range. Before the widget-sizing
+    // fix, Card / Alert / Spinner all collapsed to 0x0 via the
+    // `min_size_for` fallthrough, so the next sibling stacked at the
+    // parent's y=0 and the three rendered on top of each other.
+    use rgui::widgets::{alert, card, spinner};
+
+    let root = Element::column()
+        .key("root")
+        .padding(8.0)
+        .gap(4.0)
+        .child(card().key("a").child(text("A").key("a-text")))
+        .child(alert().key("b").child(text("B").key("b-text")))
+        .child(spinner().key("c"));
+
+    let mut runtime = UiRuntime::default();
+    let output = runtime.update(FrameInput {
+        root,
+        viewport: Size::new(400.0, 400.0),
+        ..Default::default()
+    });
+
+    let snapshot = output.snapshot.as_ref().expect("snapshot exists");
+    let a = snapshot.layout_box("a").expect("a layout");
+    let b = snapshot.layout_box("b").expect("b layout");
+    let c = snapshot.layout_box("c").expect("c layout");
+
+    // Each widget has a non-zero size.
+    assert!(a.height > 0.0 && b.height > 0.0 && c.height > 0.0,
+            "all three widgets should have non-zero height (a={}, b={}, c={})",
+            a.height, b.height, c.height);
+
+    // They are stacked in order, no overlap.
+    assert!(a.y < b.y, "a.y={} should be < b.y={}", a.y, b.y);
+    assert!(b.y < c.y, "b.y={} should be < c.y={}", b.y, c.y);
+    let a_max = a.y + a.height;
+    let b_max = b.y + b.height;
+    assert!(a_max <= b.y + 0.01,
+            "a (y={}..{}) should not overlap b (y={}..{})",
+            a.y, a_max, b.y, b_max);
+    assert!(b_max <= c.y + 0.01,
+            "b (y={}..{}) should not overlap c (y={}..{})",
+            b.y, b_max, c.y, c.y + c.height);
+}
+
+#[test]
+fn toolbar_siblings_have_disjoint_x_ranges() {
+    // Direct regression test for the user-reported screenshot: a horizontal
+    // row of mixed widgets (button / input / checkbox / radio / select /
+    // textarea) should produce layout boxes with strictly ascending, non-
+    // overlapping x-ranges. Before the widget-sizing fix, widgets whose
+    // `min_size_for` fell through to Size::new(0, 0) would collapse to 0
+    // wide, causing the next sibling to stack at the same x as the previous
+    // one (visible overlap).
+    use rgui::widgets::{button, checkbox, input, radio, select, textarea};
+
+    let root = Element::row()
+        .key("bar")
+        .gap(8.0)
+        .child(button("Save").key("save").primary())
+        .child(input().key("search"))
+        .child(checkbox().key("enabled").checked(true))
+        .child(radio().key("choice"))
+        .child(select().key("filter").options([option("a", "Active")]))
+        .child(textarea().key("notes").width(120.0));
+
+    let mut runtime = UiRuntime::default();
+    let output = runtime.update(FrameInput {
+        root,
+        viewport: Size::new(800.0, 200.0),
+        ..Default::default()
+    });
+
+    let snapshot = output.snapshot.as_ref().expect("snapshot exists");
+    let keys = ["save", "search", "enabled", "choice", "filter", "notes"];
+    let boxes: Vec<_> = keys
+        .iter()
+        .map(|k| {
+            (
+                *k,
+                snapshot
+                    .layout_box(k)
+                    .unwrap_or_else(|| panic!("{k} layout")),
+            )
+        })
+        .collect();
+
+    // Each box has a positive width and height.
+    for (k, b) in &boxes {
+        assert!(b.width > 0.0 && b.height > 0.0,
+                "{k} should have non-zero size (got {}x{})", b.width, b.height);
+    }
+
+    // Strictly ascending x with no horizontal overlap.
+    for window in boxes.windows(2) {
+        let (k1, prev) = &window[0];
+        let (k2, next) = &window[1];
+        let prev_max_x = prev.x + prev.width;
+        assert!(prev_max_x <= next.x + 0.01,
+                "{k1} (x={}..{}) should not overlap {k2} (x={}..{})",
+                prev.x, prev_max_x, next.x, next.x + next.width);
+        assert!(next.x > prev.x,
+                "{k2}.x ({}) should be > {k1}.x ({})", next.x, prev.x);
+    }
+}

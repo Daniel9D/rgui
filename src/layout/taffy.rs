@@ -666,6 +666,34 @@ fn base_taffy_style(
         _ => {}
     }
 
+    // Container-hug widgets: when these have children and the user did not
+    // set an explicit display / flex-direction / align-items, treat them as
+    // a vertical flex container so they auto-size to their children instead
+    // of collapsing to the block default. An explicit width() or height() on
+    // the user style still wins because that flows through `to_taffy_style`
+    // and is preserved on the taffy_style's `size` field.
+    if let ElementKind::Widget(kind) = node.kind {
+        let is_hug_kind = matches!(
+            kind,
+            WidgetKind::Card
+                | WidgetKind::Alert
+                | WidgetKind::Modal
+                | WidgetKind::Popover
+                | WidgetKind::Tooltip
+        );
+        if is_hug_kind {
+            if style.display.is_none() {
+                style.display = Some(Display::Flex);
+            }
+            if style.flex_direction.is_none() {
+                style.flex_direction = Some(FlexDirection::Column);
+            }
+            if style.align_items.is_none() {
+                style.align_items = Some(crate::core::Align::Stretch);
+            }
+        }
+    }
+
     let mut taffy_style = to_taffy_style(&style);
     if matches!(node.kind, ElementKind::Widget(WidgetKind::Tabs)) {
         taffy_style.display = taffy::Display::Flex;
@@ -690,6 +718,20 @@ fn base_taffy_style(
                 taffy_style.size.height = taffy::Dimension::length(viewport.height);
             }
         } else {
+            // Overlay roots (Popover / Modal / Tooltip / Menu) get a default
+            // `overflow: Hidden` so content past the max_size cap is clipped
+            // instead of bleeding into the surrounding UI. Users can still
+            // opt into `Visible` / `Scroll` by setting `overflow_x` or
+            // `overflow_y` explicitly on the element.
+            if style.overflow_x.is_none() {
+                style.overflow_x = Some(crate::core::Overflow::Hidden);
+            }
+            if style.overflow_y.is_none() {
+                style.overflow_y = Some(crate::core::Overflow::Hidden);
+            }
+            // Re-derive the taffy_style after the overflow mutation since
+            // `to_taffy_style` was already called above.
+            taffy_style = to_taffy_style(&style);
             match node.kind {
                 ElementKind::Widget(WidgetKind::Modal) => {
                     if node.style.max_width.is_none() {

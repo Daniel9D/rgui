@@ -2,7 +2,7 @@ use crate::core::{
     Color, DisplayList, FontStyle, FontWeight, PaintCommand, Rect, SizeU32, effective_clip,
 };
 
-use super::{RendererError, RendererResult};
+use super::{RendererError, RendererResult, constants, debug_env};
 
 pub struct GlyphonTextBridge {
     font_system: glyphon::FontSystem,
@@ -166,7 +166,9 @@ impl GlyphonTextBridge {
                         &mut self.font_system,
                         glyphon::Metrics::new(
                             cmd.size.max(1.0),
-                            cmd.line_height.unwrap_or(cmd.size * 1.2).max(1.0),
+                            cmd.line_height
+                                .unwrap_or(cmd.size * constants::TEXT_LINE_HEIGHT_RATIO)
+                                .max(1.0),
                         ),
                     );
                     buffer.set_size(
@@ -183,7 +185,7 @@ impl GlyphonTextBridge {
                     );
                     buffer.set_wrap(&mut self.font_system, glyphon::Wrap::Word);
                     buffer.shape_until_scroll(&mut self.font_system, false);
-                    if std::env::var_os("RGUI_DEBUG_TEXT").is_some() {
+                    if debug_env::dump_text() {
                         eprintln!(
                             "{}",
                             debug_text_area_line(&cmd.text, rect, clip, text_bounds(clip))
@@ -216,7 +218,10 @@ fn text_rect(cmd: &crate::core::TextCmd) -> Rect {
     if cmd.rect.size.width > 0.0 && cmd.rect.size.height > 0.0 {
         return cmd.rect;
     }
-    let line_height = cmd.line_height.unwrap_or(cmd.size * 1.2).max(1.0);
+    let line_height = cmd
+        .line_height
+        .unwrap_or(cmd.size * constants::TEXT_LINE_HEIGHT_RATIO)
+        .max(1.0);
     let glyph_count = cmd.text.chars().count().max(1) as f32;
     Rect::new(
         cmd.rect.origin,

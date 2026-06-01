@@ -1,6 +1,9 @@
 use crate::core::{Color, LayerKind, Point, Rect, Size};
 
-use super::{PipelineKind, RenderItem, item::MAX_RENDER_ITEMS_PER_FRAME, item::paint_order};
+use super::{
+    PipelineKind, RenderItem, color::color_to_linear, constants,
+    item::MAX_RENDER_ITEMS_PER_FRAME, item::paint_order,
+};
 
 const GLYPH_WIDTH: usize = 5;
 const GLYPH_HEIGHT: usize = 7;
@@ -79,7 +82,12 @@ pub(crate) fn push_bitmap_text_runs_with_pipeline(
                         uv_rect: [0.0, 0.0, 1.0, 1.0],
                         radius: 0.0,
                         z_index,
-                        order: paint_order(order, visible_index * 64 + row * 8 + run_start),
+                        order: paint_order(
+                            order,
+                            visible_index * constants::GLYPH_SUB_ORDER_STRIDE
+                                + row * constants::GLYPH_ROW_STRIDE
+                                + run_start,
+                        ),
                     },
                 )?;
             }
@@ -248,11 +256,4 @@ fn bitmap_glyph(ch: char) -> [u8; GLYPH_HEIGHT] {
     }
 }
 
-fn color_to_linear(color: Color, opacity: f32) -> [f32; 4] {
-    [
-        color.r as f32 / 255.0,
-        color.g as f32 / 255.0,
-        color.b as f32 / 255.0,
-        color.a as f32 / 255.0 * opacity,
-    ]
-}
+

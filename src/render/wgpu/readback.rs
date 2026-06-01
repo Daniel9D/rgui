@@ -1,13 +1,13 @@
 use crate::core::SizeU32;
 
-use super::{RendererError, RendererResult, WgpuContext};
+use super::{RendererError, RendererResult, WgpuContext, constants};
 
 pub async fn read_rgba8_texture(
     context: &WgpuContext,
     texture: &wgpu::Texture,
     size: SizeU32,
 ) -> RendererResult<Vec<u8>> {
-    let bytes_per_pixel = 4u32;
+    let bytes_per_pixel = constants::ATLAS_BYTES_PER_PIXEL;
     let unpadded_bytes_per_row = size.width * bytes_per_pixel;
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;

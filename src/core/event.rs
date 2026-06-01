@@ -244,18 +244,6 @@ impl HitTestTree {
         self.entries
             .iter()
             .filter(|entry| entry.pointer_events && entry.hit_rect().contains(point))
-            .max_by_key(|entry| (layer_order(entry.layer), entry.z_index, entry.order))
-    }
-}
-
-fn layer_order(layer: LayerKind) -> i32 {
-    match layer {
-        LayerKind::Document => 0,
-        LayerKind::Floating => 1,
-        LayerKind::Popover => 2,
-        LayerKind::Tooltip => 3,
-        LayerKind::ContextMenu => 4,
-        LayerKind::Modal => 5,
-        LayerKind::Debug => 6,
+            .max_by_key(|entry| (entry.layer.order(), entry.z_index, entry.order))
     }
 }

@@ -1,7 +1,7 @@
 use crate::core::{DisplayList, RenderStats, ResourceStore, SizeU32};
 use winit::window::Window;
 
-use super::{RendererError, RendererOptions, RendererResult, WgpuContext, WgpuRenderer};
+use super::{RendererError, RendererOptions, RendererResult, WgpuContext, WgpuRenderer, constants};
 
 pub struct SurfaceRenderer {
     surface: wgpu::Surface<'static>,
@@ -69,7 +69,7 @@ impl SurfaceRenderer {
                 .copied()
                 .unwrap_or(wgpu::CompositeAlphaMode::Auto),
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: constants::DESIRED_MAXIMUM_FRAME_LATENCY,
         };
         surface.configure(&device, &config);
 

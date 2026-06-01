@@ -16,6 +16,10 @@ pub fn spinner() -> Element {
 }
 
 /// Creates an alert / banner element for inline status messages.
+///
+/// Sizing: by default the alert **hugs its children** (auto-sized as a
+/// vertical flex container). To force a fixed size, set an explicit `width()`
+/// and/or `height()` on the element.
 pub fn alert() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Alert))
         .widget_spec(WidgetSpec::Alert(AlertSpec::default()))

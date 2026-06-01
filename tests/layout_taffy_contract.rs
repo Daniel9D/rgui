@@ -145,3 +145,101 @@ fn tabs_percentage_padding_is_preserved_by_theme_header_minimum() {
     let panel = result.box_for_key("panel").expect("panel layout");
     assert!(panel.local_rect.origin.y > tabs.local_rect.origin.y);
 }
+
+#[test]
+fn card_with_child_hugs_content() {
+    // A Card with a child should auto-size to that child (hug content).
+    // Before the fix, the Card collapsed to 0x0 because min_size_for fell
+    // through to Size::new(0, 0) and the layout backend didn't treat Card
+    // as a flex container.
+    let output = frame(
+        rgui::widgets::card()
+            .key("card")
+            .child(text("X").key("x")),
+        Size::new(320.0, 240.0),
+    );
+
+    let snapshot = output.snapshot.as_ref().expect("snapshot exists");
+    let card = snapshot.layout_box("card").expect("card layout");
+    let x = snapshot.layout_box("x").expect("x layout");
+
+    assert!(
+        card.height > 0.0,
+        "card should have non-zero height (got h={})",
+        card.height
+    );
+    let card_max_y = card.y + card.height;
+    let x_max_y = x.y + x.height;
+    assert!(
+        x.y >= card.y && x_max_y <= card_max_y + 0.01,
+        "child 'x' (y={}..{}) should fit inside the card (y={}..{})",
+        x.y,
+        x_max_y,
+        card.y,
+        card_max_y
+    );
+}
+
+#[test]
+fn overlay_root_defaults_to_overflow_hidden() {
+    // Modal / Popover / Tooltip roots should default to overflow: Hidden so
+    // content past the max_size cap is clipped, not visible.
+    for (label, builder) in [
+        ("modal", rgui::widgets::modal as fn() -> Element),
+        ("popover", rgui::widgets::popover as fn() -> Element),
+        ("tooltip", rgui::widgets::tooltip as fn() -> Element),
+    ] {
+        let output = frame(
+            builder().key(label).child(text("x")),
+            Size::new(800.0, 600.0),
+        );
+        let layout_box = output
+            .snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.layout_box(label))
+            .unwrap_or_else(|| panic!("{label} layout"));
+        assert!(
+            layout_box.clips_overflow(),
+            "{label} should default to overflow: Hidden (clips_overflow == true)"
+        );
+    }
+}
+
+#[test]
+fn card_explicit_size_overrides_hug() {
+    // An explicit width() / height() on the user style must override the
+    // hug-to-content behavior, just like on the root column.
+    let output = frame(
+        rgui::widgets::card()
+            .key("card")
+            .width(300.0)
+            .height(150.0)
+            .child(text("Hello").key("hello")),
+        Size::new(640.0, 480.0),
+    );
+
+    let snapshot = output.snapshot.as_ref().expect("snapshot exists");
+    let card = snapshot.layout_box("card").expect("card layout");
+    assert_eq!(card.width, 300.0);
+    assert_eq!(card.height, 150.0);
+}
+
+#[test]
+fn card_overflow_remains_visible_by_default() {
+    // Card is a regular container widget (not an overlay root), so its
+    // overflow should remain Visible by default — children should not be
+    // clipped to the card's bounds without an explicit overflow setting.
+    let output = frame(
+        rgui::widgets::card()
+            .key("card")
+            .child(text("Hello").key("hello")),
+        Size::new(640.0, 480.0),
+    );
+
+    let snapshot = output.snapshot.as_ref().expect("snapshot exists");
+    let card = snapshot.layout_box("card").expect("card layout");
+    assert!(
+        !card.clips_overflow(),
+        "card overflow should default to Visible (clips_overflow == false)"
+    );
+}

@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::core::{AtlasEntryKind, GlyphKey, ImageId, Rect, SizeU32, SvgId};
 
+use super::constants;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct AtlasAllocation {
     pub rect: Rect,
@@ -40,16 +42,31 @@ impl TextureAtlas {
         if size.width > self.size.width || size.height > self.size.height {
             return None;
         }
+        if self.try_place(size) {
+            return Some(self.commit(kind, size));
+        }
+        self.evict_all();
+        if self.try_place(size) {
+            return Some(self.commit(kind, size));
+        }
+        None
+    }
+
+    fn try_place(&self, size: SizeU32) -> bool {
+        let cursor_x = self.cursor_x;
+        let cursor_y_after_row = if cursor_x + size.width > self.size.width {
+            self.cursor_y + self.row_height
+        } else {
+            self.cursor_y
+        };
+        cursor_y_after_row + size.height <= self.size.height
+    }
+
+    fn commit(&mut self, kind: AtlasEntryKind, size: SizeU32) -> AtlasAllocation {
         if self.cursor_x + size.width > self.size.width {
             self.cursor_x = 0;
             self.cursor_y += self.row_height;
             self.row_height = 0;
-        }
-        if self.cursor_y + size.height > self.size.height {
-            self.evict_all();
-        }
-        if self.cursor_y + size.height > self.size.height {
-            return None;
         }
         self.generation += 1;
         let allocation = AtlasAllocation {
@@ -62,7 +79,7 @@ impl TextureAtlas {
         self.cursor_x += size.width;
         self.row_height = self.row_height.max(size.height);
         self.entries.push((kind, allocation.clone()));
-        Some(allocation)
+        allocation
     }
 
     pub fn occupancy_count(&self) -> usize {
@@ -110,7 +127,10 @@ impl GpuAtlas {
         size: SizeU32,
         bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let size = SizeU32::new(size.width.max(1024), size.height.max(1024));
+        let size = SizeU32::new(
+            size.width.max(constants::ATLAS_MIN_SIZE),
+            size.height.max(constants::ATLAS_MIN_SIZE),
+        );
         let cpu = TextureAtlas::new(size);
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("rgui-gpu-atlas"),
@@ -186,7 +206,7 @@ impl GpuAtlas {
             rgba,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(size.width * 4),
+                bytes_per_row: Some(size.width * constants::ATLAS_BYTES_PER_PIXEL),
                 rows_per_image: Some(size.height),
             },
             wgpu::Extent3d {

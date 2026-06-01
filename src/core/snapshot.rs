@@ -113,6 +113,16 @@ pub struct LayoutBoxSnapshot {
     pub clip_rect: Option<crate::Rect>,
 }
 
+impl LayoutBoxSnapshot {
+    /// Returns `true` when this box has an active clip rect, meaning content
+    /// that falls outside is clipped rather than drawn. Mirrors
+    /// `crate::core::layout::LayoutBox::clips_overflow` so tests can use the
+    /// same vocabulary on both representations.
+    pub fn clips_overflow(&self) -> bool {
+        self.clip_rect.is_some()
+    }
+}
+
 impl UiSnapshot {
     pub fn layout_box(&self, key: &str) -> Option<&LayoutBoxSnapshot> {
         self.layout

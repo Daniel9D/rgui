@@ -1,9 +1,11 @@
 use crate::core::{
-    AtlasEntryKind, BorderCmd, ClipSpec, Color, DisplayList, LayerKind, Paint, PaintCommand,
-    PathCmd, Point, Rect, ResourceStore, ShadowCmd, Size, effective_clip,
+    AtlasEntryKind, BorderCmd, ClipSpec, DisplayList, LayerKind, Paint, PaintCommand, PathCmd,
+    Point, Rect, ResourceStore, ShadowCmd, Size, effective_clip,
 };
 
-use super::{GpuAtlas, PipelineKind, RendererError, RendererResult};
+use super::{
+    GpuAtlas, PipelineKind, RendererError, RendererResult, color::color_to_linear, constants,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderItem {
@@ -18,7 +20,7 @@ pub struct RenderItem {
     pub order: u64,
 }
 
-pub const MAX_RENDER_ITEMS_PER_FRAME: usize = 100_000;
+pub const MAX_RENDER_ITEMS_PER_FRAME: usize = constants::MAX_RENDER_ITEMS_PER_FRAME;
 
 pub fn build_render_items(
     display_list: &DisplayList,
@@ -105,24 +107,12 @@ pub fn build_render_items(
         }
     }
     debug_assert!(items.len() <= MAX_RENDER_ITEMS_PER_FRAME);
-    items.sort_by_key(|item| (layer_order(item.layer), item.z_index, item.order));
+    items.sort_by_key(|item| (item.layer.order(), item.z_index, item.order));
     Ok(items)
 }
 
 pub(crate) fn paint_order(command_order: usize, sub_order: usize) -> u64 {
-    ((command_order as u64) << 32) | sub_order as u64
-}
-
-fn layer_order(layer: LayerKind) -> i32 {
-    match layer {
-        LayerKind::Document => 0,
-        LayerKind::Floating => 1,
-        LayerKind::Popover => 2,
-        LayerKind::Tooltip => 3,
-        LayerKind::ContextMenu => 4,
-        LayerKind::Modal => 5,
-        LayerKind::Debug => 6,
-    }
+    ((command_order as u64) << 32) | (sub_order as u64)
 }
 
 fn push_rect(
@@ -132,7 +122,7 @@ fn push_rect(
     layer: LayerKind,
     clip_rect: Option<Rect>,
 ) -> RendererResult<()> {
-    let base_pipeline = if cmd.radius > 0.5 {
+    let base_pipeline = if cmd.radius > constants::ROUNDED_RECT_RADIUS_THRESHOLD {
         PipelineKind::RoundedRect
     } else {
         PipelineKind::SolidRect
@@ -255,7 +245,7 @@ fn push_shadow(
     layer: LayerKind,
     clip_rect: Option<Rect>,
 ) -> RendererResult<()> {
-    let expand = cmd.blur_radius + cmd.offset.x.abs().max(cmd.offset.y.abs());
+    let expand = cmd.blur_radius + (cmd.offset.x * cmd.offset.x + cmd.offset.y * cmd.offset.y).sqrt();
     push_item(
         items,
         RenderItem {
@@ -269,7 +259,7 @@ fn push_shadow(
                     cmd.rect.size.height + expand * 2.0,
                 ),
             ),
-            color: color_to_linear(cmd.color, 0.35),
+            color: color_to_linear(cmd.color, constants::SHADOW_OPACITY),
             uv_rect: [0.0, 0.0, 1.0, 1.0],
             radius: 0.0,
             z_index: cmd.z_index,
@@ -312,13 +302,4 @@ fn effective_clip_rect(clip_stack: &[ClipSpec]) -> Option<Rect> {
     let first = clip_stack.first()?.rect;
     let rest: Vec<Rect> = clip_stack.iter().skip(1).map(|clip| clip.rect).collect();
     effective_clip(&rest, first)
-}
-
-fn color_to_linear(color: Color, opacity: f32) -> [f32; 4] {
-    [
-        color.r as f32 / 255.0,
-        color.g as f32 / 255.0,
-        color.b as f32 / 255.0,
-        color.a as f32 / 255.0 * opacity,
-    ]
 }

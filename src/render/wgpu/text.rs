@@ -1,5 +1,7 @@
 use super::{GpuAtlas, RenderItem, RendererResult};
 #[cfg(feature = "bitmap-text-fallback")]
+use super::{color::color_to_linear, constants};
+#[cfg(feature = "bitmap-text-fallback")]
 use super::{
     PipelineKind, RendererError,
     item::{MAX_RENDER_ITEMS_PER_FRAME, paint_order},
@@ -41,7 +43,7 @@ pub(crate) fn lower_text_bitmap(
     #[cfg(feature = "bitmap-text-fallback")]
     {
         let before = items.len();
-        let baseline = (cmd.size * 0.8).ceil();
+        let baseline = (cmd.size * constants::TEXT_BASELINE_RATIO).ceil();
         let origin = Point::new(cmd.rect.origin.x, cmd.rect.origin.y + baseline);
         super::bitmap_text::push_bitmap_text_runs(
             items,
@@ -88,7 +90,7 @@ pub(crate) fn lower_text_glyph_atlas(
             )));
         }
 
-        let baseline = (cmd.size * 0.8).ceil();
+        let baseline = (cmd.size * constants::TEXT_BASELINE_RATIO).ceil();
         let origin = Point::new(cmd.rect.origin.x, cmd.rect.origin.y + baseline);
 
         super::bitmap_text::push_bitmap_text_runs_with_pipeline(
@@ -143,7 +145,7 @@ pub(crate) fn lower_text_glyph_atlas(
                             uv_rect: atlas_entry.uv_rect,
                             radius: 0.0,
                             z_index: cmd.z_index,
-                            order: paint_order(command_order, i * 64),
+                            order: paint_order(command_order, i * constants::GLYPH_SUB_ORDER_STRIDE),
                         },
                     )?;
                 }
@@ -167,12 +169,12 @@ fn shape_text_for_atlas(text: &str, font_size: f32) -> Option<Vec<GlyphPosition>
 
     let mut font_system = glyphon::cosmic_text::FontSystem::new();
     let font_px = font_size.max(1.0);
-    let line_height = (font_px * 1.2).ceil();
+    let line_height = (font_px * constants::TEXT_LINE_HEIGHT_RATIO).ceil();
     let metrics = Metrics::new(font_px, line_height);
     let mut buffer = Buffer::new(&mut font_system, metrics);
 
     let attrs = Attrs::new().family(Family::SansSerif);
-    buffer.set_size(&mut font_system, Some(f32::MAX), Some(line_height * 50.0));
+    buffer.set_size(&mut font_system, Some(f32::MAX), Some(line_height * constants::SHAPING_BUFFER_LINE_MULTIPLIER));
     buffer.set_text(&mut font_system, text, &attrs, Shaping::Advanced, None);
     buffer.set_wrap(&mut font_system, Wrap::Word);
     buffer.shape_until_scroll(&mut font_system, false);
@@ -211,12 +213,3 @@ struct GlyphPosition {
     height: f32,
 }
 
-#[cfg(feature = "bitmap-text-fallback")]
-fn color_to_linear(color: crate::core::Color, opacity: f32) -> [f32; 4] {
-    [
-        color.r as f32 / 255.0,
-        color.g as f32 / 255.0,
-        color.b as f32 / 255.0,
-        color.a as f32 / 255.0 * opacity,
-    ]
-}

@@ -26,8 +26,26 @@ pub struct ResolvedLayout {
 }
 
 fn clips_overflow_node(node: &UiNode) -> bool {
+    // Overlay roots (Modal / Popover / Tooltip / Menu) default to overflow:
+    // Hidden when the user has not set it, so content past the max_size
+    // cap is clipped instead of bleeding into the surrounding UI. The
+    // matching taffy-side default lives in `layout::taffy::base_taffy_style`.
+    let default_overlay_hidden = matches!(
+        node.kind,
+        ElementKind::Widget(
+            WidgetKind::Modal | WidgetKind::Popover | WidgetKind::Tooltip | WidgetKind::Menu
+        )
+    ) && node.parent.is_none();
+    let (effective_x, effective_y) = if default_overlay_hidden {
+        (
+            node.style.overflow_x.or(Some(Overflow::Hidden)),
+            node.style.overflow_y.or(Some(Overflow::Hidden)),
+        )
+    } else {
+        (node.style.overflow_x, node.style.overflow_y)
+    };
     matches!(
-        (node.style.overflow_x, node.style.overflow_y),
+        (effective_x, effective_y),
         (
             Some(Overflow::Hidden | Overflow::Clip | Overflow::Scroll | Overflow::Auto),
             _
