@@ -51,6 +51,9 @@ pub(crate) fn push_bitmap_text_runs_with_pipeline(
     let linear_color = color_to_linear(color, 1.0);
     let mut x = origin.x;
     let mut visible_index = 0usize;
+    // Bug fix 4.6: scratch buffer for row_runs so the inner loop
+    // doesn't allocate a Vec per row per character.
+    let mut row_runs_buf: Vec<(usize, usize)> = Vec::with_capacity(4);
 
     for ch in text.chars() {
         if ch.is_whitespace() {
@@ -60,10 +63,11 @@ pub(crate) fn push_bitmap_text_runs_with_pipeline(
 
         let glyph = bitmap_glyph(ch);
         for (row, bits) in glyph.iter().copied().enumerate() {
-            for (run_start, run_len) in row_runs(bits) {
+            row_runs(bits, &mut row_runs_buf);
+            for (run_start, run_len) in &row_runs_buf {
                 let rect = Rect::new(
-                    Point::new(x + run_start as f32 * scale, origin.y + row as f32 * scale),
-                    Size::new(run_len as f32 * scale, run_height),
+                    Point::new(x + *run_start as f32 * scale, origin.y + row as f32 * scale),
+                    Size::new(*run_len as f32 * scale, run_height),
                 );
                 if rect.size.width == 0.0 || rect.size.height == 0.0 {
                     continue;
@@ -99,8 +103,15 @@ pub(crate) fn push_bitmap_text_runs_with_pipeline(
     Ok(())
 }
 
-fn row_runs(bits: u8) -> Vec<(usize, usize)> {
-    let mut runs = Vec::new();
+/// Find runs of set bits in `bits` (a `GLYPH_WIDTH`-wide row). Pushes
+/// `(start, len)` pairs into `out` so the caller can reuse a single
+/// buffer across rows. Bug fix 4.6: previously this function
+/// allocated a fresh `Vec<(usize, usize)>` per row per character; in
+/// a frame with `N` text nodes of `R` rows each, that's `N*R`
+/// allocations. The reused buffer is the standard "scratch buffer"
+/// pattern in tight inner loops.
+fn row_runs(bits: u8, out: &mut Vec<(usize, usize)>) {
+    out.clear();
     let mut col = 0usize;
     while col < GLYPH_WIDTH {
         if bits & (1 << (GLYPH_WIDTH - 1 - col)) == 0 {
@@ -111,9 +122,8 @@ fn row_runs(bits: u8) -> Vec<(usize, usize)> {
         while col < GLYPH_WIDTH && bits & (1 << (GLYPH_WIDTH - 1 - col)) != 0 {
             col += 1;
         }
-        runs.push((start, col - start));
+        out.push((start, col - start));
     }
-    runs
 }
 
 fn bitmap_glyph(ch: char) -> [u8; GLYPH_HEIGHT] {
