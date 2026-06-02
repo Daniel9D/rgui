@@ -43,9 +43,9 @@ pub use layout::{
 };
 pub use overlay::{AnchorSpec, DismissPolicy, OverlayManager, OverlaySpec, Placement};
 pub use render::{
-    AtlasEntry, AtlasEntryKind, BorderCmd, ClipSpec, Color, DisplayList, GlyphKey, ImageCmd,
-    ImageId, LayerKind, LayerSpec, Paint, PaintCommand, PathCmd, RectCmd, RenderStats,
-    RendererBackend, ResourceStore, ShadowCmd, SvgCmd, SvgId, TextCmd,
+    AtlasEntry, AtlasEntryKind, BorderCmd, ClipSpec, Color, DisplayList, DisplayListError,
+    GlyphKey, ImageCmd, ImageId, LayerKind, LayerSpec, Paint, PaintCommand, PathCmd, RectCmd,
+    RenderStats, RendererBackend, ResourceStore, ShadowCmd, SvgCmd, SvgId, TextCmd,
 };
 pub use scroll::{Axis, AxisSet, ScrollState, ScrollbarPolicy};
 pub use snapshot::{

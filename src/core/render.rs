@@ -263,7 +263,7 @@ impl DisplayList {
         &self.commands
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), DisplayListError> {
         let mut layers = 0usize;
         let mut clips = 0usize;
         for command in &self.commands {
@@ -273,14 +273,18 @@ impl DisplayList {
                     validate_non_negative(spec.opacity, "layer opacity")?;
                 }
                 PaintCommand::PopLayer => {
-                    layers = layers.checked_sub(1).ok_or("layer stack underflow")?;
+                    layers = layers
+                        .checked_sub(1)
+                        .ok_or(DisplayListError::LayerStackUnderflow)?;
                 }
                 PaintCommand::PushClip(spec) => {
                     clips += 1;
                     validate_rect(spec.rect)?;
                 }
                 PaintCommand::PopClip => {
-                    clips = clips.checked_sub(1).ok_or("clip stack underflow")?;
+                    clips = clips
+                        .checked_sub(1)
+                        .ok_or(DisplayListError::ClipStackUnderflow)?;
                 }
                 PaintCommand::DrawRect(cmd) => {
                     validate_rect(cmd.rect)?;
@@ -293,7 +297,7 @@ impl DisplayList {
                     validate_non_negative(cmd.radius, "border radius")?;
                 }
                 PaintCommand::DrawText(cmd) => {
-                    validate_point(cmd.rect.origin).map_err(|err| format!("text {err}"))?;
+                    validate_point(cmd.rect.origin, "text origin")?;
                     validate_positive(cmd.size, "text size")?;
                 }
                 PaintCommand::DrawImage(cmd) => {
@@ -306,60 +310,142 @@ impl DisplayList {
                 }
                 PaintCommand::DrawPath(cmd) => {
                     if cmd.points.len() < 2 {
-                        return Err("path must contain at least two points".to_string());
+                        return Err(DisplayListError::PathTooShort);
                     }
                     for point in &cmd.points {
-                        validate_point(*point).map_err(|err| format!("path {err}"))?;
+                        validate_point(*point, "path point")?;
                     }
                     validate_non_negative(cmd.width, "path width")?;
                 }
                 PaintCommand::DrawShadow(cmd) => {
                     validate_rect(cmd.rect)?;
                     validate_non_negative(cmd.blur_radius, "shadow blur radius")?;
-                    validate_point(cmd.offset).map_err(|err| format!("shadow offset {err}"))?;
+                    validate_point(cmd.offset, "shadow offset")?;
                 }
             }
         }
         if layers != 0 {
-            return Err(format!("layer stack has {layers} unclosed entries"));
+            return Err(DisplayListError::LayerStackUnbalanced(layers));
         }
         if clips != 0 {
-            return Err(format!("clip stack has {clips} unclosed entries"));
+            return Err(DisplayListError::ClipStackUnbalanced(clips));
         }
         Ok(())
     }
 }
 
-fn validate_point(point: Point) -> Result<(), String> {
+/// Structured error for [`DisplayList::validate`].
+///
+/// Bug fix 5.7: the previous return type was `Result<(), String>`,
+/// which callers couldn't match on. The variants are derived
+/// from the actual validation cases; the `Display` impl renders
+/// the human-readable message, so existing `format!("{err}")`
+/// code keeps working. To migrate a caller, replace
+/// `Result<(), String>` with `Result<(), DisplayListError>` and
+/// `?` keeps working.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DisplayListError {
+    /// A `PopLayer` had no matching `PushLayer`.
+    LayerStackUnderflow,
+    /// A `PopClip` had no matching `PushClip`.
+    ClipStackUnderflow,
+    /// The number of `PushLayer` minus `PopLayer` left over at
+    /// the end of the command stream. Should be 0; any other
+    /// value means a `PushLayer` was never closed.
+    LayerStackUnbalanced(usize),
+    /// The number of `PushClip` minus `PopClip` left over at
+    /// the end of the command stream.
+    ClipStackUnbalanced(usize),
+    /// A `DrawPath` had fewer than 2 points.
+    PathTooShort,
+    /// A `Point` had non-finite coordinates.
+    NonFinitePoint {
+        /// Where the bad point was used.
+        field: &'static str,
+    },
+    /// A `Rect` had a non-finite origin or a negative / non-finite
+    /// size axis.
+    InvalidRect {
+        /// Which axis or property was bad.
+        field: &'static str,
+    },
+    /// A `f32` value was not finite, or was negative when the
+    /// validator required non-negative.
+    NonFiniteOrNegative {
+        /// The validator's name for the field (e.g. "rect radius").
+        field: &'static str,
+    },
+    /// A `f32` value was not finite, or was non-positive when the
+    /// validator required positive.
+    NonFiniteOrNonPositive {
+        /// The validator's name for the field (e.g. "text size").
+        field: &'static str,
+    },
+}
+
+impl std::fmt::Display for DisplayListError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LayerStackUnderflow => write!(f, "layer stack underflow"),
+            Self::ClipStackUnderflow => write!(f, "clip stack underflow"),
+            Self::LayerStackUnbalanced(n) => {
+                write!(f, "layer stack has {n} unclosed entries")
+            }
+            Self::ClipStackUnbalanced(n) => {
+                write!(f, "clip stack has {n} unclosed entries")
+            }
+            Self::PathTooShort => write!(f, "path must contain at least two points"),
+            Self::NonFinitePoint { field } => {
+                write!(f, "{field} coordinates must be finite")
+            }
+            Self::InvalidRect { field } => match *field {
+                "origin" => write!(f, "rect origin must be finite"),
+                "width" => write!(f, "rect width must be finite and non-negative"),
+                "height" => write!(f, "rect height must be finite and non-negative"),
+                _ => write!(f, "rect {field} is invalid"),
+            },
+            Self::NonFiniteOrNegative { field } => {
+                write!(f, "{field} must be finite and non-negative")
+            }
+            Self::NonFiniteOrNonPositive { field } => {
+                write!(f, "{field} must be finite and positive")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DisplayListError {}
+
+fn validate_point(point: Point, field: &'static str) -> Result<(), DisplayListError> {
     if !point.x.is_finite() || !point.y.is_finite() {
-        return Err("point coordinates must be finite".to_string());
+        return Err(DisplayListError::NonFinitePoint { field });
     }
     Ok(())
 }
 
-fn validate_non_negative(value: f32, name: &str) -> Result<(), String> {
+fn validate_non_negative(value: f32, field: &'static str) -> Result<(), DisplayListError> {
     if !value.is_finite() || value < 0.0 {
-        return Err(format!("{name} must be finite and non-negative"));
+        return Err(DisplayListError::NonFiniteOrNegative { field });
     }
     Ok(())
 }
 
-fn validate_positive(value: f32, name: &str) -> Result<(), String> {
+fn validate_positive(value: f32, field: &'static str) -> Result<(), DisplayListError> {
     if !value.is_finite() || value <= 0.0 {
-        return Err(format!("{name} must be finite and positive"));
+        return Err(DisplayListError::NonFiniteOrNonPositive { field });
     }
     Ok(())
 }
 
-fn validate_rect(rect: Rect) -> Result<(), String> {
+fn validate_rect(rect: Rect) -> Result<(), DisplayListError> {
     if !rect.origin.x.is_finite() || !rect.origin.y.is_finite() {
-        return Err("rect origin must be finite".to_string());
+        return Err(DisplayListError::InvalidRect { field: "origin" });
     }
     if !rect.size.width.is_finite() || rect.size.width < 0.0 {
-        return Err("rect width must be finite and non-negative".to_string());
+        return Err(DisplayListError::InvalidRect { field: "width" });
     }
     if !rect.size.height.is_finite() || rect.size.height < 0.0 {
-        return Err("rect height must be finite and non-negative".to_string());
+        return Err(DisplayListError::InvalidRect { field: "height" });
     }
     Ok(())
 }
@@ -499,5 +585,127 @@ mod tests {
         assert_eq!(list.commands().len(), 1);
         assert!(!list.commands().is_empty());
         assert!(list.validate().is_ok());
+    }
+
+    // Bug fix 5.7: `DisplayList::validate` now returns
+    // `Result<(), DisplayListError>` so callers can match on
+    // specific failure modes. The Display impl renders the
+    // human-readable message that the old `String` errors had,
+    // so callers that used `format!("{err}")` keep working.
+
+    #[test]
+    fn validate_catches_layer_underflow() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::PopLayer);
+        let err = list.validate().unwrap_err();
+        assert_eq!(err, DisplayListError::LayerStackUnderflow);
+        // Display impl renders the human-readable form.
+        assert_eq!(format!("{err}"), "layer stack underflow");
+    }
+
+    #[test]
+    fn validate_catches_clip_underflow() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::PopClip);
+        let err = list.validate().unwrap_err();
+        assert_eq!(err, DisplayListError::ClipStackUnderflow);
+    }
+
+    #[test]
+    fn validate_catches_unbalanced_layer_stack() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::PushLayer(LayerSpec::new(LayerKind::Document)));
+        let err = list.validate().unwrap_err();
+        assert_eq!(err, DisplayListError::LayerStackUnbalanced(1));
+    }
+
+    #[test]
+    fn validate_catches_path_too_short() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawPath(PathCmd {
+            points: vec![Point::new(0.0, 0.0)],
+            width: 1.0,
+            color: Color::rgb(0, 0, 0),
+            z_index: 0,
+        }));
+        assert_eq!(list.validate().unwrap_err(), DisplayListError::PathTooShort);
+    }
+
+    #[test]
+    fn validate_catches_non_finite_radius() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(Point::new(0.0, 0.0), crate::core::Size::new(10.0, 10.0)),
+            paint: Paint::Solid(Color::rgb(0, 0, 0)),
+            radius: f32::NAN,
+            opacity: 1.0,
+            z_index: 0,
+        }));
+        let err = list.validate().unwrap_err();
+        assert_eq!(
+            err,
+            DisplayListError::NonFiniteOrNegative { field: "rect radius" }
+        );
+    }
+
+    #[test]
+    fn validate_catches_negative_rect_width() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(Point::new(0.0, 0.0), crate::core::Size::new(-1.0, 10.0)),
+            paint: Paint::Solid(Color::rgb(0, 0, 0)),
+            radius: 0.0,
+            opacity: 1.0,
+            z_index: 0,
+        }));
+        assert_eq!(
+            list.validate().unwrap_err(),
+            DisplayListError::InvalidRect { field: "width" }
+        );
+    }
+
+    #[test]
+    fn display_list_error_display_renders_readable_message() {
+        // All variants have a human-readable Display form so
+        // existing `format!("{err}")` callers keep working.
+        let cases: Vec<(DisplayListError, &str)> = vec![
+            (DisplayListError::LayerStackUnderflow, "layer stack underflow"),
+            (DisplayListError::ClipStackUnderflow, "clip stack underflow"),
+            (
+                DisplayListError::LayerStackUnbalanced(3),
+                "layer stack has 3 unclosed entries",
+            ),
+            (
+                DisplayListError::ClipStackUnbalanced(2),
+                "clip stack has 2 unclosed entries",
+            ),
+            (
+                DisplayListError::PathTooShort,
+                "path must contain at least two points",
+            ),
+            (
+                DisplayListError::NonFinitePoint { field: "text origin" },
+                "text origin coordinates must be finite",
+            ),
+            (
+                DisplayListError::InvalidRect { field: "origin" },
+                "rect origin must be finite",
+            ),
+            (
+                DisplayListError::InvalidRect { field: "width" },
+                "rect width must be finite and non-negative",
+            ),
+            (
+                DisplayListError::NonFiniteOrNegative { field: "rect radius" },
+                "rect radius must be finite and non-negative",
+            ),
+            (
+                DisplayListError::NonFiniteOrNonPositive { field: "text size" },
+                "text size must be finite and positive",
+            ),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(format!("{err}"), expected, "for {err:?}");
+        }
     }
 }

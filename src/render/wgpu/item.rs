@@ -28,9 +28,7 @@ pub fn build_render_items(
     atlas: &mut GpuAtlas,
 ) -> RendererResult<Vec<RenderItem>> {
     let _ = resources;
-    display_list
-        .validate()
-        .map_err(RendererError::InvalidDisplayList)?;
+    display_list.validate()?;
 
     let mut items = Vec::new();
     let mut layer_stack = vec![LayerKind::Document];
