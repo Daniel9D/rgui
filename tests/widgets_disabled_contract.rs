@@ -73,6 +73,35 @@ fn disabled_checkbox_does_not_toggle() {
 }
 
 #[test]
+fn checkbox_click_emits_toggle_not_set_true() {
+    // Bug fix 1.4: the old pointer-up handler emitted
+    // `SetBool { value: true }` regardless of the current state,
+    // which would un-toggle a checked-off checkbox. The fix emits
+    // `Toggle`, which the runtime applies as a state flip. To detect
+    // a regression we click a checkbox that starts checked and
+    // verify the new state is unchecked (i.e. the click toggled it
+    // off, not slammed it to true).
+    let mut runtime = UiRuntime::default();
+    let output = update(&mut runtime, checkbox().key("cb").default_checked(true));
+    // Sanity: the seeded state is checked.
+    assert_eq!(runtime.bool_state("cb"), Some(true));
+    let rect = output.hit_test.entries()[0].rect;
+
+    click(
+        &mut runtime,
+        Point::new(rect.origin.x + 4.0, rect.origin.y + 4.0),
+    );
+
+    // The click should have toggled true -> false. The old bug
+    // would have slammed it back to true.
+    assert_eq!(
+        runtime.bool_state("cb"),
+        Some(false),
+        "checkbox click must emit Toggle (true -> false), not SetBool value: true"
+    );
+}
+
+#[test]
 fn disabled_input_and_textarea_do_not_focus_or_edit() {
     let mut runtime = UiRuntime::default();
     update(
