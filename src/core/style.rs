@@ -351,11 +351,27 @@ impl Style {
         self
     }
 
-    /// Returns `self` with `next`'s `Some` fields overriding `self`'s. Layers
-    /// merge top‑down: the last `Some` for a field wins.
-    pub fn merge_over(mut self, next: Style) -> Self {
+    /// Returns `self` with `next`'s `Some` fields overriding `self`'s.
+    /// Layers merge top-down: the last `Some` for a field wins.
+    ///
+    /// Reading the call site as `self.merged_with(next)` is more
+    /// natural than the older `self.merge_over(next)` (which read
+    /// as "self *over* next" — the opposite of what it does).
+    pub fn merged_with(mut self, next: Style) -> Self {
         merge(&mut self, &next);
         self
+    }
+
+    /// Deprecated alias for [`Style::merged_with`].
+    ///
+    /// The name reads as "merge self *over* next" — the opposite of
+    /// what it does. New code should use [`Style::merged_with`].
+    #[deprecated(
+        since = "0.1.0",
+        note = "use Style::merged_with — merge_over read as 'self over next', but next actually wins"
+    )]
+    pub fn merge_over(self, next: Style) -> Self {
+        self.merged_with(next)
     }
 }
 
@@ -468,10 +484,10 @@ mod tests {
     }
 
     #[test]
-    fn merge_overrides_only_some_fields() {
+    fn merged_with_overrides_only_some_fields() {
         let base = Style::default().width(10.0).height(20.0);
         let next = Style::default().width(99.0); // height stays 20.0
-        let merged = base.merge_over(next);
+        let merged = base.merged_with(next);
         assert_eq!(merged.width, Some(Length::Px(99.0)));
         assert_eq!(merged.height, Some(Length::Px(20.0)));
     }
@@ -481,7 +497,7 @@ mod tests {
         let a = Style::default().width(10.0);
         let b = Style::default().width(20.0).height(30.0);
         let c = Style::default().width(40.0);
-        let merged = a.merge_over(b).merge_over(c);
+        let merged = a.merged_with(b).merged_with(c);
         assert_eq!(merged.width, Some(Length::Px(40.0))); // c wins
         assert_eq!(merged.height, Some(Length::Px(30.0))); // b only
     }
@@ -493,7 +509,7 @@ mod tests {
             .height(20.0)
             .opacity(0.5);
         let next = Style::default(); // all None
-        let merged = base.merge_over(next);
+        let merged = base.merged_with(next);
         assert_eq!(merged.width, Some(Length::Px(10.0)));
         assert_eq!(merged.height, Some(Length::Px(20.0)));
         assert_eq!(merged.opacity, Some(0.5));
@@ -503,8 +519,8 @@ mod tests {
     fn merge_is_idempotent_when_next_is_empty() {
         let base = Style::default().width(10.0).height(20.0).opacity(0.5);
         let next = Style::default();
-        let merged_once = base.clone().merge_over(next.clone());
-        let merged_twice = merged_once.clone().merge_over(next);
+        let merged_once = base.clone().merged_with(next.clone());
+        let merged_twice = merged_once.clone().merged_with(next);
         assert_eq!(merged_once, merged_twice);
     }
 
@@ -531,7 +547,7 @@ mod tests {
             bottom: Length::Px(0.0),
             left: Length::Px(20.0),
         });
-        let merged = base.merge_over(next);
+        let merged = base.merged_with(next);
         let padding = merged.padding.expect("padding set");
         // next wins entirely.
         assert_eq!(padding.top, Length::Px(0.0));
@@ -546,7 +562,7 @@ mod tests {
             .height(50.0)
             .opacity(0.8)
             .z_index(5);
-        let merged = base.merge_over(next);
+        let merged = base.merged_with(next);
         assert_eq!(merged.width, Some(Length::Px(100.0)));
         assert_eq!(merged.height, Some(Length::Px(50.0)));
         assert_eq!(merged.opacity, Some(0.8));
@@ -559,8 +575,20 @@ mod tests {
         // as opaque values (replaced, not merged). Verify that.
         let base = Style::default();
         let next = Style::default().background(crate::Color::rgb(1, 2, 3));
-        let merged = base.merge_over(next);
+        let merged = base.merged_with(next);
         assert!(merged.background.is_some());
+    }
+
+    // Bug fix 3.7: `merge_over` reads as "self *over* next" but next
+    // wins. Renamed to `merged_with`. The old name is preserved as a
+    // deprecated alias so we exercise both paths in the suite.
+    #[test]
+    #[allow(deprecated)]
+    fn merge_over_deprecated_alias_still_works() {
+        let base = Style::default().width(10.0);
+        let next = Style::default().width(20.0);
+        let merged = base.merge_over(next);
+        assert_eq!(merged.width, Some(Length::Px(20.0)));
     }
 
     #[test]

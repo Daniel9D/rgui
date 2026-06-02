@@ -99,7 +99,7 @@ impl Element {
     /// assign to `element.style` directly.
     #[must_use]
     pub fn style(mut self, style: Style) -> Self {
-        self.style = self.style.merge_over(style);
+        self.style = self.style.merged_with(style);
         self
     }
 
@@ -401,7 +401,7 @@ impl Element {
             let mut builder = crate::widgets::SelectStylesBuilder::new(&mut spec.styles);
             configure(&mut builder);
             if let Some(trigger) = spec.styles.trigger.clone() {
-                self.style = self.style.merge_over(trigger);
+                self.style = self.style.merged_with(trigger);
             }
         }
         self

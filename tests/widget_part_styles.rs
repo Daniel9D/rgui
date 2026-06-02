@@ -25,7 +25,7 @@ fn style_new_supports_numeric_widget_part_helpers() {
 fn style_merge_over_uses_last_writer_for_option_fields() {
     let base = Style::new().width(120.0).height(24.0);
     let override_style = Style::new().height(36.0);
-    let merged = base.merge_over(override_style);
+    let merged = base.merged_with(override_style);
 
     assert_eq!(merged.width, Some(Length::Px(120.0)));
     assert_eq!(merged.height, Some(Length::Px(36.0)));

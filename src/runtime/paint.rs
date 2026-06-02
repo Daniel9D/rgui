@@ -674,7 +674,7 @@ fn merge_optional_style(
     next: Option<crate::Style>,
 ) -> Option<crate::Style> {
     match (base, next) {
-        (Some(base), Some(next)) => Some(base.merge_over(next)),
+        (Some(base), Some(next)) => Some(base.merged_with(next)),
         (None, Some(next)) => Some(next),
         (Some(base), None) => Some(base),
         (None, None) => None,

@@ -2366,7 +2366,7 @@ fn apply_widget_part_layout_styles(root: &mut crate::Element, theme: &Theme) {
         }
         trigger = merge_optional_style(trigger, spec.styles.trigger.clone());
         if let Some(trigger) = trigger {
-            root.style = root.style.clone().merge_over(trigger);
+            root.style = root.style.clone().merged_with(trigger);
         }
     }
     for child in &mut root.children {
@@ -2379,7 +2379,7 @@ fn merge_optional_style(
     next: Option<crate::Style>,
 ) -> Option<crate::Style> {
     match (base, next) {
-        (Some(base), Some(next)) => Some(base.merge_over(next)),
+        (Some(base), Some(next)) => Some(base.merged_with(next)),
         (None, Some(next)) => Some(next),
         (Some(base), None) => Some(base),
         (None, None) => None,
