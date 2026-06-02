@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use crate::core::{FontStyle, FontWeight, ShapedGlyph, ShapedText, Size, TextEngine, TextSpec};
+use crate::render::wgpu::constants::{TEXT_WIDTH_HEURISTIC, TEXT_WIDTH_HEURISTIC_BOLD};
+use crate::text_engine::layout::{TextGlyphRun, TextLine};
 
 use super::{CosmicTextEngine, TextGlyphPosition, TextLayout};
-use crate::text_engine::layout::{TextGlyphRun, TextLine};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TextShapeKey {
@@ -232,9 +233,9 @@ impl TextSystem {
     ) -> TextLayout {
         let glyph_count = text.chars().count();
         let weight_factor = if weight == FontWeight::Bold {
-            0.64
+            TEXT_WIDTH_HEURISTIC_BOLD
         } else {
-            0.58
+            TEXT_WIDTH_HEURISTIC
         };
         let style_factor = if style == FontStyle::Italic {
             1.04

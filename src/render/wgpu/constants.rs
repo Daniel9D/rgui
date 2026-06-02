@@ -51,6 +51,19 @@ pub const SHADOW_OPACITY: f32 = 0.35;
 /// when lowering text commands. Mirrors `runtime/paint.rs:1494`.
 pub const TEXT_BASELINE_RATIO: f32 = 0.8;
 
+/// Average advance-width-to-font-size ratio for ASCII glyphs at normal
+/// weight. Used by both the CPU-side `runtime/text_metrics.rs`
+/// `measure_text` heuristic and the GPU-side
+/// `text_engine/system.rs` `measure_estimated` fast path. Bug fix
+/// 5.6: the value was duplicated in two files; both now read the
+/// constant. The real shape cache is the source of truth for layout.
+pub const TEXT_WIDTH_HEURISTIC: f32 = 0.58;
+
+/// Average advance-width-to-font-size ratio for bold ASCII glyphs.
+/// Mirrors `text_engine/system.rs` and used wherever the bold path
+/// is special-cased.
+pub const TEXT_WIDTH_HEURISTIC_BOLD: f32 = 0.64;
+
 /// Default line-height ratio when a text command does not specify one.
 /// Mirrors `runtime/paint.rs:1489` and `glyphon_text.rs:169`.
 pub const TEXT_LINE_HEIGHT_RATIO: f32 = 1.2;

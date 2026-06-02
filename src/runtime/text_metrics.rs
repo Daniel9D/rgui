@@ -1,4 +1,5 @@
 use crate::core::{FontStyle, FontWeight, Size};
+use crate::render::wgpu::constants::{TEXT_WIDTH_HEURISTIC, TEXT_WIDTH_HEURISTIC_BOLD};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextMetrics {
@@ -15,7 +16,7 @@ pub fn measure_text(
     max_width: f32,
 ) -> TextMetrics {
     // Bug fix 4.1 note: `chars().count()` is O(n) and walks UTF-8.
-    // The 0.58 width coefficient is itself an approximation, so the
+    // The width heuristic is itself an approximation, so the
     // function is "fast and approximate" overall. The real shape cache
     // in `text_engine` is the source of truth for layout; this function
     // exists for callers that need a width estimate without paying the
@@ -32,7 +33,12 @@ pub fn measure_text(
     } else {
         1.0
     };
-    let width = (glyph_count * font_size * 0.58 * weight_scale * style_scale)
+    let width_heuristic = if matches!(weight, FontWeight::Bold) {
+        TEXT_WIDTH_HEURISTIC_BOLD
+    } else {
+        TEXT_WIDTH_HEURISTIC
+    };
+    let width = (glyph_count * font_size * width_heuristic * weight_scale * style_scale)
         .max(font_size)
         .min(max_width.max(font_size));
     let height = (font_size * 1.25).max(1.0);
