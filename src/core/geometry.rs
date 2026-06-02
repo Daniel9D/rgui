@@ -188,6 +188,11 @@ impl Rect {
 
     /// Snap to whole logical pixels. The origin is floored, the max edge is
     /// ceiled, so the resulting rect always fully covers the original.
+    ///
+    /// For a fractional-scale variant that *preserves area* (rounded
+    /// size rather than max-cover), see [`physical_pixel_snap`].
+    /// Bug fix 4.5: the two snapping functions follow different
+    /// policies; pick consciously.
     pub fn round_to_pixel(self) -> Rect {
         let x0 = self.origin.x.floor();
         let y0 = self.origin.y.floor();
@@ -254,6 +259,10 @@ pub fn scroll_translate(rect: Rect, scroll: Vec2) -> Rect {
 /// so the result has the same overall area as the input. Use this for
 /// fractional scales (1.5, 2.0, 1.25) where you want the size to be a
 /// whole-pixel multiple.
+///
+/// For a max-cover variant (origin floored, max ceiled) see
+/// [`Rect::round_to_pixel`]. Bug fix 4.5: the two snapping functions
+/// follow different policies; pick consciously.
 pub fn physical_pixel_snap(rect: Rect, scale_factor: f32) -> Rect {
     let scale = if scale_factor > 0.0 { scale_factor } else { 1.0 };
     Rect::new(
