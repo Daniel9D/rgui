@@ -4,7 +4,7 @@ use crate::core::{AtlasEntryKind, GlyphKey, ImageId, Rect, SizeU32, SvgId};
 
 use super::constants;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AtlasAllocation {
     pub rect: Rect,
     pub generation: u64,
@@ -88,7 +88,13 @@ impl TextureAtlas {
         };
         self.cursor_x += size.width;
         self.row_height = self.row_height.max(size.height);
-        self.entries.push((kind, allocation.clone()));
+        // Bug fix 2.16: `AtlasAllocation` is now `Copy` (POD:
+        // two f32s + a u64), so we can pass it by value to the
+        // vec *and* return a copy without an explicit `.clone()`
+        // call. The byte cost is identical to the previous
+        // explicit `clone()`; the win is removing the misleading
+        // `.clone()` from the call site.
+        self.entries.push((kind, allocation));
         allocation
     }
 
