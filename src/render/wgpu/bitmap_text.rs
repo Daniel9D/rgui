@@ -250,6 +250,16 @@ fn bitmap_glyph(ch: char) -> [u8; GLYPH_HEIGHT] {
         '!' => [
             0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100,
         ],
+        // Bug fix 2.15 note: any character not in the table above
+        // (e.g. all of CJK, Cyrillic, accented Latin, emoji) falls
+        // through to the "box" glyph below. This is fine for the
+        // unit-test gallery (which only uses ASCII) but is a real
+        // limitation for production UIs. Two follow-ups are possible
+        // if/when this becomes a problem:
+        //   1. Gate the table on `#[cfg(test)]` so production builds
+        //      route non-ASCII through the real text engine.
+        //   2. Return a sentinel and let the caller route to glyphon
+        //      when `ch > 0x7F`.
         _ => [
             0b11111, 0b10001, 0b00110, 0b00110, 0b00110, 0b10001, 0b11111,
         ],
