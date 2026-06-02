@@ -125,10 +125,18 @@ pub struct TextStyle {
     pub color: Color,
 }
 
+/// Default font family. The text system looks this up first; on
+/// systems without it, it falls back to the platform default
+/// (CosmicText's `system-ui` mapping).
+/// Bug fix 5.2: previously written as `vec!["system-ui".to_string()]`
+/// (round-trip through String); `.into()` is shorter and avoids the
+/// explicit `.to_string()`.
+pub const DEFAULT_FONT_FAMILY: &str = "system-ui";
+
 impl Default for TextStyle {
     fn default() -> Self {
         Self {
-            family: vec!["system-ui".to_string()],
+            family: vec![DEFAULT_FONT_FAMILY.into()],
             size: Length::Px(14.0),
             weight: FontWeight::Normal,
             style: FontStyle::Normal,
