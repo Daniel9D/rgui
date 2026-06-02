@@ -189,7 +189,11 @@ pub struct HitTestEntry {
 }
 
 impl HitTestEntry {
-    pub fn new(node: NodeId, rect: Rect, z_index: i32, layer: LayerKind) -> Self {
+    /// Bug fix 5.1: this is a struct-literal constructor with no
+    /// allocation or runtime work, so it is `const fn`. Callers
+    /// that need a fully-initialized entry (e.g. tests or
+    /// debug-overlay tables) can build one at compile time.
+    pub const fn new(node: NodeId, rect: Rect, z_index: i32, layer: LayerKind) -> Self {
         Self {
             node,
             key: None,
@@ -254,5 +258,34 @@ impl HitTestTree {
             .filter(|(_, entry)| entry.pointer_events && entry.hit_rect().contains(point))
             .max_by_key(|(idx, entry)| (entry.layer.order(), entry.z_index, entry.order, *idx))
             .map(|(_, entry)| entry)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Size;
+
+    // Bug fix 5.1: `HitTestEntry::new` is `const fn`. Verify by
+    // constructing one in const context and asserting the field
+    // values match the documented defaults.
+    const HIT_ENTRY: HitTestEntry = HitTestEntry::new(
+        NodeId::from_raw(7),
+        Rect::new(Point::new(1.0, 2.0), Size::new(3.0, 4.0)),
+        5,
+        LayerKind::Popover,
+    );
+
+    #[test]
+    fn hit_test_entry_new_is_const_constructible() {
+        assert_eq!(HIT_ENTRY.node.raw(), 7);
+        assert_eq!(HIT_ENTRY.rect.origin.x, 1.0);
+        assert_eq!(HIT_ENTRY.rect.origin.y, 2.0);
+        assert_eq!(HIT_ENTRY.z_index, 5);
+        assert_eq!(HIT_ENTRY.layer, LayerKind::Popover);
+        assert!(HIT_ENTRY.pointer_events);
+        assert_eq!(HIT_ENTRY.order, 0);
+        assert!(HIT_ENTRY.key.is_none());
+        assert!(HIT_ENTRY.visible_rect.is_none());
     }
 }

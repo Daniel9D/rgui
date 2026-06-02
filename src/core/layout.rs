@@ -194,7 +194,11 @@ pub struct LayoutBox {
 }
 
 impl LayoutBox {
-    pub fn new(node: NodeId, rect: Rect) -> Self {
+    /// Bug fix 5.1: pure struct-literal constructor; no allocation
+    /// or runtime work, so `const fn`. Useful in tests and
+    /// debug-overlay code that wants to build a layout box at
+    /// compile time.
+    pub const fn new(node: NodeId, rect: Rect) -> Self {
         Self {
             node,
             key: None,
@@ -204,7 +208,7 @@ impl LayoutBox {
             padding_rect: rect,
             content_rect: rect,
             clip_rect: None,
-            scroll_offset: Vec2::default(),
+            scroll_offset: Vec2::new(0.0, 0.0),
             z_index: 0,
         }
     }
@@ -302,5 +306,32 @@ impl LayoutResult {
         self.boxes
             .iter()
             .find(|layout| layout.key.as_deref() == Some(key))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Point;
+
+    // Bug fix 5.1: `LayoutBox::new` is `const fn`. Verify by
+    // constructing one in const context and asserting the field
+    // values match the documented defaults (rect copied to all
+    // geometry fields, scroll_offset zero, z_index 0).
+    const LAYOUT: LayoutBox = LayoutBox::new(
+        NodeId::from_raw(11),
+        Rect::new(Point::new(2.0, 3.0), Size::new(40.0, 50.0)),
+    );
+
+    #[test]
+    fn layout_box_new_is_const_constructible() {
+        assert_eq!(LAYOUT.node.raw(), 11);
+        assert_eq!(LAYOUT.local_rect.size, Size::new(40.0, 50.0));
+        assert_eq!(LAYOUT.world_rect, LAYOUT.local_rect);
+        assert_eq!(LAYOUT.content_size, Size::new(40.0, 50.0));
+        assert_eq!(LAYOUT.scroll_offset, Vec2::new(0.0, 0.0));
+        assert_eq!(LAYOUT.z_index, 0);
+        assert!(LAYOUT.key.is_none());
+        assert!(LAYOUT.clip_rect.is_none());
     }
 }

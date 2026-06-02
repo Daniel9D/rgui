@@ -55,7 +55,9 @@ pub struct ScrollState {
 }
 
 impl ScrollState {
-    pub fn new(axis: AxisSet) -> Self {
+    /// Bug fix 5.1: pure struct-literal constructor; `const fn`.
+    /// Useful in tests and fixture builders.
+    pub const fn new(axis: AxisSet) -> Self {
         Self {
             offset: Vec2::new(0.0, 0.0),
             content_size: Size::new(0.0, 0.0),
@@ -95,5 +97,27 @@ impl ScrollState {
             delta.x - (self.offset.x - before.x),
             delta.y - (self.offset.y - before.y),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug fix 5.1: `ScrollState::new` is `const fn`. Verify by
+    // constructing one in const context and asserting the field
+    // values match the documented defaults (everything zeroed
+    // except the axis and policy).
+    const SCROLL: ScrollState = ScrollState::new(AxisSet::both());
+
+    #[test]
+    fn scroll_state_new_is_const_constructible() {
+        assert_eq!(SCROLL.offset, Vec2::new(0.0, 0.0));
+        assert_eq!(SCROLL.content_size, Size::new(0.0, 0.0));
+        assert_eq!(SCROLL.viewport_size, Size::new(0.0, 0.0));
+        assert_eq!(SCROLL.axis, AxisSet::both());
+        assert_eq!(SCROLL.policy_x, ScrollbarPolicy::Auto);
+        assert_eq!(SCROLL.policy_y, ScrollbarPolicy::Auto);
+        assert_eq!(SCROLL.velocity, Vec2::new(0.0, 0.0));
     }
 }
