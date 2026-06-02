@@ -456,7 +456,6 @@ static DIVIDER_PAINTER: DividerPainter = DividerPainter;
 static CANVAS_PAINTER: CanvasPainter = CanvasPainter;
 static INVISIBLE_PAINTER: InvisiblePainter = InvisiblePainter;
 static TEXT_BACKGROUND_PAINTER: TextBackgroundPainter = TextBackgroundPainter;
-static GENERIC_PAINTER: GenericPainter = GenericPainter;
 // Bug fix 2.2: previously these widget kinds fell through to
 // `GenericPainter` (background only, no foreground content). Each
 // now has a dedicated painter that reads its spec.
@@ -1686,15 +1685,15 @@ impl WidgetPainter for TextBackgroundPainter {
     }
 }
 
-// ── Generic fallback ──────────────────────────────────────────────────────────
-
-/// Background-only fallback for new or unimplemented widget kinds.
-struct GenericPainter;
-impl WidgetPainter for GenericPainter {
-    fn has_border(&self) -> bool {
-        false
-    }
-}
+// ── (was: Generic fallback) ──────────────────────────────────────────────────
+// Bug fix 2.2 cont.: the `GenericPainter` and `GENERIC_PAINTER`
+// were the catch-all for `WidgetKind` variants without a
+// dedicated painter. After the 2.2 work every variant in the
+// enum has a dedicated painter, and `static_painter_for` is
+// exhaustive (the `_` arm is gone). New variants added to
+// `WidgetKind` without a painter now fail to compile, which
+// is the signal the reviewer wanted. The `GenericPainter`
+// struct and its `static` are removed.
 
 // ── Card ───────────────────────────────────────────────────────────────────────
 
