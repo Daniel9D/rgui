@@ -209,10 +209,7 @@ impl LayoutBox {
     }
 
     pub fn scrollable_size(&self) -> Size {
-        Size::new(
-            (self.content_size.width - self.local_rect.size.width).max(0.0),
-            (self.content_size.height - self.local_rect.size.height).max(0.0),
-        )
+        crate::core::geometry::scrollable_size(self.content_size, self.local_rect.size)
     }
 
     pub fn viewport_size(&self) -> Size {

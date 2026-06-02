@@ -23,7 +23,7 @@ pub struct ColorTokens {
     pub border: Color,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SpacingTokens {
     pub xs: f32,
     pub sm: f32,
@@ -32,7 +32,7 @@ pub struct SpacingTokens {
     pub xl: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct RadiusTokens {
     pub none: Radius,
     pub sm: Radius,
@@ -185,35 +185,35 @@ pub struct WidgetMetrics {
     pub link: LinkTheme,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ButtonMetrics {
     pub min_width: f32,
     pub height: f32,
     pub horizontal_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct InputMetrics {
     pub min_size: Size,
     pub horizontal_padding: f32,
     pub vertical_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SelectMetrics {
     pub trigger_min_size: Size,
     pub horizontal_padding: f32,
     pub arrow_slot_width: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TextareaMetrics {
     pub min_size: Size,
     pub horizontal_padding: f32,
     pub vertical_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TabsMetrics {
     pub min_size: Size,
     pub tab_min_width: f32,
@@ -222,66 +222,66 @@ pub struct TabsMetrics {
     pub horizontal_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TreeMetrics {
     pub min_size: Size,
     pub row_height: f32,
     pub indent: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TableMetrics {
     pub min_size: Size,
     pub row_height: f32,
     pub cell_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ListMetrics {
     pub min_size: Size,
     pub row_height: f32,
     pub item_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MenuMetrics {
     pub min_size: Size,
     pub item_height: f32,
     pub item_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MenuItemTheme {
     pub default_size: Size,
     pub padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct IconMetrics {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DividerMetrics {
     pub default_size: Size,
     pub thickness: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CanvasMetrics {
     pub default_size: Size,
     pub padding: f32,
     pub label_baseline_offset: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TooltipMetrics {
     pub min_size: Size,
     pub horizontal_padding: f32,
     pub vertical_padding: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct OverlayMetrics {
     pub min_width: f32,
     pub min_height: f32,
@@ -290,69 +290,69 @@ pub struct OverlayMetrics {
     pub max_measure_height: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ScrollbarMetrics {
     pub width: f32,
     pub padding: f32,
     pub min_thumb_height: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CardTheme {
     pub min_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AlertTheme {
     pub min_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ModalTheme {
     pub min_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PopoverTheme {
     pub min_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ImageTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SwitchTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SliderTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ProgressBarTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SpinnerTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BadgeTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AvatarTheme {
     pub default_size: Size,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct LinkTheme {
     pub default_size: Size,
 }

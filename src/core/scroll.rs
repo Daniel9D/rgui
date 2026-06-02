@@ -68,10 +68,8 @@ impl ScrollState {
     }
 
     pub fn max_offset(&self) -> Vec2 {
-        Vec2::new(
-            (self.content_size.width - self.viewport_size.width).max(0.0),
-            (self.content_size.height - self.viewport_size.height).max(0.0),
-        )
+        let s = crate::core::geometry::scrollable_size(self.content_size, self.viewport_size);
+        Vec2::new(s.width, s.height)
     }
 
     pub fn scroll_by(&mut self, delta: Vec2) -> Vec2 {
