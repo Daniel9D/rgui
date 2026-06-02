@@ -871,7 +871,7 @@ fn measure_context_for_node(
                 .style
                 .text
                 .as_ref()
-                .and_then(|t| t.size.resolve(theme.typography.body_size))
+                .and_then(|t| t.size.try_resolve(theme.typography.body_size))
                 .filter(|s| *s > 0.0)
                 .unwrap_or(theme.typography.body_size),
             font_weight: node
@@ -894,7 +894,7 @@ fn measure_context_for_node(
                 .style
                 .text
                 .as_ref()
-                .and_then(|t| t.size.resolve(theme.typography.body_size))
+                .and_then(|t| t.size.try_resolve(theme.typography.body_size))
                 .filter(|s| *s > 0.0)
                 .unwrap_or(theme.typography.body_size),
             font_weight: node

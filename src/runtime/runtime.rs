@@ -2149,25 +2149,25 @@ fn overlay_root_element_for_layout(
 
     let min_width = root_style
         .min_width
-        .and_then(|width| width.resolve(metrics.min_width))
+        .and_then(|width| width.try_resolve(metrics.min_width))
         .unwrap_or(metrics.min_width);
     root_style.min_width = Some(crate::core::Length::Px(min_width));
 
     let min_height = root_style
         .min_height
-        .and_then(|height| height.resolve(metrics.min_height))
+        .and_then(|height| height.try_resolve(metrics.min_height))
         .unwrap_or(metrics.min_height);
     root_style.min_height = Some(crate::core::Length::Px(min_height));
 
     let max_width = root_style
         .max_width
-        .and_then(|width| width.resolve(max_size.width))
+        .and_then(|width| width.try_resolve(max_size.width))
         .unwrap_or(max_size.width);
     root_style.max_width = Some(crate::core::Length::Px(max_width));
 
     let max_height = root_style
         .max_height
-        .and_then(|height| height.resolve(max_size.height))
+        .and_then(|height| height.try_resolve(max_size.height))
         .unwrap_or(max_size.height);
     root_style.max_height = Some(crate::core::Length::Px(max_height));
 

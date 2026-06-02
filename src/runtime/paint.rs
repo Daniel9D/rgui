@@ -604,6 +604,12 @@ pub fn widget_painter_registry() -> impl std::ops::Deref<Target = WidgetPainterR
 /// layer (`widget_painter_for`) consults the registry first
 /// and falls back to this.
 fn static_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
+    // Bug fix 2.2 cont.: the match is now exhaustive. Adding a
+    // new `WidgetKind` variant without a dedicated painter
+    // becomes a compile-time error here, which is the signal
+    // the reviewer wanted. The `widget_painter_for_covers_every_kind`
+    // test pins the list of variants that must keep being
+    // handled.
     match kind {
         WidgetKind::Button       => &BUTTON_PAINTER,
         WidgetKind::Input        => &INPUT_PAINTER,
@@ -634,7 +640,6 @@ fn static_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
         WidgetKind::Slider       => &SLIDER_PAINTER,
         WidgetKind::Image        => &IMAGE_PAINTER,
         WidgetKind::Avatar       => &AVATAR_PAINTER,
-        _                        => &GENERIC_PAINTER,
     }
 }
 
@@ -2247,7 +2252,7 @@ fn text_style_for_node(node: &UiNode, theme: Option<&Theme>) -> RuntimeTextStyle
     let text_style = node.style.text.as_ref();
     RuntimeTextStyle {
         font_size: text_style
-            .and_then(|style| style.size.resolve(14.0))
+            .and_then(|style| style.size.try_resolve(14.0))
             .filter(|size| *size > 0.0)
             .unwrap_or(DEFAULT_TEXT_SIZE),
         weight: text_style

@@ -11,28 +11,78 @@ pub enum Length {
     FitContent(Box<Length>),
 }
 
-impl Length {
-    /// Resolves to an absolute length in pixels relative to `parent`.
-    ///
-    /// Returns `Some(px)` for `Px`, `Percent`, and recursively for
-    /// `FitContent` (which delegates to its inner length). Returns
-    /// `None` for `Fr`, `Auto`, `MinContent`, and `MaxContent` — these
-    /// are "intrinsic" lengths whose size depends on the layout pass
-    /// (taffy) and is not knowable at this layer.
-    ///
-    /// Bug fix 3.11: previously the `None` variants had no doc, so
-    /// callers couldn't tell whether the resolution failed or was
-    /// deliberately deferred. The function still returns `Option<f32>`;
-    /// if a richer return type is needed (e.g. to distinguish "deferred"
-    /// from "unknown"), introduce `enum ResolvedLength { Concrete(f32),
-    /// Intrinsic }` in a follow-up.
-    pub fn resolve(&self, parent: f32) -> Option<f32> {
+/// Result of resolving a [`Length`] against a parent size.
+///
+/// Bug fix 3.11: the old `Option<f32>` return collapsed two
+/// distinct conditions — "resolved to N pixels" and "cannot
+/// resolve at this layer, defer to the layout pass" — into the
+/// same `None`. This enum separates them so callers can decide
+/// what to do with an intrinsic length (e.g. substitute a
+/// default, fall back to a different sizing strategy) instead
+/// of treating it as a generic missing value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ResolvedLength {
+    /// A concrete pixel value resolved from `Px`, `Percent`, or
+    /// `FitContent`.
+    Concrete(f32),
+    /// An intrinsic length (`Fr`, `Auto`, `MinContent`,
+    /// `MaxContent`) that requires the layout pass to resolve.
+    /// The numeric value is not knowable at this layer.
+    Intrinsic,
+}
+
+impl ResolvedLength {
+    /// `Some(px)` for `Concrete`, `None` for `Intrinsic`.
+    /// Equivalent to `self.into()`.
+    pub fn into_option(self) -> Option<f32> {
         match self {
-            Self::Px(px) => Some(*px),
-            Self::Percent(percent) => Some(parent * *percent),
-            Self::FitContent(inner) => inner.resolve(parent),
-            Self::Fr(_) | Self::Auto | Self::MinContent | Self::MaxContent => None,
+            Self::Concrete(px) => Some(px),
+            Self::Intrinsic => None,
         }
+    }
+}
+
+impl From<ResolvedLength> for Option<f32> {
+    fn from(r: ResolvedLength) -> Self {
+        r.into_option()
+    }
+}
+
+impl Length {
+    /// Resolve the length relative to `parent`. Returns the
+    /// richer [`ResolvedLength`] enum so callers can distinguish
+    /// "concrete value" from "intrinsic, defer to layout pass".
+    ///
+    /// Bug fix 3.11: the previous return type was `Option<f32>`,
+    /// which couldn't distinguish "deferred" from "unknown".
+    /// For an `Option<f32>` view, use `.into()` or
+    /// `into_option()`; for the boolean "is this intrinsic",
+    /// use [`Length::is_intrinsic`].
+    pub fn resolve(&self, parent: f32) -> ResolvedLength {
+        match self {
+            Self::Px(px) => ResolvedLength::Concrete(*px),
+            Self::Percent(percent) => ResolvedLength::Concrete(parent * *percent),
+            Self::FitContent(inner) => inner.resolve(parent),
+            Self::Fr(_) | Self::Auto | Self::MinContent | Self::MaxContent => {
+                ResolvedLength::Intrinsic
+            }
+        }
+    }
+
+    /// Convenience: `Some(px)` for concrete values, `None` for
+    /// intrinsic. Equivalent to `self.resolve(parent).into()`.
+    pub fn try_resolve(&self, parent: f32) -> Option<f32> {
+        self.resolve(parent).into()
+    }
+
+    /// True if this length is intrinsic — i.e. requires the
+    /// layout pass to resolve and cannot be turned into a pixel
+    /// value at this layer.
+    pub fn is_intrinsic(&self) -> bool {
+        matches!(
+            self,
+            Self::Fr(_) | Self::Auto | Self::MinContent | Self::MaxContent
+        )
     }
 }
 
@@ -333,5 +383,75 @@ mod tests {
         assert_eq!(LAYOUT.z_index, 0);
         assert!(LAYOUT.key.is_none());
         assert!(LAYOUT.clip_rect.is_none());
+    }
+}
+
+#[cfg(test)]
+mod length_resolve_tests {
+    use super::*;
+
+    // Bug fix 3.11: `Length::resolve` now returns a richer
+    // `ResolvedLength` enum. Verify each `Length` variant
+    // maps to the right arm and that the convenience
+    // `try_resolve` / `is_intrinsic` helpers agree.
+
+    #[test]
+    fn resolve_px_is_concrete() {
+        let r = Length::Px(12.0).resolve(100.0);
+        assert_eq!(r, ResolvedLength::Concrete(12.0));
+        assert_eq!(r.into_option(), Some(12.0));
+    }
+
+    #[test]
+    fn resolve_percent_is_concrete() {
+        let r = Length::Percent(0.5).resolve(200.0);
+        assert_eq!(r, ResolvedLength::Concrete(100.0));
+    }
+
+    #[test]
+    fn resolve_fit_content_delegates() {
+        let r = Length::FitContent(Box::new(Length::Px(8.0))).resolve(100.0);
+        assert_eq!(r, ResolvedLength::Concrete(8.0));
+    }
+
+    #[test]
+    fn resolve_intrinsic_variants_are_intrinsic() {
+        for variant in [
+            Length::Fr(1.0),
+            Length::Auto,
+            Length::MinContent,
+            Length::MaxContent,
+        ] {
+            let r = variant.resolve(100.0);
+            assert_eq!(r, ResolvedLength::Intrinsic, "{variant:?}");
+            assert_eq!(r.into_option(), None);
+        }
+    }
+
+    #[test]
+    fn try_resolve_agrees_with_into_option() {
+        let concrete = Length::Px(5.0).try_resolve(100.0);
+        assert_eq!(concrete, Some(5.0));
+        let intrinsic = Length::Auto.try_resolve(100.0);
+        assert_eq!(intrinsic, None);
+    }
+
+    #[test]
+    fn is_intrinsic_classifies_variants() {
+        assert!(!Length::Px(0.0).is_intrinsic());
+        assert!(!Length::Percent(0.5).is_intrinsic());
+        assert!(!Length::FitContent(Box::new(Length::Px(1.0))).is_intrinsic());
+        assert!(Length::Fr(1.0).is_intrinsic());
+        assert!(Length::Auto.is_intrinsic());
+        assert!(Length::MinContent.is_intrinsic());
+        assert!(Length::MaxContent.is_intrinsic());
+    }
+
+    #[test]
+    fn resolved_length_from_impl_covers_both_arms() {
+        let concrete: Option<f32> = ResolvedLength::Concrete(7.0).into();
+        assert_eq!(concrete, Some(7.0));
+        let intrinsic: Option<f32> = ResolvedLength::Intrinsic.into();
+        assert_eq!(intrinsic, None);
     }
 }
