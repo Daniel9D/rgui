@@ -1173,7 +1173,7 @@ impl UiRuntime {
             Some(crate::widgets::WidgetSpec::Tabs(spec)) if !spec.tabs.is_empty() => {
                 spec.tabs.clone()
             }
-            _ => vec!["Tab1".to_string(), "Tab2".to_string(), "Tab3".to_string()],
+            _ => vec!["Tab1".into(), "Tab2".into(), "Tab3".into()],
         };
 
         let rects = super::paint::calculate_tab_rects_with_metrics(

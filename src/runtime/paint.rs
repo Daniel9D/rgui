@@ -943,7 +943,7 @@ impl WidgetPainter for TabsPainter {
         if let Some(crate::WidgetSpec::Tabs(ref tabs_spec)) = ctx.node.widget_spec {
             spec_tabs = &tabs_spec.tabs;
         }
-        let default_tabs = vec!["Tab1".to_string(), "Tab2".to_string(), "Tab3".to_string()];
+        let default_tabs = vec!["Tab1".into(), "Tab2".into(), "Tab3".into()];
         let tabs: &Vec<String> = if spec_tabs.is_empty() { &default_tabs } else { spec_tabs };
 
         let active_index = ctx.state.tabs_active_index.unwrap_or(0);
@@ -1148,10 +1148,10 @@ impl WidgetPainter for ListPainter {
             spec_items = &list_spec.items;
         }
         let default_items = vec![
-            "Item One".to_string(),
-            "Item Two".to_string(),
-            "Item Three".to_string(),
-            "Item Four".to_string(),
+            "Item One".into(),
+            "Item Two".into(),
+            "Item Three".into(),
+            "Item Four".into(),
         ];
         let items: &Vec<String> =
             if spec_items.is_empty() { &default_items } else { spec_items };

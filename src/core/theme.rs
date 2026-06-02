@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::style::DEFAULT_FONT_FAMILY;
 use crate::{Color, FontWeight, Point, Radius, Rect, Shadow, Size, Style};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -100,7 +101,7 @@ impl Theme {
                 full: Radius::all(999.0),
             },
             typography: TypographyTokens {
-                families: vec!["system-ui".to_string()],
+                families: vec![DEFAULT_FONT_FAMILY.into()],
                 body_size: 14.0,
                 heading_size: 24.0,
                 normal_weight: FontWeight::Normal,
