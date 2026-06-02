@@ -241,9 +241,18 @@ impl HitTestTree {
     }
 
     pub fn hit(&self, point: Point) -> Option<&HitTestEntry> {
+        // Bug fix 1.8: `max_by_key` returns the *last* element on tie, so two
+        // overlapping entries with the same (layer, z_index, order) would
+        // resolve to whichever was pushed later — usually correct, but not
+        // guaranteed. Make the ordering total by also keying on the entry's
+        // position in the underlying vec (so the most recently added entry
+        // wins on a complete tie, which is the more intuitive behavior for
+        // overlays pushed last).
         self.entries
             .iter()
-            .filter(|entry| entry.pointer_events && entry.hit_rect().contains(point))
-            .max_by_key(|entry| (entry.layer.order(), entry.z_index, entry.order))
+            .enumerate()
+            .filter(|(_, entry)| entry.pointer_events && entry.hit_rect().contains(point))
+            .max_by_key(|(idx, entry)| (entry.layer.order(), entry.z_index, entry.order, *idx))
+            .map(|(_, entry)| entry)
     }
 }

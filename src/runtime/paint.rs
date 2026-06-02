@@ -40,12 +40,17 @@ pub(crate) fn visual_state_for_element(element: &Element) -> VisualState {
     VisualState {
         checked: element.checked.unwrap_or(false),
         text: None,
-        label: element.semantic.label.clone().or_else(|| {
-            element.children.iter().find_map(|child| match &child.kind {
-                ElementKind::Text(spec) => Some(spec.text.clone()),
-                _ => None,
-            })
-        }),
+        label: element
+            .widget_spec
+            .as_ref()
+            .and_then(crate::widgets::spec_label)
+            .or_else(|| element.semantic.label.clone())
+            .or_else(|| {
+                element.children.iter().find_map(|child| match &child.kind {
+                    ElementKind::Text(spec) => Some(spec.text.clone()),
+                    _ => None,
+                })
+            }),
         focused: false,
         active: false,
         hovered: false,
@@ -72,6 +77,12 @@ pub fn paint_node(
     z_index: i32,
     state: &VisualState,
 ) -> Vec<PaintedCommand> {
+    // Bug fix 2.7: the old `TextSystem::default()` per call destroyed any
+    // shaping cache between sibling nodes. The default impl is now
+    // `#[deprecated]` to nudge callers into the explicit
+    // `paint_node_with_text(..., &mut text)` path which keeps the
+    // `TextSystem` (and its caches) alive across the whole tree.
+    #[allow(deprecated)]
     let mut text = TextSystem::default();
     paint_node_with_text(node, rect, z_index, state, &mut text)
 }

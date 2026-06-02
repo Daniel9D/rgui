@@ -44,6 +44,10 @@ pub struct UiNode {
     pub handlers: EventHandlers,
     pub overlay: Option<Box<Element>>,
     pub open: bool,
+    /// Uncontrolled initial open state.
+    pub default_open: Option<bool>,
+    /// If `true`, the runtime must treat `open` as controlled.
+    pub controlled_open: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -152,6 +156,8 @@ impl UiTree {
             handlers: element.event_handlers,
             overlay: element.overlay,
             open: element.open,
+            default_open: element.default_open,
+            controlled_open: element.controlled_open,
         });
 
         let child_ids = children
@@ -190,6 +196,8 @@ impl UiTree {
             handlers: element.event_handlers,
             overlay: element.overlay,
             open: element.open,
+            default_open: element.default_open,
+            controlled_open: element.controlled_open,
         });
 
         let child_ids = children
@@ -228,6 +236,8 @@ impl UiTree {
             handlers: element.event_handlers,
             overlay: element.overlay,
             open: element.open,
+            default_open: element.default_open,
+            controlled_open: element.controlled_open,
         });
 
         let child_ids = children

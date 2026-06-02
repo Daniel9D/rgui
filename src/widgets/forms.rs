@@ -24,10 +24,9 @@ pub fn button(label: impl Into<String>) -> Element {
     let label = label.into();
     Element::new(ElementKind::Widget(WidgetKind::Button))
         .widget_spec(WidgetSpec::Button(ButtonSpec {
-            label: Some(label.clone()),
+            label: Some(label),
             ..Default::default()
         }))
-        .child(Element::text(label))
 }
 
 pub fn input() -> Element {

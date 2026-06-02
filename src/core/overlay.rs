@@ -61,17 +61,27 @@ impl OverlayManager {
         self.overlays.push(overlay);
     }
 
+    /// Returns the overlays sorted by `LayerKind::order` (lowest first,
+    /// drawn first / hit-tested first). Clones the underlying vec; if
+    /// you have a `&mut self`, prefer [`Self::sort_in_place`] to avoid
+    /// the allocation.
     pub fn ordered(&self) -> Vec<OverlaySpec> {
         let mut overlays = self.overlays.clone();
-        overlays.sort_by_key(|overlay| match overlay.layer {
-            LayerKind::Document => 0,
-            LayerKind::Floating => 1,
-            LayerKind::Popover => 2,
-            LayerKind::Tooltip => 3,
-            LayerKind::ContextMenu => 4,
-            LayerKind::Modal => 5,
-            LayerKind::Debug => 6,
-        });
+        overlays.sort_by_key(|overlay| overlay.layer.order());
         overlays
+    }
+
+    /// In-place sort using [`LayerKind::order`]. Reuses the caller's
+    /// buffer, so this is allocation-free.
+    pub fn sort_in_place(&mut self) {
+        self.overlays.sort_by_key(|overlay| overlay.layer.order());
+    }
+
+    /// Borrow the overlays sorted by `LayerKind::order` without cloning.
+    /// Caller must already own the vec mutably; use [`Self::ordered`] for
+    /// an owned return.
+    pub fn sorted_slice(&mut self) -> &[OverlaySpec] {
+        self.sort_in_place();
+        &self.overlays
     }
 }

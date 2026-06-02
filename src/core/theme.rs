@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use crate::{Color, FontWeight, Point, Radius, Rect, Shadow, Size, Style};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ThemeMode {
     Light,
-    Dark,
+    #[default]
     System,
+    Dark,
 }
 
 #[derive(Clone, Debug, PartialEq)]

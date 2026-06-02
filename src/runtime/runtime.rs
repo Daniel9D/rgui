@@ -2202,6 +2202,8 @@ fn overlay_root_element_for_layout(
         event_handlers: crate::core::EventHandlers::default(),
         overlay: None,
         open: true,
+        default_open: None,
+        controlled_open: true,
     }
 }
 
@@ -2298,7 +2300,7 @@ fn role_for_node(node: &UiNode) -> Role {
     }
 }
 
-fn label_for_node(node: &UiNode, tree: &UiTree) -> Option<String> {
+fn label_for_node(node: &UiNode, _tree: &UiTree) -> Option<String> {
     // Prioritize widget_spec labels (clean separation from semantic.label)
     if let Some(ref spec) = node.widget_spec {
         if let Some(label) = crate::widgets::spec_label(spec) {
@@ -2308,11 +2310,6 @@ fn label_for_node(node: &UiNode, tree: &UiTree) -> Option<String> {
 
     match &node.kind {
         ElementKind::Text(spec) => Some(spec.text.clone()),
-        ElementKind::Widget(WidgetKind::Button) => node
-            .children
-            .iter()
-            .filter_map(|child| tree.get(*child))
-            .find_map(|child| label_for_node(child, tree)),
         _ => node.semantic.label.clone(),
     }
 }

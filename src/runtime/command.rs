@@ -1,12 +1,32 @@
+/// User-intent commands emitted by the dispatch layer.
+///
+/// # Toggle vs SetBool
+///
+/// `Toggle` is the right command for boolean toggles (e.g. a Checkbox
+/// pointer-up). The runtime is responsible for reading the current state
+/// and converting `Toggle` into a `SetBool` with the correct next value.
+///
+/// `SetBool` should only be used when the new value is known up front
+/// (e.g. radio button selection, form initialization). The dispatch layer
+/// must never emit `SetBool { value: true }` for a checkbox — that hardcodes
+/// the next value and breaks controlled checkboxes. See bug fix 1.4.
 #[derive(Clone, Debug, PartialEq)]
 pub enum UiCommand {
     Click {
         key: Option<String>,
         action: Option<String>,
     },
+    /// Set a boolean state to an absolute value. Use only when the new
+    /// value is known up front.
     SetBool {
         key: String,
         value: bool,
+    },
+    /// Toggle a boolean state. The runtime is responsible for reading the
+    /// current state and emitting a corresponding `SetBool` with the next
+    /// value. This is the correct command for checkbox pointer-up.
+    Toggle {
+        key: String,
     },
     SetText {
         key: String,
@@ -53,6 +73,7 @@ impl UiCommand {
         match self {
             UiCommand::Click { .. } => "Click",
             UiCommand::SetBool { .. } => "SetBool",
+            UiCommand::Toggle { .. } => "Toggle",
             UiCommand::SetText { .. } => "SetText",
             UiCommand::OpenOverlay { .. } => "OpenOverlay",
             UiCommand::CloseOverlay { .. } => "CloseOverlay",

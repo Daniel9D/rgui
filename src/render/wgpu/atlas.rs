@@ -45,6 +45,16 @@ impl TextureAtlas {
         if self.try_place(size) {
             return Some(self.commit(kind, size));
         }
+        // Bug fix 1.7: emit a warning when the shelf allocator can't fit
+        // a placement and falls back to a full eviction. Frequent
+        // occurrences mean the atlas is undersized (or the shelf algorithm
+        // needs to be replaced with a real LRU / guillotine allocator).
+        #[cfg(any(debug_assertions, feature = "debug"))]
+        eprintln!(
+            "rgui-atlas: shelf-pack miss, evicting all entries to fit {:?} {:?}. \
+             Consider increasing atlas size.",
+            kind, size
+        );
         self.evict_all();
         if self.try_place(size) {
             return Some(self.commit(kind, size));

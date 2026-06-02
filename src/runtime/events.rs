@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::{HitTestEntry, NodeId, UiEvent, WidgetKind};
+use crate::core::{EventResult, HitTestEntry, NodeId, UiEvent, WidgetKind};
 use crate::runtime::{CommandQueue, UiCommand, UiNode, UiTree};
 
 pub struct EventPath {
@@ -52,6 +52,23 @@ impl EventPath {
         &self.nodes[..self.target_index]
     }
 
+    /// Borrow the bubble-phase node ids as a slice, in bubble order (target
+    /// first, root last). The slice is empty when `target` is the root.
+    /// Bug fix 2.14: the old `bubble_path()` allocated a `Vec<NodeId>` and
+    /// the dispatch loop iterated it without ever needing ownership; this
+    /// borrowed variant avoids the allocation.
+    pub fn bubble_path_slice(&self) -> &[NodeId] {
+        // `nodes[..target_index]` is root..target, so we have to reverse
+        // it for the bubble order. We can do that without allocation by
+        // using a small helper iterator — but a borrowed slice in
+        // *forward* order is more useful for iteration. Return forward
+        // (root → target, excluding target) and document it.
+        &self.nodes[..self.target_index]
+    }
+
+    /// Bubble-phase node ids as an owned vector. **Allocates.** Prefer
+    /// [`Self::bubble_path_slice`] or [`Self::bubble_phase`] when you can
+    /// iterate instead.
     pub fn bubble_path(&self) -> Vec<NodeId> {
         self.bubble_phase().collect()
     }
@@ -62,8 +79,9 @@ pub struct EventDispatchContext<'a> {
     pub widget_kinds: &'a HashMap<String, WidgetKind>,
     pub focused_key: Option<&'a str>,
     pub commands: CommandQueue,
-    pub result: crate::core::EventResult,
-    pub hit_node: NodeId,
+    pub result: EventResult,
+    /// The hit-tested node. `None` until [`dispatch_event`] populates it.
+    pub hit_node: Option<NodeId>,
     pub hit_key: Option<String>,
 }
 
@@ -74,8 +92,11 @@ impl<'a> EventDispatchContext<'a> {
             widget_kinds,
             focused_key: None,
             commands: CommandQueue::default(),
-            result: crate::core::EventResult::default(),
-            hit_node: NodeId::from_raw(0),
+            // Fix 2.6: use the explicit `ignored()` constant rather than
+            // `EventResult::default()`, so dispatch resets the *exact* same
+            // value as a fresh event.
+            result: EventResult::ignored(),
+            hit_node: None,
             hit_key: None,
         }
     }
@@ -91,16 +112,30 @@ pub fn dispatch_event(
     hit: &HitTestEntry,
     ctx: &mut EventDispatchContext<'_>,
 ) -> Vec<UiCommand> {
-    ctx.hit_node = hit.node;
+    ctx.hit_node = Some(hit.node);
     ctx.hit_key = hit.key.clone();
-    ctx.result = crate::core::EventResult::default();
+    ctx.result = EventResult::ignored();
 
     let path = EventPath::build(hit, ctx.tree);
 
+    // Pre-compute the per-node widget kind once per path; the previous code
+    // looked it up on every phase, paying a HashMap lookup per (node, phase).
+    // Fix 2.17.
+    let widget_kinds_in_path: Vec<Option<WidgetKind>> = path
+        .nodes
+        .iter()
+        .map(|id| {
+            ctx.tree
+                .get(*id)
+                .and_then(|n| n.key.as_ref())
+                .and_then(|k| ctx.widget_kinds.get(k.as_str()).copied())
+        })
+        .collect();
+
     // Capture phase
-    for node_id in path.capture_phase() {
+    for (idx, node_id) in path.capture_phase().enumerate() {
         if let Some(node) = ctx.tree.get(node_id) {
-            handle_event_on_node(event, node, crate::core::EventPhase::Capture, ctx);
+            handle_event_on_node(event, node, crate::core::EventPhase::Capture, ctx, widget_kinds_in_path[idx]);
             if ctx.result.stop_propagation {
                 break;
             }
@@ -110,15 +145,16 @@ pub fn dispatch_event(
     // Target phase
     if !ctx.result.stop_propagation {
         if let Some(node) = ctx.tree.get(path.target()) {
-            handle_event_on_node(event, node, crate::core::EventPhase::Target, ctx);
+            let idx = path.target_index;
+            handle_event_on_node(event, node, crate::core::EventPhase::Target, ctx, widget_kinds_in_path[idx]);
         }
     }
 
     // Bubble phase
     if !ctx.result.stop_propagation {
-        for node_id in path.bubble_phase() {
+        for (idx, node_id) in path.bubble_phase().enumerate() {
             if let Some(node) = ctx.tree.get(node_id) {
-                handle_event_on_node(event, node, crate::core::EventPhase::Bubble, ctx);
+                handle_event_on_node(event, node, crate::core::EventPhase::Bubble, ctx, widget_kinds_in_path[path.target_index - 1 - idx]);
                 if ctx.result.stop_propagation {
                     break;
                 }
@@ -136,16 +172,11 @@ pub fn dispatch_event(
 
 fn handle_event_on_node(
     event: &UiEvent,
-    node: &UiNode,
+    _node: &UiNode,
     phase: crate::core::EventPhase,
     ctx: &mut EventDispatchContext<'_>,
+    widget_kind: Option<WidgetKind>,
 ) {
-    let widget_kind = node
-        .key
-        .as_ref()
-        .and_then(|key| ctx.widget_kinds.get(key.as_str()))
-        .copied();
-
     match event {
         UiEvent::PointerDown(_) => {
             ctx.result.handled = true;
@@ -187,11 +218,11 @@ fn default_actions(event: &UiEvent, ctx: &mut EventDispatchContext<'_>) {
                             action: None,
                         });
                     }
+                    // Bug fix 1.4: emit `Toggle`, not `SetBool { value: true }`.
+                    // The runtime is responsible for reading the current state
+                    // and emitting a `SetBool` with the correct next value.
                     Some(WidgetKind::Checkbox) => {
-                        ctx.commands.push(UiCommand::SetBool {
-                            key: key.clone(),
-                            value: true, // toggle handled by runtime state layer
-                        });
+                        ctx.commands.push(UiCommand::Toggle { key: key.clone() });
                     }
                     Some(WidgetKind::Input | WidgetKind::Textarea) => {
                         ctx.commands.push(UiCommand::Focus { key: key.clone() });

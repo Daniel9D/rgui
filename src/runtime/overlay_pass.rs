@@ -111,8 +111,20 @@ pub fn place_anchored_overlay(
     constrain_overlay_to_viewport(rect, viewport)
 }
 
+/// Reserve the top of the `u64` address space for synthetic ids.
+/// Real ids are allocated monotonically from 0 by `IdAllocator`, so the
+/// top 2^32 ids are guaranteed not to collide with user-allocated ones.
+/// This fixes bug 1.10 (the previous implementation subtracted from
+/// `u64::MAX` and could collide with a real node at `raw() == u64::MAX`).
+const BACKDROP_ID_BASE: u64 = u64::MAX - (u32::MAX as u64);
+
 fn backdrop_node_id(owner: NodeId) -> NodeId {
-    NodeId::from_raw(u64::MAX - owner.raw())
+    // Map `owner.raw()` into the reserved range. The simple
+    // `BACKDROP_ID_BASE - owner.raw()` would still collide if the owner
+    // id were near `u64::MAX`; instead, fold the owner id into the lower
+    // 32 bits of the reserved range.
+    let owner_low = owner.raw() & 0xFFFF_FFFF;
+    NodeId::from_raw(BACKDROP_ID_BASE | owner_low)
 }
 
 fn layer_for_overlay_kind(kind: &ElementKind) -> LayerKind {

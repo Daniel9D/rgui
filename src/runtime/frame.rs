@@ -13,6 +13,11 @@ pub struct FrameInput {
 }
 
 impl Default for FrameInput {
+    /// ⚠️ **For tests and scaffolding only.** The default `FrameInput` is an
+    /// empty column with a light theme and 800×600 viewport. Production code
+    /// must construct a `FrameInput` with a real `Element` root and the
+    /// appropriate viewport / theme for the host window. Bug fix 1.6:
+    /// previously the doc was implicit; now the intent is loud.
     fn default() -> Self {
         Self {
             root: Element::column(),

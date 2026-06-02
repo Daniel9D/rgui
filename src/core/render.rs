@@ -25,6 +25,12 @@ pub struct GlyphKey {
     pub size_bits: u32,
 }
 
+/// An sRGB color. Channels are stored as 8-bit values.
+///
+/// The "no color" / "resolve at paint time from the active theme" sentinel
+/// is [`Color::DEFAULT`]. Use [`Color::is_default`] to detect it. The render
+/// path is responsible for replacing `DEFAULT` with the appropriate token
+/// (e.g. `theme.colors.text`) before lowering to the GPU.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Color {
     pub r: u8,
@@ -34,12 +40,39 @@ pub struct Color {
 }
 
 impl Color {
+    /// Sentinel meaning "use the active theme to resolve this color at paint
+    /// time". Recognized by [`Color::is_default`]. Storing `DEFAULT` directly
+    /// in a `Color` field is preferred over a `Option<Color>` so the field
+    /// shape stays uniform.
+    pub const DEFAULT: Color = Color::rgba(0, 0, 0, 0);
+
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b, a: 255 }
     }
 
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
+    }
+
+    /// `true` if this is the [`Color::DEFAULT`] sentinel.
+    pub const fn is_default(self) -> bool {
+        self.a == 0
+    }
+
+    /// `true` if the alpha channel is fully opaque.
+    pub const fn is_opaque(self) -> bool {
+        self.a == 255
+    }
+
+    /// Returns a new color with the same RGB but a different alpha.
+    pub const fn with_alpha(self, a: u8) -> Self {
+        Self { r: self.r, g: self.g, b: self.b, a }
+    }
+}
+
+impl Default for Color {
+    fn default() -> Self {
+        Color::DEFAULT
     }
 }
 
@@ -190,6 +223,12 @@ pub enum PaintCommand {
 }
 
 impl PaintCommand {
+    /// Z-index used for paint ordering. Stack-management commands
+    /// (`PushLayer` / `PopLayer` / `PushClip` / `PopClip`) return `i32::MIN`
+    /// so they sort before any draw command. Bug fix 2.13: previously
+    /// `PushLayer` returned `spec.z_index` and the rest returned `0`, which
+    /// silently corrupted the sort order when stack commands had non-zero
+    /// z-indices.
     pub fn z_index(&self) -> i32 {
         match self {
             PaintCommand::DrawRect(cmd) => cmd.z_index,
@@ -199,8 +238,13 @@ impl PaintCommand {
             PaintCommand::DrawSvg(cmd) => cmd.z_index,
             PaintCommand::DrawPath(cmd) => cmd.z_index,
             PaintCommand::DrawShadow(cmd) => cmd.z_index,
-            PaintCommand::PushLayer(spec) => spec.z_index,
-            _ => 0,
+            // Stack-management commands sort first. `i32::MIN` is well
+            // below the documented `OVERLAY_PANEL_Z_BASE = 1000`, so
+            // this is safe for the existing z-base constants.
+            PaintCommand::PushLayer(_)
+            | PaintCommand::PopLayer
+            | PaintCommand::PushClip(_)
+            | PaintCommand::PopClip => i32::MIN,
         }
     }
 }
@@ -359,4 +403,75 @@ pub struct RenderStats {
 pub trait RendererBackend {
     fn resize(&mut self, size: SizeU32);
     fn render(&mut self, display_list: &DisplayList, resources: &ResourceStore) -> RenderStats;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_default_sentinel_is_recognized() {
+        assert!(Color::DEFAULT.is_default());
+        assert!(!Color::rgb(255, 0, 0).is_default());
+        assert!(Color::rgb(0, 0, 0).is_opaque());
+        assert!(!Color::DEFAULT.is_opaque());
+    }
+
+    #[test]
+    fn color_with_alpha_returns_new_color() {
+        let c = Color::rgb(10, 20, 30).with_alpha(128);
+        assert_eq!(c.r, 10);
+        assert_eq!(c.g, 20);
+        assert_eq!(c.b, 30);
+        assert_eq!(c.a, 128);
+    }
+
+    #[test]
+    fn paint_command_z_index_for_stack_ops_is_min() {
+        // Bug fix 2.13: PushLayer / PopLayer / PushClip / PopClip must sort
+        // before any draw command.
+        let list = DisplayList::default();
+        let push_layer = PaintCommand::PushLayer(LayerSpec::new(LayerKind::Document));
+        let pop_layer = PaintCommand::PopLayer;
+        let push_clip = PaintCommand::PushClip(ClipSpec::rect(Rect::new(
+            Point::new(0.0, 0.0),
+            crate::core::Size::new(10.0, 10.0),
+        )));
+        let pop_clip = PaintCommand::PopClip;
+        assert_eq!(push_layer.z_index(), i32::MIN);
+        assert_eq!(pop_layer.z_index(), i32::MIN);
+        assert_eq!(push_clip.z_index(), i32::MIN);
+        assert_eq!(pop_clip.z_index(), i32::MIN);
+        // Draw command with z=0 sorts after the stack ops.
+        let draw_rect = PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(
+                Point::new(0.0, 0.0),
+                crate::core::Size::new(1.0, 1.0),
+            ),
+            paint: Paint::Solid(Color::rgb(0, 0, 0)),
+            radius: 0.0,
+            opacity: 1.0,
+            z_index: 0,
+        });
+        assert!(draw_rect.z_index() > push_layer.z_index());
+        // Suppress unused warning for the empty list.
+        let _ = list;
+    }
+
+    #[test]
+    fn layer_kind_order_is_a_total_order() {
+        use std::collections::HashSet;
+        let mut orders = HashSet::new();
+        for kind in [
+            LayerKind::Document,
+            LayerKind::Floating,
+            LayerKind::Popover,
+            LayerKind::Tooltip,
+            LayerKind::ContextMenu,
+            LayerKind::Modal,
+            LayerKind::Debug,
+        ] {
+            assert!(orders.insert(kind.order()), "duplicate order for {kind:?}");
+        }
+    }
 }

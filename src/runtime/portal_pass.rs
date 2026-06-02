@@ -451,6 +451,8 @@ fn portal_element_to_ui_node(node_id: NodeId, element: &Element) -> UiNode {
         handlers: EventHandlers::default(),
         overlay: None,
         open: element.open,
+        default_open: element.default_open,
+        controlled_open: element.controlled_open,
     }
 }
 
@@ -471,26 +473,15 @@ fn overlay_children_to_portal_items(
 
 fn portal_label_for_node(node: &UiNode) -> Option<String> {
     if let Some(spec) = node.widget_spec.as_ref() {
-        match spec {
-            crate::widgets::WidgetSpec::Button(spec) => return spec.label.clone(),
-            crate::widgets::WidgetSpec::Input(spec) => return spec.aria_label.clone(),
-            crate::widgets::WidgetSpec::Textarea(_) => return node.semantic.label.clone(),
-            _ => {}
+        if let Some(label) = crate::widgets::spec_label(spec) {
+            return Some(label);
         }
     }
 
     match &node.kind {
         ElementKind::Text(spec) => Some(spec.text.clone()),
-        ElementKind::Widget(WidgetKind::Button) => node
-            .children
-            .first()
-            .and_then(|child| child_label_text(node, *child)),
         _ => node.semantic.label.clone(),
     }
-}
-
-fn child_label_text(_node: &UiNode, _child: NodeId) -> Option<String> {
-    None
 }
 
 fn portal_value_for_node(node: &UiNode) -> Option<crate::core::SemanticValue> {
@@ -530,5 +521,7 @@ fn ui_node_to_portal_element(tree: &UiTree, node: &UiNode) -> Element {
         event_handlers: crate::core::EventHandlers::default(),
         overlay: None,
         open: node.open,
+        default_open: node.default_open,
+        controlled_open: node.controlled_open,
     }
 }
