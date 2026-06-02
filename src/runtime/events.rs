@@ -1,3 +1,19 @@
+//! Event dispatch.
+//!
+//! The dispatcher walks the `UiEvent` from the platform layer through
+//! a hit-tested path, accumulates the per-phase node stack, and
+//! routes the event to the appropriate handler:
+//!
+//! - `default_actions` (this file) produces the default
+//!   `UiCommand`s for primitive events (click, focus, toggle).
+//! - Per-widget handlers in the runtime apply the command
+//!   to the right state slot (`BoolState`, `InputState`,
+//!   `OpenOverlay`, etc.).
+//!
+//! Hit-test routing is cached on `EventPath::build` (per
+//! `EventPath`) so the per-phase walk does not re-lookup
+//! `widget_kinds` for every node. Bug fix 2.17.
+
 use std::collections::HashMap;
 
 use crate::core::{EventResult, HitTestEntry, NodeId, UiEvent, WidgetKind};

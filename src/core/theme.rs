@@ -153,6 +153,18 @@ impl Default for WidgetThemes {
     }
 }
 
+/// Per-widget sizing baselines (min size, default size, padding,
+/// row height, etc.). The struct is a flat namespace of `*Metrics`
+/// fields; the canonical way to query "what is the min size of a
+/// `Button`" is [`WidgetMetrics::min_size_for`].
+///
+/// **Access pattern:** callers should go through [`WidgetMetrics::min_size_for`]
+/// for size lookups by `WidgetKind`. Direct field access is
+/// reserved for fields that are *not* the min size (e.g.
+/// `metrics.tabs.tab_height` for the tab-strip height, which is a
+/// layout detail independent of the Tabs content's min size). Bug
+/// fix 8.4: this single-access pattern is documented but not
+/// enforced at compile time.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WidgetMetrics {
     pub button: ButtonMetrics,

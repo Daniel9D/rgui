@@ -1,3 +1,19 @@
+//! Tree reconciliation between the user-supplied `Element` tree and
+//! the runtime's `UiTree`.
+//!
+//! The reconciler takes the new element tree produced by the user
+//! each frame and produces a minimal-diff update to the live
+//! `UiTree` (allocating only new `NodeId`s, preserving keyed nodes,
+//! and emitting dirty flags for downstream passes). The key
+//! invariants are:
+//! - The `keyed_ids` map makes consecutive frames with the same
+//!   keyed structure stable — the same `NodeId` is reused.
+//! - `DirtyFlags` is the only signal downstream passes need to
+//!   re-layout / re-paint a node; everything else can be read
+//!   from `UiTree` directly.
+//! - `IdAllocator` saturates at `u64::MAX - 1` to leave room for
+//!   the `backdrop_node_id` reserved range (see overlay_pass).
+
 use std::collections::HashMap;
 
 use crate::core::{Element, ElementKey, ElementKind, NodeId, Style};
