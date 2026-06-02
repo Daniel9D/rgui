@@ -12,6 +12,20 @@ pub enum Length {
 }
 
 impl Length {
+    /// Resolves to an absolute length in pixels relative to `parent`.
+    ///
+    /// Returns `Some(px)` for `Px`, `Percent`, and recursively for
+    /// `FitContent` (which delegates to its inner length). Returns
+    /// `None` for `Fr`, `Auto`, `MinContent`, and `MaxContent` — these
+    /// are "intrinsic" lengths whose size depends on the layout pass
+    /// (taffy) and is not knowable at this layer.
+    ///
+    /// Bug fix 3.11: previously the `None` variants had no doc, so
+    /// callers couldn't tell whether the resolution failed or was
+    /// deliberately deferred. The function still returns `Option<f32>`;
+    /// if a richer return type is needed (e.g. to distinguish "deferred"
+    /// from "unknown"), introduce `enum ResolvedLength { Concrete(f32),
+    /// Intrinsic }` in a follow-up.
     pub fn resolve(&self, parent: f32) -> Option<f32> {
         match self {
             Self::Px(px) => Some(*px),

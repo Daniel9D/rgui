@@ -14,6 +14,13 @@ pub fn measure_text(
     style: FontStyle,
     max_width: f32,
 ) -> TextMetrics {
+    // Bug fix 4.1 note: `chars().count()` is O(n) and walks UTF-8.
+    // The 0.58 width coefficient is itself an approximation, so the
+    // function is "fast and approximate" overall. The real shape cache
+    // in `text_engine` is the source of truth for layout; this function
+    // exists for callers that need a width estimate without paying the
+    // full shaping cost. If profiling shows this is hot, replace with
+    // a per-text-node cache keyed on (text, font_size, weight, style).
     let glyph_count = text.chars().count() as f32;
     let weight_scale = if matches!(weight, FontWeight::Bold) {
         1.08
