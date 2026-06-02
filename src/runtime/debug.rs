@@ -2,6 +2,7 @@ use crate::core::{
     BorderCmd, Color, DisplayList, LayerKind, LayerSpec, Paint, PaintCommand, Rect, RectCmd, Size,
 };
 use crate::runtime::FrameOutput;
+use std::fmt::Write as _;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DebugVisualMode {
@@ -63,54 +64,61 @@ impl DebugVisualMode {
 /// allocation still happened at the call site (a `String` is built
 /// regardless), defeating the early-return. The current contract
 /// is "caller checks the gate; this function always dumps".
+///
+/// Bug fix 2.11 (continued): each line was previously formatted
+/// with `format!("…{x:?}\n")`, which allocates a fresh `String`
+/// per line and then copies it into the output buffer. We now use
+/// `write!` against a single `String` so the only allocations are
+/// the buffer's internal growth and the per-line Debug string the
+/// std library itself produces for the value.
 pub fn format_frame_dump(output: &FrameOutput) -> String {
     let mut dump = String::new();
-    dump.push_str("=== FRAME ===\n");
-    dump.push_str(&format!("layout_engine: {}\n", output.layout_engine));
+    writeln!(dump, "=== FRAME ===").unwrap();
+    writeln!(dump, "layout_engine: {}", output.layout_engine).unwrap();
 
-    dump.push_str("=== DISPLAY LIST ===\n");
+    writeln!(dump, "=== DISPLAY LIST ===").unwrap();
     for (index, command) in output.display_list.commands().iter().enumerate() {
-        dump.push_str(&format!("[{index:03}] {command:?}\n"));
+        writeln!(dump, "[{index:03}] {command:?}").unwrap();
     }
 
     if let Some(snapshot) = &output.snapshot {
-        dump.push_str("=== STYLES ===\n");
+        writeln!(dump, "=== STYLES ===").unwrap();
         for style in &snapshot.styles {
-            dump.push_str(&format!("{style:?}\n"));
+            writeln!(dump, "{style:?}").unwrap();
         }
 
-        dump.push_str("=== MEASURE ===\n");
+        writeln!(dump, "=== MEASURE ===").unwrap();
         for measure in &snapshot.measure {
-            dump.push_str(&format!("{measure:?}\n"));
+            writeln!(dump, "{measure:?}").unwrap();
         }
 
-        dump.push_str("=== LAYOUT ===\n");
+        writeln!(dump, "=== LAYOUT ===").unwrap();
         for layout in &snapshot.layout {
-            dump.push_str(&format!("{layout:?}\n"));
+            writeln!(dump, "{layout:?}").unwrap();
         }
 
-        dump.push_str("=== PAINT ===\n");
+        writeln!(dump, "=== PAINT ===").unwrap();
         for paint in &snapshot.display_list {
-            dump.push_str(&format!("{paint:?}\n"));
+            writeln!(dump, "{paint:?}").unwrap();
         }
 
-        dump.push_str("=== HIT TEST ===\n");
+        writeln!(dump, "=== HIT TEST ===").unwrap();
         for entry in &snapshot.hit_test_entries {
-            dump.push_str(&format!("{entry:?}\n"));
+            writeln!(dump, "{entry:?}").unwrap();
         }
 
-        dump.push_str("=== SEMANTICS ===\n");
+        writeln!(dump, "=== SEMANTICS ===").unwrap();
         for semantic in &snapshot.semantics {
-            dump.push_str(&format!("{semantic:?}\n"));
+            writeln!(dump, "{semantic:?}").unwrap();
         }
 
-        dump.push_str("=== OVERLAYS ===\n");
+        writeln!(dump, "=== OVERLAYS ===").unwrap();
         for overlay in snapshot.overlays() {
-            dump.push_str(&format!("{overlay:?}\n"));
+            writeln!(dump, "{overlay:?}").unwrap();
         }
 
-        dump.push_str("=== STATS ===\n");
-        dump.push_str(&format!("{:?}\n", snapshot.performance));
+        writeln!(dump, "=== STATS ===").unwrap();
+        writeln!(dump, "{:?}", snapshot.performance).unwrap();
     }
 
     dump
