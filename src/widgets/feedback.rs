@@ -3,13 +3,15 @@ use crate::{
     WidgetSpec,
 };
 
-/// Creates a progress bar element.
+/// Creates a progress bar element. Use `.value(0.0..=1.0)` to set
+/// the fill fraction and `.max(n)` to change the upper bound.
 pub fn progress_bar() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::ProgressBar))
         .widget_spec(WidgetSpec::ProgressBar(ProgressBarSpec::default()))
 }
 
-/// Creates a spinner (loading indicator) element.
+/// Creates a spinner (loading indicator) element. Use
+/// `.label("…")` to show hint text alongside the spinner.
 pub fn spinner() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Spinner))
         .widget_spec(WidgetSpec::Spinner(SpinnerSpec::default()))

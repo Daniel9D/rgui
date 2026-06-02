@@ -3,13 +3,14 @@ use crate::{
     TreeSpec, WidgetKind, WidgetSpec,
 };
 
+/// Creates a tabs container. Use `.tabs(["…", "…"])` to set the
+/// tab labels (the source of truth for both the strip and the
+/// active child) and `.default_active_index(n)` to seed the
+/// initial selection. Add children via `.child(...)` for each
+/// tab's content.
 pub fn tabs() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Tabs))
         .widget_spec(WidgetSpec::Tabs(TabsSpec::default()))
-}
-
-pub fn tab(label: impl Into<String>) -> Element {
-    Element::text(label)
 }
 
 pub fn tree_item(label: impl Into<String>) -> TreeItemSpec {
@@ -34,21 +35,32 @@ impl TreeItemSpec {
     }
 }
 
+/// Creates a tree element. Use `.items([tree_item("a"), …])` to seed
+/// the tree; chain `.expanded(true)` and `.child(item)` on each
+/// `tree_item` to nest and expand.
 pub fn tree() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Tree))
         .widget_spec(WidgetSpec::Tree(TreeSpec::default()))
 }
 
+/// Creates a table element. Use `.columns(["Name", "Status"])`
+/// to set the column headers, `.rows([["a", "b"], …])` for the
+/// body, and `.default_selected_row(n)` to pre-select a row.
 pub fn table() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Table))
         .widget_spec(WidgetSpec::Table(TableSpec::default()))
 }
 
+/// Creates a list element. Use `.items(["a", "b", …])` to set the
+/// entries and `.default_selected_index(n)` to pre-select.
 pub fn list() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::List))
         .widget_spec(WidgetSpec::List(ListSpec::default()))
 }
 
+/// Creates a menu (dropdown / popup) container. Children must be
+/// `menu_item(...)` elements. A menu does not have an open state of
+/// its own — the parent element decides when to show it.
 pub fn menu() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Menu))
         .widget_spec(WidgetSpec::Menu(MenuSpec::default()))

@@ -18,6 +18,9 @@ pub fn icon(name: impl Into<String>) -> Element {
         .aria_label(name)
 }
 
+/// Creates a horizontal divider element. The default size is taken
+/// from the theme's `divider` metrics; override with `.width()` /
+/// `.height()` on the element.
 pub fn divider() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Divider)).widget_spec(WidgetSpec::Divider)
 }
@@ -34,7 +37,9 @@ pub fn image(src: impl Into<String>) -> Element {
         }))
 }
 
-/// Creates a badge element displaying a small status label.
+/// Creates a badge element displaying a small status label. Use
+/// `.variant(BadgeVariant::Primary | Success | Warning | Danger)` to
+/// apply a color scheme.
 pub fn badge(text: impl Into<String>) -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Badge))
         .widget_spec(WidgetSpec::Badge(BadgeSpec {
@@ -44,7 +49,8 @@ pub fn badge(text: impl Into<String>) -> Element {
 }
 
 /// Creates an avatar element. Displays an image if `src` is provided,
-/// otherwise falls back to `initials` text.
+/// otherwise falls back to `initials` text. Use `.size(AvatarSize::*)`
+/// to control the rendered size.
 pub fn avatar() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Avatar))
         .widget_spec(WidgetSpec::Avatar(AvatarSpec::default()))

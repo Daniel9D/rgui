@@ -20,6 +20,11 @@ pub enum InputVariant {
     Plain,
 }
 
+/// Creates a button element with the given label.
+///
+/// The label is stored on the `ButtonSpec`; the button painter reads
+/// it via `label_for_node` to draw centered text. Pair with
+/// `.primary()` (or `.variant(...)`) to apply a styled variant.
 pub fn button(label: impl Into<String>) -> Element {
     let label = label.into();
     Element::new(ElementKind::Widget(WidgetKind::Button))
@@ -29,21 +34,35 @@ pub fn button(label: impl Into<String>) -> Element {
         }))
 }
 
+/// Creates a single-line text input element. Use `.placeholder("…")`
+/// to show hint text when the field is empty, `.value("…")` to seed
+/// the initial text, and `.password(true)` for masked input.
 pub fn input() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Input))
         .widget_spec(WidgetSpec::Input(InputSpec::default()))
 }
 
+/// Creates a checkbox element. Use `.checked(true)` to seed the
+/// initial state; the runtime emits a `UiCommand::Toggle` on
+/// pointer-up (the runtime applies the toggle, so controlled
+/// checkboxes are safe).
 pub fn checkbox() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Checkbox))
         .widget_spec(WidgetSpec::Checkbox(CheckboxSpec::default()))
 }
 
+/// Creates a radio-button element. Use `.value("…")` to set the
+/// underlying value; the runtime groups radio buttons by parent
+/// key for single-selection.
 pub fn radio() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Radio))
         .widget_spec(WidgetSpec::Radio(RadioSpec::default()))
 }
 
+/// Creates a select (dropdown) element. Use `.options([...])` to
+/// populate the option list, `.placeholder("…")` to show hint
+/// text when nothing is selected, and `.selected_index(n)` to
+/// pre-select.
 pub fn select() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Select))
         .widget_spec(WidgetSpec::Select(SelectSpec::default()))
@@ -148,6 +167,9 @@ pub fn select_options(options: impl IntoIterator<Item = impl IntoSelectOption>) 
     select().options(options)
 }
 
+/// Creates a multi-line textarea element. Use `.placeholder("…")`
+/// for hint text, `.rows(n)` to seed the visible row count, and
+/// `.value("…")` to seed the initial text.
 pub fn textarea() -> Element {
     Element::new(ElementKind::Widget(WidgetKind::Textarea))
         .widget_spec(WidgetSpec::Textarea(TextareaSpec::default()))
