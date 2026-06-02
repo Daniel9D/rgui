@@ -486,7 +486,7 @@ impl Element {
     /// "set on every render, fight the runtime" is gone. If you want
     /// uncontrolled, use [`Element::initially_open`].
     #[must_use]
-    pub fn open(mut self, value: bool) -> Self {
+    pub fn open(self, value: bool) -> Self {
         self.open_now(value)
     }
 
