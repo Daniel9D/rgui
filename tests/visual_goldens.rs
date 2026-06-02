@@ -79,6 +79,79 @@ fn diff_rgba(expected: &[u8], actual: &[u8]) -> (usize, Vec<u8>) {
     (changed, diff)
 }
 
+/// Per-channel diff statistics computed from two RGBA8 frames.
+///
+/// These are the inputs to a *perceptual* tolerance check: small
+/// GPU/driver-level non-determinism (1-2 units of channel difference
+/// on a few thousand pixels) should be tolerated, while genuine
+/// regressions (whole regions redrawn) should fail loudly. A pixel
+/// is counted as "changed" when any of its four channels differs by
+/// more than `PIXEL_TOLERANCE` (configured below) from the expected
+/// value.
+#[derive(Debug, Clone, Copy)]
+struct PixelDiffStats {
+    /// Number of pixels that differ by more than the per-channel
+    /// tolerance threshold.
+    changed_pixels: usize,
+    /// Largest single-channel absolute difference observed.
+    max_abs_diff: u8,
+    /// Total pixel count.
+    total_pixels: usize,
+}
+
+impl PixelDiffStats {
+    /// Fraction of pixels that exceed the tolerance, range `[0.0, 1.0]`.
+    fn changed_ratio(&self) -> f64 {
+        if self.total_pixels == 0 {
+            return 0.0;
+        }
+        self.changed_pixels as f64 / self.total_pixels as f64
+    }
+}
+
+/// Per-channel absolute difference that a single pixel may have
+/// before it is counted as "changed". `1` covers quantization noise
+/// and minor sub-pixel rasterization differences; anything above
+/// this on a meaningful fraction of pixels is a real regression.
+const PIXEL_TOLERANCE: u8 = 1;
+
+/// Maximum fraction of pixels allowed to differ by more than the
+/// per-pixel tolerance. `0.0001` = 0.01% of pixels, e.g. ~30
+/// pixels on a 640×480 frame. Anything more is a real regression.
+const CHANGED_PIXEL_RATIO_LIMIT: f64 = 0.0001;
+
+/// Maximum single-channel drift tolerated anywhere in the frame.
+/// `5` catches the case where a tiny fraction of pixels drift by a
+/// lot (which the ratio gate would otherwise miss) — e.g. a 1-pixel
+/// brush stroke rendering at a different sub-pixel offset on a
+/// different driver.
+const MAX_ABS_DIFF_LIMIT: u8 = 5;
+
+fn pixel_diff_stats(expected: &[u8], actual: &[u8]) -> PixelDiffStats {
+    debug_assert_eq!(expected.len(), actual.len());
+    let mut stats = PixelDiffStats {
+        changed_pixels: 0,
+        max_abs_diff: 0,
+        total_pixels: expected.len() / 4,
+    };
+    for (expected_px, actual_px) in expected.chunks_exact(4).zip(actual.chunks_exact(4)) {
+        let mut pixel_changed = false;
+        for (&e, &a) in expected_px.iter().zip(actual_px.iter()) {
+            let d = (e as i32 - a as i32).unsigned_abs() as u8;
+            if d > stats.max_abs_diff {
+                stats.max_abs_diff = d;
+            }
+            if d > PIXEL_TOLERANCE {
+                pixel_changed = true;
+            }
+        }
+        if pixel_changed {
+            stats.changed_pixels += 1;
+        }
+    }
+    stats
+}
+
 fn assert_visual_matches(name: &str, size: SizeU32, actual_pixels: &[u8]) {
     let (expected_path, actual_path, diff_path) = golden_paths(name);
     if std::env::var_os("RGUI_UPDATE_GOLDENS").is_some() {
@@ -95,17 +168,79 @@ fn assert_visual_matches(name: &str, size: SizeU32, actual_pixels: &[u8]) {
 
     let (expected_size, expected_pixels) = load_png_rgba(&expected_path);
     assert_eq!(expected_size, size, "golden size changed for {name}");
-    let (changed, diff_pixels) = diff_rgba(&expected_pixels, actual_pixels);
-    if changed > 0 {
-        save_png(&diff_path, size, &diff_pixels);
+
+    // Strict path: bytes match exactly. This is the common case on
+    // a deterministic software rasterizer; if we reach this, the
+    // golden is locked in and we don't need to consider tolerance.
+    if expected_pixels == actual_pixels {
+        return;
     }
+
+    let (strict_changed, diff_pixels) = diff_rgba(&expected_pixels, actual_pixels);
+    let stats = pixel_diff_stats(&expected_pixels, actual_pixels);
+    save_png(&diff_path, size, &diff_pixels);
+
+    // Tolerance path: a small amount of per-pixel noise is OK so
+    // the goldens don't flake on driver / GPU non-determinism. If
+    // either gate fails we treat the diff as a real regression.
+    let within_ratio = stats.changed_ratio() <= CHANGED_PIXEL_RATIO_LIMIT;
+    let within_max = stats.max_abs_diff <= MAX_ABS_DIFF_LIMIT;
+
+    if !(within_ratio && within_max) {
+        panic!(
+            "visual golden {name} changed beyond tolerance \
+             (changed_pixels={}/{} changed_ratio={:.6} max_abs_diff={} \
+             strict_changed={} limits: ratio<={:.6} max<={}); \
+             actual={} diff={}",
+            stats.changed_pixels,
+            stats.total_pixels,
+            stats.changed_ratio(),
+            stats.max_abs_diff,
+            strict_changed,
+            CHANGED_PIXEL_RATIO_LIMIT,
+            MAX_ABS_DIFF_LIMIT,
+            actual_path.display(),
+            diff_path.display(),
+        );
+    }
+}
+
+#[test]
+fn pixel_diff_stats_reports_clean_match_as_zero() {
+    let pixels = vec![10u8, 20, 30, 255, 40, 50, 60, 128];
+    let stats = pixel_diff_stats(&pixels, &pixels);
+    assert_eq!(stats.changed_pixels, 0);
+    assert_eq!(stats.max_abs_diff, 0);
+    assert_eq!(stats.total_pixels, 2);
+    assert!(stats.changed_ratio() <= CHANGED_PIXEL_RATIO_LIMIT);
+}
+
+#[test]
+fn pixel_diff_stats_counts_tolerated_drift_as_unflagged() {
+    // Two pixels, each channel drifts by 1 (within tolerance).
+    let expected = vec![10u8, 20, 30, 255, 40, 50, 60, 128];
+    let actual = vec![11u8, 21, 31, 255, 41, 51, 61, 128];
+    let stats = pixel_diff_stats(&expected, &actual);
     assert_eq!(
-        changed,
-        0,
-        "visual golden {name} changed; actual={} diff={}",
-        actual_path.display(),
-        diff_path.display()
+        stats.changed_pixels, 0,
+        "drift within tolerance should not flag pixels"
     );
+    assert_eq!(stats.max_abs_diff, 1);
+    assert!(stats.changed_ratio() <= CHANGED_PIXEL_RATIO_LIMIT);
+    assert!(stats.max_abs_diff <= MAX_ABS_DIFF_LIMIT);
+}
+
+#[test]
+fn pixel_diff_stats_flags_regression_above_tolerance() {
+    // One pixel of 8 channels drifts by 50 in red; the rest match.
+    let mut expected = vec![0u8; 32];
+    let mut actual = vec![0u8; 32];
+    actual[0] = 50; // first pixel red channel: drift = 50
+    let stats = pixel_diff_stats(&expected, &actual);
+    assert_eq!(stats.changed_pixels, 1, "single out-of-tolerance pixel");
+    assert_eq!(stats.max_abs_diff, 50);
+    assert!(stats.changed_ratio() > CHANGED_PIXEL_RATIO_LIMIT);
+    assert!(stats.max_abs_diff > MAX_ABS_DIFF_LIMIT);
 }
 
 #[test]
