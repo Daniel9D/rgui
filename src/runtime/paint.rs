@@ -429,28 +429,54 @@ pub trait WidgetPainter {
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
-fn widget_painter_for(kind: WidgetKind) -> Box<dyn WidgetPainter> {
+// Bug fix 8.3: a fresh `Box<dyn WidgetPainter>` per node per frame
+// defeated the trait-object dispatch the rest of the file relies on.
+// The painter impls are stateless and `Zeroable`; serve them as
+// `&'static dyn WidgetPainter` so the factory is allocation-free.
+
+static BUTTON_PAINTER: ButtonPainter = ButtonPainter;
+static INPUT_PAINTER: InputPainter = InputPainter;
+static TEXTAREA_PAINTER: TextareaPainter = TextareaPainter;
+static CHECKBOX_PAINTER: CheckboxPainter = CheckboxPainter;
+static RADIO_PAINTER: RadioPainter = RadioPainter;
+static SELECT_PAINTER: SelectPainter = SelectPainter;
+static TABS_PAINTER: TabsPainter = TabsPainter;
+static TREE_PAINTER: TreePainter = TreePainter;
+static TABLE_PAINTER: TablePainter = TablePainter;
+static LIST_PAINTER: ListPainter = ListPainter;
+static SCROLL_AREA_PAINTER: ScrollAreaPainter = ScrollAreaPainter;
+static MENU_PAINTER: MenuPainter = MenuPainter;
+static MENU_ITEM_PAINTER: MenuItemPainter = MenuItemPainter;
+static TOOLTIP_PAINTER: TooltipPainter = TooltipPainter;
+static ICON_PAINTER: IconPainter = IconPainter;
+static DIVIDER_PAINTER: DividerPainter = DividerPainter;
+static CANVAS_PAINTER: CanvasPainter = CanvasPainter;
+static INVISIBLE_PAINTER: InvisiblePainter = InvisiblePainter;
+static TEXT_BACKGROUND_PAINTER: TextBackgroundPainter = TextBackgroundPainter;
+static GENERIC_PAINTER: GenericPainter = GenericPainter;
+
+fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
     match kind {
-        WidgetKind::Button       => Box::new(ButtonPainter),
-        WidgetKind::Input        => Box::new(InputPainter),
-        WidgetKind::Textarea     => Box::new(TextareaPainter),
-        WidgetKind::Checkbox     => Box::new(CheckboxPainter),
-        WidgetKind::Radio        => Box::new(RadioPainter),
-        WidgetKind::Select       => Box::new(SelectPainter),
-        WidgetKind::Tabs         => Box::new(TabsPainter),
-        WidgetKind::Tree         => Box::new(TreePainter),
-        WidgetKind::Table        => Box::new(TablePainter),
-        WidgetKind::List         => Box::new(ListPainter),
-        WidgetKind::ScrollArea   => Box::new(ScrollAreaPainter),
-        WidgetKind::Menu         => Box::new(MenuPainter),
-        WidgetKind::MenuItem     => Box::new(MenuItemPainter),
-        WidgetKind::Tooltip      => Box::new(TooltipPainter),
-        WidgetKind::Icon         => Box::new(IconPainter),
-        WidgetKind::Divider      => Box::new(DividerPainter),
-        WidgetKind::Canvas       => Box::new(CanvasPainter),
-        WidgetKind::Modal | WidgetKind::Popover => Box::new(InvisiblePainter),
-        WidgetKind::Text         => Box::new(TextBackgroundPainter),
-        _                        => Box::new(GenericPainter),
+        WidgetKind::Button       => &BUTTON_PAINTER,
+        WidgetKind::Input        => &INPUT_PAINTER,
+        WidgetKind::Textarea     => &TEXTAREA_PAINTER,
+        WidgetKind::Checkbox     => &CHECKBOX_PAINTER,
+        WidgetKind::Radio        => &RADIO_PAINTER,
+        WidgetKind::Select       => &SELECT_PAINTER,
+        WidgetKind::Tabs         => &TABS_PAINTER,
+        WidgetKind::Tree         => &TREE_PAINTER,
+        WidgetKind::Table        => &TABLE_PAINTER,
+        WidgetKind::List         => &LIST_PAINTER,
+        WidgetKind::ScrollArea   => &SCROLL_AREA_PAINTER,
+        WidgetKind::Menu         => &MENU_PAINTER,
+        WidgetKind::MenuItem     => &MENU_ITEM_PAINTER,
+        WidgetKind::Tooltip      => &TOOLTIP_PAINTER,
+        WidgetKind::Icon         => &ICON_PAINTER,
+        WidgetKind::Divider      => &DIVIDER_PAINTER,
+        WidgetKind::Canvas       => &CANVAS_PAINTER,
+        WidgetKind::Modal | WidgetKind::Popover => &INVISIBLE_PAINTER,
+        WidgetKind::Text         => &TEXT_BACKGROUND_PAINTER,
+        _                        => &GENERIC_PAINTER,
     }
 }
 
