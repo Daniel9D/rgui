@@ -51,11 +51,19 @@ impl DebugVisualMode {
     }
 }
 
-pub fn format_frame_dump(output: &FrameOutput, enabled: bool) -> String {
-    if !enabled {
-        return String::new();
-    }
-
+/// Format a human-readable dump of the frame for diagnostics.
+///
+/// **Allocation warning:** this function eagerly formats every
+/// `PaintCommand` and style entry. Do *not* call it on every
+/// frame in release builds; gate the call behind an env-var
+/// check (see `runtime.rs` `RGUI_DUMP_FRAME`) or a debug flag.
+///
+/// Bug fix 2.11: the previous signature took an `enabled: bool`
+/// parameter and returned `String::new()` if it was `false`. The
+/// allocation still happened at the call site (a `String` is built
+/// regardless), defeating the early-return. The current contract
+/// is "caller checks the gate; this function always dumps".
+pub fn format_frame_dump(output: &FrameOutput) -> String {
     let mut dump = String::new();
     dump.push_str("=== FRAME ===\n");
     dump.push_str(&format!("layout_engine: {}\n", output.layout_engine));

@@ -300,14 +300,18 @@ let widgets = rgui::Element::column()
     .child(modal().open(false));
 ```
 
-`CanvasBuilder` is returned by `canvas()`:
+`canvas(name)` is a direct constructor. Phase A3 dropped the
+`CanvasBuilder` indirection — the canvas name is now a required
+positional argument:
 
 ```rust
-use rgui::widgets::{canvas, CanvasBuilder};
+use rgui::widgets::canvas;
 
-let builder: CanvasBuilder = canvas().named("timeline");
-let element = builder.build();
+let element = canvas("timeline");
 ```
+
+(Callers no longer need `.named("…").build()` and the panic-on-
+missing-name path is gone.)
 
 Additional widget APIs:
 

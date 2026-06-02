@@ -1030,10 +1030,7 @@ impl UiRuntime {
         self.dismissed_overlay_keys
             .retain(|key| open_now.contains(key));
         if std::env::var_os("RGUI_DUMP_FRAME").is_some() {
-            eprintln!(
-                "{}",
-                crate::runtime::debug::format_frame_dump(&output, true)
-            );
+            eprintln!("{}", crate::runtime::debug::format_frame_dump(&output));
         }
         output
     }

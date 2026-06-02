@@ -426,7 +426,14 @@ fn debug_visual_mode_parses_comma_separated_flags() {
 }
 
 #[test]
-fn frame_debug_dump_is_empty_when_disabled() {
+fn frame_debug_dump_smoke_test_does_not_panic() {
+    // Bug fix 2.11: the `format_frame_dump` function used to take an
+    // `enabled: bool` parameter and return `String::new()` when
+    // disabled. The allocation still happened at the call site, so
+    // the "early return" was a no-op. The current contract is
+    // "always dump; caller checks the env var". This smoke test
+    // ensures the function still returns a non-empty string for
+    // a real frame.
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {
         root: Element::column().child(text("Hello").key("hello")),
@@ -435,13 +442,13 @@ fn frame_debug_dump_is_empty_when_disabled() {
         scale_factor: 1.0,
     });
 
-    let dump = rgui::runtime::debug::format_frame_dump(&output, false);
-
-    assert!(dump.is_empty());
+    let dump = rgui::runtime::debug::format_frame_dump(&output);
+    assert!(!dump.is_empty());
+    assert!(dump.contains("FRAME"));
 }
 
 #[test]
-fn frame_debug_dump_includes_layout_paint_hit_test_and_overlays_when_enabled() {
+fn frame_debug_dump_includes_layout_paint_hit_test_and_overlays() {
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {
         root: Element::column().child(text("Hello").key("hello")),
@@ -450,7 +457,7 @@ fn frame_debug_dump_includes_layout_paint_hit_test_and_overlays_when_enabled() {
         scale_factor: 1.0,
     });
 
-    let dump = rgui::runtime::debug::format_frame_dump(&output, true);
+    let dump = rgui::runtime::debug::format_frame_dump(&output);
 
     assert!(dump.contains("DISPLAY LIST"));
     assert!(dump.contains("layout_engine: taffy_first"));
@@ -469,7 +476,7 @@ fn frame_debug_dump_includes_styles_measure_semantics_and_stats() {
         scale_factor: 1.0,
     });
 
-    let dump = rgui::runtime::debug::format_frame_dump(&output, true);
+    let dump = rgui::runtime::debug::format_frame_dump(&output);
 
     assert!(dump.contains("STYLES"));
     assert!(dump.contains("MEASURE"));
