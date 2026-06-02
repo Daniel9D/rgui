@@ -29,6 +29,9 @@
 //! shared [`TextSystem`] so the shaping cache survives across siblings
 //! in a single frame.
 
+use std::collections::HashMap;
+use std::sync::{OnceLock, RwLock};
+
 use crate::core::{
     BorderCmd, Color, Element, ElementKind, FontStyle, FontWeight, Paint, PaintCommand,
     PaintCommandSnapshot, Point, Rect, RectCmd, ResolvedStateFlags, ResolvedWidgetStyle, Size,
@@ -374,7 +377,7 @@ impl<'a> PaintCtx<'a> {
 ///
 /// Widgets that have a fundamentally different background geometry (e.g. [`CheckboxPainter`],
 /// [`RadioPainter`]) may override `paint` entirely and manage their own z-layers.
-pub trait WidgetPainter {
+pub trait WidgetPainter: Send + Sync {
     // ── Override hooks ────────────────────────────────────────────────────────
 
     /// Background fill color. Default: `ctx.style.background`.
@@ -468,7 +471,139 @@ static SLIDER_PAINTER: SliderPainter = SliderPainter;
 static IMAGE_PAINTER: ImagePainter = ImagePainter;
 static AVATAR_PAINTER: AvatarPainter = AvatarPainter;
 
-fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
+// ─── Registry (third-party extension hook) ────────────────────────────────────
+
+/// Bug fix 2.2: `widget_painter_for` was a 20-arm match with no
+/// way to plug in third-party widget painters. This registry is
+/// the extension hook: external crates (or future internal use)
+/// call [`register_widget_painter`] at startup to install an
+/// override for any [`WidgetKind`]. The hot path is a single
+/// `RwLock::read` (which is essentially an atomic counter pair
+/// when uncontended) and a `HashMap` lookup; an empty registry
+/// pays only the read-lock cost.
+#[derive(Default)]
+pub struct WidgetPainterRegistry {
+    overrides: HashMap<WidgetKind, &'static dyn WidgetPainter>,
+}
+
+impl WidgetPainterRegistry {
+    /// Construct an empty registry. Useful for tests or for
+    /// callers that want to manage the registry locally instead
+    /// of using the process-global one.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register `painter` for `kind`. Returns the painter that
+    /// was previously registered for `kind`, if any. The
+    /// painter is borrowed from a `static` in the caller; the
+    /// registry does not clone or own the value.
+    pub fn register(
+        &mut self,
+        kind: WidgetKind,
+        painter: &'static dyn WidgetPainter,
+    ) -> Option<&'static dyn WidgetPainter> {
+        self.overrides.insert(kind, painter)
+    }
+
+    /// Remove the override for `kind`. Returns the painter
+    /// that was registered, if any.
+    pub fn unregister(&mut self, kind: WidgetKind) -> Option<&'static dyn WidgetPainter> {
+        self.overrides.remove(&kind)
+    }
+
+    /// Borrow the override for `kind`, if any.
+    pub fn get(&self, kind: WidgetKind) -> Option<&'static dyn WidgetPainter> {
+        self.overrides.get(&kind).copied()
+    }
+
+    /// Number of currently-registered overrides.
+    pub fn len(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// True if no overrides are registered.
+    pub fn is_empty(&self) -> bool {
+        self.overrides.is_empty()
+    }
+
+    /// Iterate over all `(kind, painter)` pairs. Order is
+    /// unspecified.
+    pub fn iter(&self) -> impl Iterator<Item = (WidgetKind, &dyn WidgetPainter)> {
+        self.overrides
+            .iter()
+            .map(|(k, p)| (*k, *p as &dyn WidgetPainter))
+    }
+}
+
+static REGISTRY: OnceLock<RwLock<WidgetPainterRegistry>> = OnceLock::new();
+
+fn global_registry() -> &'static RwLock<WidgetPainterRegistry> {
+    REGISTRY.get_or_init(|| RwLock::new(WidgetPainterRegistry::default()))
+}
+
+/// Register a `WidgetPainter` override in the process-global
+/// registry. Returns the painter that was previously
+/// registered for `kind`, if any. Callers must hold the
+/// painter in a `static` so the `&'static dyn` reference is
+/// sound. Typical use: once at startup, before the first
+/// frame. The function is thread-safe.
+///
+/// # Example
+///
+/// ```no_run
+/// use rgui::runtime::paint::{register_widget_painter, WidgetPainter};
+/// use rgui::core::WidgetKind;
+///
+/// struct MyWidgetPainter;
+/// impl WidgetPainter for MyWidgetPainter { /* ... */ }
+/// static MY_PAINTER: MyWidgetPainter = MyWidgetPainter;
+///
+/// register_widget_painter(WidgetKind::Badge, &MY_PAINTER);
+/// ```
+pub fn register_widget_painter(
+    kind: WidgetKind,
+    painter: &'static dyn WidgetPainter,
+) -> Option<&'static dyn WidgetPainter> {
+    global_registry()
+        .write()
+        .expect("widget painter registry poisoned")
+        .register(kind, painter)
+}
+
+/// Remove the override for `kind` from the process-global
+/// registry. Returns the painter that was registered, if any.
+/// Thread-safe.
+pub fn unregister_widget_painter(kind: WidgetKind) -> Option<&'static dyn WidgetPainter> {
+    global_registry()
+        .write()
+        .expect("widget painter registry poisoned")
+        .unregister(kind)
+}
+
+/// Number of currently-registered overrides in the
+/// process-global registry.
+pub fn widget_painter_override_count() -> usize {
+    global_registry()
+        .read()
+        .expect("widget painter registry poisoned")
+        .len()
+}
+
+/// Borrow the process-global registry (read-only).
+pub fn widget_painter_registry() -> impl std::ops::Deref<Target = WidgetPainterRegistry> {
+    global_registry()
+        .read()
+        .expect("widget painter registry poisoned")
+}
+
+// ─── Factory ──────────────────────────────────────────────────────────────────
+
+/// Built-in painter lookup. Bug fix 8.3 keeps this as a static
+/// `match` returning `&'static dyn WidgetPainter`; the factory
+/// layer (`widget_painter_for`) consults the registry first
+/// and falls back to this.
+fn static_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
     match kind {
         WidgetKind::Button       => &BUTTON_PAINTER,
         WidgetKind::Input        => &INPUT_PAINTER,
@@ -501,6 +636,23 @@ fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
         WidgetKind::Avatar       => &AVATAR_PAINTER,
         _                        => &GENERIC_PAINTER,
     }
+}
+
+/// Painter factory. Checks the process-global registry for an
+/// override first; if none is registered, falls back to the
+/// static `static_painter_for` match. Hot path is a single
+/// `RwLock::read` and an empty `HashMap` lookup when no
+/// overrides are installed.
+pub fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
+    // Read-lock only: registration is rare, lookup is hot.
+    if let Some(override_painter) = global_registry()
+        .read()
+        .expect("widget painter registry poisoned")
+        .get(kind)
+    {
+        return override_painter;
+    }
+    static_painter_for(kind)
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -2163,5 +2315,68 @@ mod tests {
             // resolves to a real vtable.
             let _: &dyn WidgetPainter = painter;
         }
+    }
+
+    // Bug fix 2.2: a custom painter registered via the public
+    // `register_widget_painter` API must override the
+    // built-in static match in `widget_painter_for`.
+    // We register a zero-sized test painter, look it up,
+    // and verify the factory returns *our* pointer, not the
+    // built-in.
+    struct TestBadgeOverride;
+    impl WidgetPainter for TestBadgeOverride {
+        fn has_border(&self) -> bool {
+            false
+        }
+    }
+    static TEST_BADGE: TestBadgeOverride = TestBadgeOverride;
+
+    #[test]
+    fn registered_painter_overrides_built_in() {
+        // Cleanup in case a previous test left an override.
+        let _ = unregister_widget_painter(WidgetKind::Badge);
+        assert_eq!(widget_painter_override_count(), 0);
+
+        // The factory returns the built-in before registration.
+        let before = widget_painter_for(WidgetKind::Badge) as *const dyn WidgetPainter;
+
+        // Register the override.
+        let previous = register_widget_painter(WidgetKind::Badge, &TEST_BADGE);
+        assert!(previous.is_none(), "no previous override");
+        assert_eq!(widget_painter_override_count(), 1);
+
+        // The factory now returns our pointer.
+        let after = widget_painter_for(WidgetKind::Badge) as *const dyn WidgetPainter;
+        assert_ne!(
+            before, after,
+            "registered painter should differ from built-in"
+        );
+
+        // Iter shows the override.
+        let kinds: Vec<_> = widget_painter_registry().iter().map(|(k, _)| k).collect();
+        assert_eq!(kinds, vec![WidgetKind::Badge]);
+
+        // Unregister and verify the built-in comes back.
+        let removed = unregister_widget_painter(WidgetKind::Badge);
+        assert!(removed.is_some());
+        assert_eq!(widget_painter_override_count(), 0);
+        let restored = widget_painter_for(WidgetKind::Badge) as *const dyn WidgetPainter;
+        assert_eq!(before, restored, "factory should restore built-in");
+    }
+
+    #[test]
+    fn registry_local_new_starts_empty() {
+        let mut local = WidgetPainterRegistry::new();
+        assert!(local.is_empty());
+        assert_eq!(local.len(), 0);
+        let previous = local.register(WidgetKind::Spinner, &TEST_BADGE);
+        assert!(previous.is_none());
+        assert_eq!(local.len(), 1);
+        assert!(!local.is_empty());
+        let got = local.get(WidgetKind::Spinner);
+        assert!(got.is_some());
+        let removed = local.unregister(WidgetKind::Spinner);
+        assert!(removed.is_some());
+        assert!(local.is_empty());
     }
 }
