@@ -40,11 +40,30 @@ impl TextShapeKey {
     }
 }
 
+/// Cache statistics for the text system. Used to surface hit-rate
+/// and capacity info to the renderer-stats hook. Bug fix 4.8:
+/// without a stats hook, a misconfigured app (e.g. one that
+/// scrolls a 10k-character text field) would silently grow the
+/// cache without anyone noticing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TextCacheStats {
+    pub shape_hits: u64,
+    pub shape_misses: u64,
+    pub layout_hits: u64,
+    pub layout_misses: u64,
+    pub shape_entries: usize,
+    pub layout_entries: usize,
+}
+
 pub struct TextSystem {
     engine: CosmicTextEngine,
     font_system: glyphon::cosmic_text::FontSystem,
     shape_cache: HashMap<TextShapeKey, ShapedText>,
     layout_cache: HashMap<TextShapeKey, TextLayout>,
+    shape_hits: u64,
+    shape_misses: u64,
+    layout_hits: u64,
+    layout_misses: u64,
 }
 
 impl Default for TextSystem {
@@ -54,6 +73,28 @@ impl Default for TextSystem {
             font_system: glyphon::cosmic_text::FontSystem::new(),
             shape_cache: HashMap::new(),
             layout_cache: HashMap::new(),
+            shape_hits: 0,
+            shape_misses: 0,
+            layout_hits: 0,
+            layout_misses: 0,
+        }
+    }
+}
+
+impl TextSystem {
+    /// Return a snapshot of the current cache statistics. Useful for
+    /// observability tools and for tuning the cache size. Note that
+    /// the underlying caches are plain `HashMap`s (not LRU), so
+    /// `shape_entries` will grow unbounded over the lifetime of
+    /// the `TextSystem`. If you see runaway growth, file a bug.
+    pub fn cache_stats(&self) -> TextCacheStats {
+        TextCacheStats {
+            shape_hits: self.shape_hits,
+            shape_misses: self.shape_misses,
+            layout_hits: self.layout_hits,
+            layout_misses: self.layout_misses,
+            shape_entries: self.shape_cache.len(),
+            layout_entries: self.layout_cache.len(),
         }
     }
 }
@@ -75,8 +116,10 @@ impl TextSystem {
         let width_limit = max_width.max(font_px);
         let key = TextShapeKey::new_with_size(text, width_limit, font_px, weight, style);
         if let Some(layout) = self.layout_cache.get(&key) {
+            self.layout_hits += 1;
             return layout.clone();
         }
+        self.layout_misses += 1;
 
         let layout = if let Some(real) =
             self.layout_with_cosmic(text, font_px, weight, style, width_limit)
@@ -282,8 +325,10 @@ impl TextSystem {
     ) -> ShapedText {
         let key = TextShapeKey::new(text, width, weight, style);
         if let Some(shaped) = self.shape_cache.get(&key) {
+            self.shape_hits += 1;
             return shaped.clone();
         }
+        self.shape_misses += 1;
 
         let shaped = self.engine.shape(
             &TextSpec {
@@ -305,8 +350,10 @@ impl TextSystem {
     ) -> ShapedText {
         let key = TextShapeKey::new_with_size(text, width, size, weight, style);
         if let Some(shaped) = self.shape_cache.get(&key) {
+            self.shape_hits += 1;
             return shaped.clone();
         }
+        self.shape_misses += 1;
 
         let shaped = if let Some(layout) = self.layout_with_cosmic(text, size, weight, style, width)
         {
@@ -432,4 +479,36 @@ fn stable_hash(value: &str) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug fix 4.8: cache_stats unit test. The shape and layout
+    // caches should each track hits and misses independently.
+    #[test]
+    fn cache_stats_record_hits_and_misses() {
+        let mut sys = TextSystem::default();
+        let initial = sys.cache_stats();
+        assert_eq!(initial.shape_hits, 0);
+        assert_eq!(initial.shape_misses, 0);
+        assert_eq!(initial.layout_hits, 0);
+        assert_eq!(initial.layout_misses, 0);
+
+        // First call: both shape and layout miss.
+        let _ = sys.measure("hello", 14.0, FontWeight::Normal, FontStyle::Normal, 200.0);
+        let after_first = sys.cache_stats();
+        assert!(after_first.layout_misses >= 1, "first measure should miss layout cache");
+        assert_eq!(after_first.layout_hits, 0);
+
+        // Second call with the same key: layout cache hit.
+        let _ = sys.measure("hello", 14.0, FontWeight::Normal, FontStyle::Normal, 200.0);
+        let after_second = sys.cache_stats();
+        assert!(
+            after_second.layout_hits >= 1,
+            "second measure with same key should hit layout cache"
+        );
+        assert_eq!(after_second.layout_entries, after_first.layout_entries);
+    }
 }
