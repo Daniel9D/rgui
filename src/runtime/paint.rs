@@ -1,3 +1,34 @@
+//! Paint pipeline for the rgui runtime.
+//!
+//! The pipeline walks the [`UiTree`] in document order and emits a
+//! [`DisplayList`] of [`PaintCommand`]s. Widget painting is delegated
+//! to per-`WidgetKind` [`WidgetPainter`] impls; primitives (Row, Column,
+//! Grid, Stack, Absolute, ScrollArea) are painted inline.
+//!
+//! # Z-layer contract
+//!
+//! Every paint command carries a `z_index`. Commands are sorted by
+//! `z_index` ascending before submission. Stack-management commands
+//! ([`PaintCommand::PushLayer`], [`PaintCommand::PopLayer`],
+//! [`PaintCommand::PushClip`], [`PaintCommand::PopClip`]) sort first
+//! (i32::MIN) so they bracket their content. See [`LayerKind::order`]
+//! for the overlay ordering source of truth.
+//!
+//! # WidgetPainter contract
+//!
+//! A `WidgetPainter` is stateless and `Send + Sync`. Painters receive
+//! a [`PaintCtx`] with the resolved theme + style and a [`VisualState`]
+//! precomputed by the runtime. They emit commands; they do not mutate
+//! shared state. Painter instances are looked up by
+//! [`widget_painter_for`] (cheap `match`, no allocation in the common
+//! case).
+//!
+//! # TextSystem sharing
+//!
+//! `paint_node` is deprecated; use [`paint_node_with_text`] with a
+//! shared [`TextSystem`] so the shaping cache survives across siblings
+//! in a single frame.
+
 use crate::core::{
     BorderCmd, Color, Element, ElementKind, FontStyle, FontWeight, Paint, PaintCommand,
     PaintCommandSnapshot, Point, Rect, RectCmd, ResolvedStateFlags, ResolvedWidgetStyle, Size,
