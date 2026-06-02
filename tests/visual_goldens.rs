@@ -495,3 +495,43 @@ fn golden_widget_showcase_flow_808x823_matches() {
     );
     assert_visual_matches("golden_widget_showcase_flow_808x823", size, &pixels);
 }
+
+// Bug fix 2.2: every widget kind that has a dedicated painter
+// (Card, Badge, Link, Alert, ProgressBar, Spinner, Switch,
+// Slider, Image, Avatar) gets exercised here. The golden is
+// a smoke test: any painter that panics or returns an empty
+// command list will produce a uniform-color image and fail.
+#[test]
+fn golden_new_painters_640x320_smoke() {
+    use rgui::widgets::{
+        alert, avatar, badge, card, image as rgui_image, link, progress_bar, slider, spinner, switch,
+    };
+    let size = SizeU32::new(640, 320);
+    let pixels = render_runtime_rgba(
+        Element::column()
+            .padding(12.0)
+            .gap(8.0)
+            .child(
+                Element::row()
+                    .key("row1")
+                    .gap(8.0)
+                    .child(card().key("card1").width(120.0).height(80.0))
+                    .child(badge("New").key("badge1"))
+                    .child(link("Read more").key("link1"))
+                    .child(alert().key("alert1").width(160.0)),
+            )
+            .child(
+                Element::row()
+                    .key("row2")
+                    .gap(8.0)
+                    .child(progress_bar().key("progress1").width(200.0))
+                    .child(spinner().key("spinner1").width(24.0).height(24.0))
+                    .child(switch().checked(true).key("switch1").width(40.0))
+                    .child(slider().key("slider1").width(120.0))
+                    .child(rgui_image("placeholder").key("image1").width(48.0).height(48.0))
+                    .child(avatar().key("avatar1").width(36.0).height(36.0)),
+            ),
+        size,
+    );
+    assert_visual_matches("golden_new_painters_640x320", size, &pixels);
+}

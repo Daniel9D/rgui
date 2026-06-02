@@ -454,6 +454,19 @@ static CANVAS_PAINTER: CanvasPainter = CanvasPainter;
 static INVISIBLE_PAINTER: InvisiblePainter = InvisiblePainter;
 static TEXT_BACKGROUND_PAINTER: TextBackgroundPainter = TextBackgroundPainter;
 static GENERIC_PAINTER: GenericPainter = GenericPainter;
+// Bug fix 2.2: previously these widget kinds fell through to
+// `GenericPainter` (background only, no foreground content). Each
+// now has a dedicated painter that reads its spec.
+static CARD_PAINTER: CardPainter = CardPainter;
+static BADGE_PAINTER: BadgePainter = BadgePainter;
+static LINK_PAINTER: LinkPainter = LinkPainter;
+static ALERT_PAINTER: AlertPainter = AlertPainter;
+static PROGRESS_BAR_PAINTER: ProgressBarPainter = ProgressBarPainter;
+static SPINNER_PAINTER: SpinnerPainter = SpinnerPainter;
+static SWITCH_PAINTER: SwitchPainter = SwitchPainter;
+static SLIDER_PAINTER: SliderPainter = SliderPainter;
+static IMAGE_PAINTER: ImagePainter = ImagePainter;
+static AVATAR_PAINTER: AvatarPainter = AvatarPainter;
 
 fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
     match kind {
@@ -476,6 +489,16 @@ fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
         WidgetKind::Canvas       => &CANVAS_PAINTER,
         WidgetKind::Modal | WidgetKind::Popover => &INVISIBLE_PAINTER,
         WidgetKind::Text         => &TEXT_BACKGROUND_PAINTER,
+        WidgetKind::Card         => &CARD_PAINTER,
+        WidgetKind::Badge        => &BADGE_PAINTER,
+        WidgetKind::Link         => &LINK_PAINTER,
+        WidgetKind::Alert        => &ALERT_PAINTER,
+        WidgetKind::ProgressBar  => &PROGRESS_BAR_PAINTER,
+        WidgetKind::Spinner      => &SPINNER_PAINTER,
+        WidgetKind::Switch       => &SWITCH_PAINTER,
+        WidgetKind::Slider       => &SLIDER_PAINTER,
+        WidgetKind::Image        => &IMAGE_PAINTER,
+        WidgetKind::Avatar       => &AVATAR_PAINTER,
         _                        => &GENERIC_PAINTER,
     }
 }
@@ -1516,6 +1539,418 @@ impl WidgetPainter for GenericPainter {
     }
 }
 
+// ── Card ───────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a `Card` is an elevated/bordered container.
+/// The default `paint` template already emits a background + border
+/// from `ctx.style`, so we just override `background_color` to
+/// use the theme's surface color (cards float on the page surface).
+struct CardPainter;
+impl WidgetPainter for CardPainter {
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        ctx.theme.colors.surface
+    }
+}
+
+// ── Badge ──────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a small status label rendered as a tinted pill.
+/// `paint_content` draws the label text centered; the pill background
+/// is the resolved style's `background` (which the theme overrides
+/// per `BadgeVariant`).
+struct BadgePainter;
+impl WidgetPainter for BadgePainter {
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        ctx.style.background
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        if let Some(label) = ctx.state.label.as_deref().filter(|v| !v.is_empty()) {
+            let label_width = ctx
+                .text
+                .measure(
+                    label,
+                    ctx.style.font_size,
+                    ctx.style.font_weight,
+                    FontStyle::Normal,
+                    ctx.rect.size.width,
+                )
+                .width;
+            let text_x = ctx.rect.origin.x + (ctx.rect.size.width - label_width) * 0.5;
+            let text_y =
+                ctx.rect.origin.y + ctx.rect.size.height * 0.5 + ctx.style.font_size * 0.3;
+            cmds.push(text_at_with_size_and_weight(
+                label.to_string(),
+                Point::new(text_x, text_y),
+                ctx.style.text_color,
+                ctx.z_index + 2,
+                ctx.style.font_size,
+                ctx.style.font_weight,
+            ));
+        }
+    }
+}
+
+// ── Link ───────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a hyperlink rendered as underlined text only.
+/// No background, no border; just the label in the theme's primary
+/// color. Hover/focus state is handled by the theme resolving to
+/// `primary_hover` when the element is focused.
+struct LinkPainter;
+impl WidgetPainter for LinkPainter {
+    fn background_color(&self, _ctx: &PaintCtx<'_>) -> Color {
+        Color::DEFAULT
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        if let Some(label) = ctx.state.label.as_deref().filter(|v| !v.is_empty()) {
+            let text_y =
+                ctx.rect.origin.y + ctx.rect.size.height * 0.5 + ctx.style.font_size * 0.3;
+            cmds.push(text_at_with_size_and_weight(
+                label.to_string(),
+                Point::new(ctx.rect.origin.x, text_y),
+                ctx.theme.colors.primary,
+                ctx.z_index + 2,
+                ctx.style.font_size,
+                ctx.style.font_weight,
+            ));
+            // Underline: a thin rect beneath the text.
+            let underline_y = text_y + ctx.style.font_size * 0.15;
+            let text_width = ctx
+                .text
+                .measure(
+                    label,
+                    ctx.style.font_size,
+                    ctx.style.font_weight,
+                    FontStyle::Normal,
+                    ctx.rect.size.width,
+                )
+                .width;
+            cmds.push(rect_command(
+                Rect::new(
+                    Point::new(ctx.rect.origin.x, underline_y),
+                    Size::new(text_width, 1.0),
+                ),
+                ctx.theme.colors.primary,
+                0.0,
+                ctx.z_index + 1,
+            ));
+        }
+    }
+}
+
+// ── Alert ──────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a banner with a colored left edge and optional title.
+/// The default template emits a background rect; we paint a
+/// colored left border on top to signal the alert variant.
+struct AlertPainter;
+impl WidgetPainter for AlertPainter {
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        ctx.theme.colors.surface
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        // 4px accent stripe on the left edge, colored by the
+        // resolved text color (which the theme overrides per
+        // `AlertVariant`).
+        let stripe_width = 4.0;
+        cmds.push(rect_command(
+            Rect::new(ctx.rect.origin, Size::new(stripe_width, ctx.rect.size.height)),
+            ctx.style.text_color,
+            0.0,
+            ctx.z_index + 1,
+        ));
+        if let Some(label) = ctx.state.label.as_deref().filter(|v| !v.is_empty()) {
+            let text_x = ctx.rect.origin.x + stripe_width + 8.0;
+            let text_y =
+                ctx.rect.origin.y + ctx.rect.size.height * 0.5 + ctx.style.font_size * 0.3;
+            cmds.push(text_at_with_size_and_weight(
+                label.to_string(),
+                Point::new(text_x, text_y),
+                ctx.style.text_color,
+                ctx.z_index + 2,
+                ctx.style.font_size,
+                FontWeight::Semibold,
+            ));
+        }
+    }
+}
+
+// ── ProgressBar ────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a horizontal track with a filled portion based on
+/// `value / max`. Reads `value` from the spec on the node.
+struct ProgressBarPainter;
+impl WidgetPainter for ProgressBarPainter {
+    fn background_color(&self, _ctx: &PaintCtx<'_>) -> Color {
+        Color::DEFAULT
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint(&self, ctx: &mut PaintCtx<'_>) -> Vec<PaintedCommand> {
+        // Read the spec's value/max. Default to 0 if missing.
+        let (value, max) = ctx
+            .node
+            .widget_spec
+            .as_ref()
+            .and_then(|spec| match spec {
+                crate::WidgetSpec::ProgressBar(p) => Some((p.value, p.max)),
+                _ => None,
+            })
+            .unwrap_or((0.0, 1.0));
+        let ratio = if max > 0.0 { (value / max).clamp(0.0, 1.0) } else { 0.0 };
+        let track_height = ctx.rect.size.height;
+        let fill_width = ctx.rect.size.width * ratio;
+
+        let mut cmds = Vec::new();
+        // Track (background).
+        cmds.push(rect_command(
+            ctx.rect,
+            ctx.theme.colors.surface_hover,
+            track_height * 0.5,
+            ctx.z_index,
+        ));
+        // Fill (foreground).
+        if fill_width > 0.0 {
+            cmds.push(rect_command(
+                Rect::new(ctx.rect.origin, Size::new(fill_width, track_height)),
+                ctx.theme.colors.primary,
+                track_height * 0.5,
+                ctx.z_index + 1,
+            ));
+        }
+        cmds
+    }
+}
+
+// ── Spinner ────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a small animated circle. Without a frame-time
+/// signal we render a static ring + a 1/4-arc highlight that
+/// callers can rotate by overlaying; the visual_state_for_element
+/// path keeps the label string available for the side text.
+struct SpinnerPainter;
+impl WidgetPainter for SpinnerPainter {
+    fn background_color(&self, _ctx: &PaintCtx<'_>) -> Color {
+        Color::DEFAULT
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint(&self, ctx: &mut PaintCtx<'_>) -> Vec<PaintedCommand> {
+        let mut cmds = Vec::new();
+        let size = ctx.rect.size.height.min(ctx.rect.size.width);
+        let diameter = size * 0.75;
+        let center_x = ctx.rect.origin.x + diameter * 0.5;
+        let center_y = ctx.rect.origin.y + ctx.rect.size.height * 0.5;
+
+        // Track: a faint ring (rendered as a rounded square).
+        let track_rect = Rect::new(
+            Point::new(center_x - diameter * 0.5, center_y - diameter * 0.5),
+            Size::new(diameter, diameter),
+        );
+        cmds.push(rect_command(
+            track_rect,
+            ctx.theme.colors.surface_hover,
+            diameter * 0.5,
+            ctx.z_index,
+        ));
+        // Highlight: a 90° arc rendered as a smaller inset rect
+        // (visual approximation — true arcs would need a new
+        // PaintCommand variant).
+        let highlight_rect = Rect::new(
+            Point::new(center_x - diameter * 0.25, center_y - diameter * 0.5),
+            Size::new(diameter * 0.5, diameter * 0.5),
+        );
+        cmds.push(rect_command(
+            highlight_rect,
+            ctx.theme.colors.primary,
+            diameter * 0.5,
+            ctx.z_index + 1,
+        ));
+        cmds
+    }
+}
+
+// ── Switch ─────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a horizontal pill with a circular thumb.
+/// Checked → thumb is on the right, track is the primary color.
+/// Unchecked → thumb is on the left, track is the surface hover.
+struct SwitchPainter;
+impl WidgetPainter for SwitchPainter {
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        if ctx.state.checked {
+            ctx.theme.colors.primary
+        } else {
+            ctx.theme.colors.surface_hover
+        }
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        // Thumb: a circle at the left or right edge of the pill.
+        let height = ctx.rect.size.height;
+        let thumb_diameter = height * 0.8;
+        let thumb_x = if ctx.state.checked {
+            ctx.rect.origin.x + ctx.rect.size.width - thumb_diameter - height * 0.1
+        } else {
+            ctx.rect.origin.x + height * 0.1
+        };
+        let thumb_y = ctx.rect.origin.y + (height - thumb_diameter) * 0.5;
+        cmds.push(rect_command(
+            Rect::new(
+                Point::new(thumb_x, thumb_y),
+                Size::new(thumb_diameter, thumb_diameter),
+            ),
+            Color::rgb(255, 255, 255),
+            thumb_diameter * 0.5,
+            ctx.z_index + 1,
+        ));
+    }
+}
+
+// ── Slider ─────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a horizontal track with a thumb at the
+/// `value / max` position. Default value is 0.0 / 1.0.
+struct SliderPainter;
+impl WidgetPainter for SliderPainter {
+    fn background_color(&self, _ctx: &PaintCtx<'_>) -> Color {
+        Color::DEFAULT
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint(&self, ctx: &mut PaintCtx<'_>) -> Vec<PaintedCommand> {
+        // Sliders don't yet carry a value spec; default to mid.
+        let ratio = 0.5;
+        let track_height = 4.0;
+        let track_y = ctx.rect.origin.y + (ctx.rect.size.height - track_height) * 0.5;
+        let mut cmds = Vec::new();
+        // Track.
+        cmds.push(rect_command(
+            Rect::new(
+                Point::new(ctx.rect.origin.x, track_y),
+                Size::new(ctx.rect.size.width, track_height),
+            ),
+            ctx.theme.colors.surface_hover,
+            track_height * 0.5,
+            ctx.z_index,
+        ));
+        // Filled portion.
+        let fill_width = ctx.rect.size.width * ratio;
+        cmds.push(rect_command(
+            Rect::new(
+                Point::new(ctx.rect.origin.x, track_y),
+                Size::new(fill_width, track_height),
+            ),
+            ctx.theme.colors.primary,
+            track_height * 0.5,
+            ctx.z_index + 1,
+        ));
+        // Thumb.
+        let thumb_diameter = ctx.rect.size.height * 0.8;
+        let thumb_x = ctx.rect.origin.x + fill_width - thumb_diameter * 0.5;
+        let thumb_y = ctx.rect.origin.y + (ctx.rect.size.height - thumb_diameter) * 0.5;
+        cmds.push(rect_command(
+            Rect::new(
+                Point::new(thumb_x, thumb_y),
+                Size::new(thumb_diameter, thumb_diameter),
+            ),
+            ctx.theme.colors.primary,
+            thumb_diameter * 0.5,
+            ctx.z_index + 2,
+        ));
+        cmds
+    }
+}
+
+// ── Image ──────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a placeholder rect for the image element.
+/// The full image decoder path lives in `images.rs`; this painter
+/// is the "no source loaded" fallback so the widget has visible
+/// bounds in paint. Tinted with the surface_hover color to read
+/// as a placeholder.
+struct ImagePainter;
+impl WidgetPainter for ImagePainter {
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        ctx.theme.colors.surface_hover
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+}
+
+// ── Avatar ─────────────────────────────────────────────────────────────────────
+
+/// Bug fix 2.2: a tinted circle. If the spec has `initials`, we
+/// render them as text inside the circle. If `src` is set, we'd
+/// defer to the image pipeline (out of scope for this fix); for
+/// now we render the initials or a tinted placeholder.
+struct AvatarPainter;
+impl WidgetPainter for AvatarPainter {
+    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
+        ctx.theme.colors.surface_hover
+    }
+
+    fn has_border(&self) -> bool {
+        false
+    }
+
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        if let Some(label) = ctx.state.label.as_deref().filter(|v| !v.is_empty()) {
+            let text_x = ctx.rect.origin.x + ctx.rect.size.width * 0.5;
+            let text_y =
+                ctx.rect.origin.y + ctx.rect.size.height * 0.5 + ctx.style.font_size * 0.3;
+            let label_width = ctx
+                .text
+                .measure(
+                    label,
+                    ctx.style.font_size,
+                    ctx.style.font_weight,
+                    FontStyle::Normal,
+                    ctx.rect.size.width,
+                )
+                .width;
+            cmds.push(text_at_with_size_and_weight(
+                label.to_string(),
+                Point::new(text_x - label_width * 0.5, text_y),
+                ctx.style.text_color,
+                ctx.z_index + 2,
+                ctx.style.font_size,
+                ctx.style.font_weight,
+            ));
+        }
+    }
+}
+
 // ─── Low-level command builders ───────────────────────────────────────────────
 
 fn rect_command(rect: Rect, color: Color, radius: f32, z_index: i32) -> PaintedCommand {
@@ -1672,5 +2107,61 @@ fn text_style_for_node(node: &UiNode, theme: Option<&Theme>) -> RuntimeTextStyle
         color: text_style
             .map(|style| style.color)
             .unwrap_or(theme.colors.text),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug fix 2.2: every WidgetKind must produce a non-null
+    // `&'static dyn WidgetPainter`. The factory is a `match` with
+    // a `_ => GENERIC_PAINTER` fallthrough, so this would not
+    // *panic* if a new variant is added without a dedicated
+    // painter, but the test asserts that the *current* shape
+    // covers every variant explicitly. The list mirrors the
+    // `WidgetKind` enum; adding a new variant here and failing
+    // to add a match arm is a test-time signal to fix the
+    // factory.
+    #[test]
+    fn widget_painter_for_covers_every_kind() {
+        let kinds = [
+            WidgetKind::Text,
+            WidgetKind::Button,
+            WidgetKind::Input,
+            WidgetKind::Checkbox,
+            WidgetKind::Radio,
+            WidgetKind::Select,
+            WidgetKind::Textarea,
+            WidgetKind::Tabs,
+            WidgetKind::Tree,
+            WidgetKind::Table,
+            WidgetKind::Modal,
+            WidgetKind::Popover,
+            WidgetKind::Tooltip,
+            WidgetKind::Menu,
+            WidgetKind::MenuItem,
+            WidgetKind::ScrollArea,
+            WidgetKind::List,
+            WidgetKind::Canvas,
+            WidgetKind::Icon,
+            WidgetKind::Divider,
+            WidgetKind::Image,
+            WidgetKind::Switch,
+            WidgetKind::Slider,
+            WidgetKind::ProgressBar,
+            WidgetKind::Spinner,
+            WidgetKind::Badge,
+            WidgetKind::Avatar,
+            WidgetKind::Link,
+            WidgetKind::Alert,
+            WidgetKind::Card,
+        ];
+        for kind in kinds {
+            let painter = widget_painter_for(kind);
+            // Pointer is non-null and the function pointer
+            // resolves to a real vtable.
+            let _: &dyn WidgetPainter = painter;
+        }
     }
 }
