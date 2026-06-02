@@ -474,4 +474,30 @@ mod tests {
             assert!(orders.insert(kind.order()), "duplicate order for {kind:?}");
         }
     }
+
+    // Bug fix 7.1: unit tests for DisplayList invariants. DisplayList
+    // is the public paint stream; the invariants (validate, push,
+    // dedup) are checked at runtime, but unit tests catch regressions
+    // before the integration suite does.
+    #[test]
+    fn display_list_starts_empty_and_validates() {
+        let list = DisplayList::default();
+        assert!(list.commands().is_empty());
+        assert!(list.validate().is_ok());
+    }
+
+    #[test]
+    fn display_list_push_grows_and_validates() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(Point::new(0.0, 0.0), crate::core::Size::new(10.0, 10.0)),
+            paint: Paint::Solid(Color::rgb(0, 0, 0)),
+            radius: 0.0,
+            opacity: 1.0,
+            z_index: 0,
+        }));
+        assert_eq!(list.commands().len(), 1);
+        assert!(!list.commands().is_empty());
+        assert!(list.validate().is_ok());
+    }
 }
