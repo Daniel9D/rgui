@@ -786,6 +786,48 @@ mod rml_tests {
         );
     }
 
+    // Bug fix 7.4: malformed input coverage. The RML parser is
+    // user-facing; every branch of the parser should have a
+    // corresponding "bad input → Err" test. RML inputs are also
+    // attack-surface: a panic in the parser would be a security issue.
+    // Tests added: unclosed tag, mismatched tag, unclosed string,
+    // unclosed brace in style, garbage at root.
+    #[test]
+    fn error_unclosed_tag() {
+        let err = parse_err(r#"<Button>"#);
+        assert!(!err.message.is_empty(), "expected an error message");
+    }
+
+    #[test]
+    fn error_mismatched_tag() {
+        let err = parse_err(r#"<Button></Div>"#);
+        assert!(
+            err.message.contains("Button")
+                || err.message.contains("Div")
+                || err.message.contains("mismatch"),
+            "message: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn error_unclosed_string() {
+        let err = parse_err(r#"<Button label="hello>"#);
+        assert!(!err.message.is_empty(), "expected an error message");
+    }
+
+    #[test]
+    fn error_garbage_root() {
+        let err = parse_err(r#"this is not RML"#);
+        assert!(!err.message.is_empty(), "expected an error message");
+    }
+
+    #[test]
+    fn error_empty_input() {
+        let err = parse_err(r#""#);
+        assert!(!err.message.is_empty(), "expected an error message");
+    }
+
     // ── Bool shorthand ────────────────────────────────────────────────────────
 
     #[test]

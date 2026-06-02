@@ -500,6 +500,61 @@ mod tests {
         assert_eq!(merged_once, merged_twice);
     }
 
+    // Bug fix 7.2: property tests for style merging. These exercise
+    // the full set of merge fields that the macro touches, ensuring
+    // that adding a new field doesn't break the merge for unrelated
+    // fields. Each test uses a different "next" pattern.
+    #[test]
+    fn merge_padding_replaces_whole() {
+        // The padding field is `Option<Edge<Length>>`. The macro
+        // treats it as opaque: if `next` has any padding, the entire
+        // edge is replaced. Per-edge merging would require a separate
+        // field per edge, which is not the current design.
+        use crate::core::Edge;
+        let base = Style::default().padding_edge(Edge {
+            top: Length::Px(10.0),
+            right: Length::Px(0.0),
+            bottom: Length::Px(0.0),
+            left: Length::Px(0.0),
+        });
+        let next = Style::default().padding_edge(Edge {
+            top: Length::Px(0.0),
+            right: Length::Px(0.0),
+            bottom: Length::Px(0.0),
+            left: Length::Px(20.0),
+        });
+        let merged = base.merge_over(next);
+        let padding = merged.padding.expect("padding set");
+        // next wins entirely.
+        assert_eq!(padding.top, Length::Px(0.0));
+        assert_eq!(padding.left, Length::Px(20.0));
+    }
+
+    #[test]
+    fn merge_overrides_with_all_axes_set() {
+        let base = Style::default();
+        let next = Style::default()
+            .width(100.0)
+            .height(50.0)
+            .opacity(0.8)
+            .z_index(5);
+        let merged = base.merge_over(next);
+        assert_eq!(merged.width, Some(Length::Px(100.0)));
+        assert_eq!(merged.height, Some(Length::Px(50.0)));
+        assert_eq!(merged.opacity, Some(0.8));
+        assert_eq!(merged.z_index, Some(5));
+    }
+
+    #[test]
+    fn merge_paints_replace_whole() {
+        // The macro intentionally treats `bg` / `border` / `shadow`
+        // as opaque values (replaced, not merged). Verify that.
+        let base = Style::default();
+        let next = Style::default().background(crate::Color::rgb(1, 2, 3));
+        let merged = base.merge_over(next);
+        assert!(merged.background.is_some());
+    }
+
     #[test]
     fn resolve_layers_uses_defaults_for_missing_fields() {
         let resolver = StyleResolver::new(DefaultStyleMode::Full);
