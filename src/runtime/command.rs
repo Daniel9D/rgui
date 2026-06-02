@@ -112,3 +112,48 @@ impl CommandQueue {
         &self.commands
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug fix 1.4: Toggle and SetBool are distinct commands. The
+    // dispatch path emits Toggle for checkboxes; consumers are
+    // expected to read the current state and emit a SetBool with
+    // the next value. The old behavior of "SetBool { value: true }"
+    // for a checkbox pointer-up is gone.
+    #[test]
+    fn toggle_is_a_distinct_variant() {
+        let toggle = UiCommand::Toggle {
+            key: "cb".to_string(),
+        };
+        let set_true = UiCommand::SetBool {
+            key: "cb".to_string(),
+            value: true,
+        };
+        let set_false = UiCommand::SetBool {
+            key: "cb".to_string(),
+            value: false,
+        };
+        assert_ne!(toggle, set_true, "Toggle must not be confusable with SetBool");
+        assert_ne!(toggle, set_false, "Toggle must not be confusable with SetBool");
+        assert_eq!(toggle.kind(), "Toggle");
+        assert_eq!(set_true.kind(), "SetBool");
+    }
+
+    // Bug fix 1.4: SetBool's `value` field is now the resolved next
+    // value (set by the runtime after a Toggle), not "always true".
+    // Verify the enum carries both the explicit-value and toggle
+    // variants independently.
+    #[test]
+    fn setbool_carries_explicit_value() {
+        let set = UiCommand::SetBool {
+            key: "cb".to_string(),
+            value: false,
+        };
+        match set {
+            UiCommand::SetBool { value, .. } => assert!(!value),
+            _ => panic!("expected SetBool"),
+        }
+    }
+}
