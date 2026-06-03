@@ -21,10 +21,10 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 ## Current Position
 
-Phase: 2 of 8 (Event & Input Hardening) — plans complete, not yet audited
-Plan: 4 of 4 in current phase
-Status: Plans complete; integration test suite green
-Last activity: 2026-06-03 — Phase 2 plans 02-01..02-04 implemented & committed (FocusManager::tab_next, ShortcutRegistry::resolve suppression, InputSpec::ime_enabled, Element::overflow_x/overflow_y + wheel 2D tests)
+Phase: 3 of 8 (Text & IME) — context complete; planning next
+Plan: 0 of 3 in current phase
+Status: Context complete; ready for `/gsd-plan-phase 3`
+Last activity: 2026-06-03 — Phase 3 `03-CONTEXT.md` written with 6 locked decisions (ImeHostDriver producer-side trait, system fonts / CI installs Noto, Arabic RTL, 3-surface TextCacheStats, preedit in existing InputState, Shaping::Advanced default)
 
 Progress: [████████░░░░] 27% (8/30 plans)
 
@@ -56,6 +56,7 @@ Progress: [████████░░░░] 27% (8/30 plans)
 
 See `PROJECT.md` Key Decisions table for the full log. Recent:
 
+- **Phase 3 context (2026-06-03)**: `ImeHostDriver` is a producer-side trait (runtime calls `driver.poll(&mut sink)` per frame; sink pushes `UiEvent::ImePreedit` / `UiEvent::ImeCommit`). `MockDriver` replays a `Vec<ImeOp>` script for tests. CJK + Arabic shaping tests rely on system fonts (`fonts-noto-cjk`, `fonts-noto`); CI installs via `scripts/ci-install-fonts.sh`; `RGUI_REQUIRE_FONTS=1` opt-in to fail-fast. Arabic is the v1 RTL reference (isolated + contextual + bidi cases). `TextCacheStats` surfaces in three places: `UiRuntime::text_cache_stats()` public method, `UiSnapshot.text_cache` field, `RendererStats.text_cache` field. Heuristic `clear_metrics_cache()` and shape/layout `clear_text_cache()` (new) clear the two caches symmetrically. `Shaping::Advanced` is the v1 default for all scripts. No winit/AppKit/browser adapters in v1 (apps wire their own).
 - **Phase 2 implementation (2026-06-03)**: `ShortcutRegistry::resolve` gained a `focused_is_text_input: bool` argument that suppresses non-modifier-prefixed chords inside `Input`/`Textarea`/`Select`. `FocusManager::is_focusable(WidgetKind)` + `tab_next`/`tab_prev` helpers provide a tree-walking focus traversal alternative to the existing `FocusSystem` (which the runtime continues to use for the scope-based overlay routing). `ModalSpec::trap_focus: bool` flag (default `false`) lets modals opt into focus trapping. `InputSpec::ime_enabled: bool` (default `false`) gates IME preedit routing so CJK users can opt in to the preedit-then-commit path. `Element::overflow_x(Overflow)` / `overflow_y(Overflow)` setters enable per-axis scroll configuration; the runtime's `handle_wheel` was already 2D — the new tests pin the per-axis clamping behavior.
 - **Phase 1 implementation (2026-06-03)**: `Reconciler::diff(prior, new) -> DiffOutput` is positional (children paired by index) with `kind_signature` comparing `WidgetSpec` signature for state preservation. New `LayoutCache` wraps the existing `TaffyLayoutBackend` and indexes `LayoutBox` per `NodeId` for the paint path. `PointerCapture::release_matching` returns a `PointerCancel` for the captured node when the capture's key is in the unmounted list. The new `diff` is *not yet* wired into `runtime::update` — the existing `reconcile_with_dirty` (keyed-only) is still the production path; the diff is exercised by tests/recon and ready for the Phase 6 (Public API Hardening) wiring.
 - **Workflow init (2026-06-03)**: Granularity=Fine, Execution=Parallel, Git=Yes, Research/PlanCheck/Verifier/DriftGuard=Yes, AI=Quality, PR body=User Stories & Acceptance Criteria, Mode=Vertical MVP.
@@ -68,6 +69,9 @@ See `PROJECT.md` Key Decisions table for the full log. Recent:
 - Add `release_captures_for_unmounted` call into `update()` after the diff runs. Tracked for Phase 6.
 - Add `LayoutCache` reads into the paint path (currently the paint path still walks taffy). Tracked for Phase 5 (Render Path Stress).
 - Wire `ModalSpec::trap_focus` into the runtime's overlay-scope routing (currently the new `FocusManager::tab_next` is the lighter-weight alternative, but the existing `FocusSystem` is what the runtime actually uses). Tracked for a future phase if/when a real-world modal needs it.
+- Write a winit `ImeHostDriver` adapter as a v1.x follow-up. Not in scope for Phase 3.
+- Add preedit underline styling in the paint path. Not in Phase 3; v1.x.
+- Add `RGUI_REQUIRE_FONTS=1` env-var path to the CJK/Arabic shaping tests' `tracing::warn!` skip → fail-fast mode. Tracked in Phase 3's CI wiring.
 
 ### Blockers/Concerns
 
@@ -97,5 +101,5 @@ Items acknowledged and carried forward:
 ## Session Continuity
 
 Last session: 2026-06-03 20:00
-Stopped at: Phase 2 plans 02-01..02-04 all implemented and committed. 9 new integration tests added (event_input_hardening 5 + ime_gating 3 + 1 input_copy_cut_paste from pre-existing); 9 new lib unit tests (focus_traversal 5 + shortcut_suppression 4). Lib 90/90 passing. Next: /gsd-discuss-phase 3 (Text & IME polish) or /gsd-plan-phase 3.
+Stopped at: Phase 3 `03-CONTEXT.md` written; 6 locked decisions recorded; STATE.md + REQUIREMENTS.md updated. Next: `/gsd-plan-phase 3` (3 plans: 03-01 ImeHostDriver + MockDriver, 03-02 CJK + Arabic shaping, 03-03 TextCacheStats 3-surface observability + `clear_text_cache`).
 Resume file: None
