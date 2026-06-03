@@ -82,6 +82,14 @@ pub struct InputSpec {
     pub disabled: bool,
     pub password: bool,
     pub aria_label: Option<String>,
+    /// Phase 2 / Plan 02-04: opt-in to IME composition events. When
+    /// `true`, the runtime routes `ImePreedit` / `ImeCommit` events
+    /// to this `Input` so CJK (and other IME-using) users can type.
+    /// Defaults to `false`: Latin-keyboard users get the simpler
+    /// direct-key-event path. v1 covers the CJK preedit-then-commit
+    /// model; complex-script composition (Hindi, Thai, Khmer) is
+    /// deferred to v1.x.
+    pub ime_enabled: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

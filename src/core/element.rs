@@ -295,6 +295,19 @@ impl Element {
         self
     }
 
+    /// Phase 2 / Plan 02-04: opt in to IME composition for this
+    /// `Input`. Defaults to `false` (Latin keyboard users get the
+    /// direct-key path). Set to `true` for CJK (and other IME-using)
+    /// apps; the runtime will then route `ImePreedit` / `ImeCommit`
+    /// events to this `Input`.
+    #[must_use]
+    pub fn ime_enabled(mut self, value: bool) -> Self {
+        if let Some(WidgetSpec::Input(spec)) = self.widget_spec.as_mut() {
+            spec.ime_enabled = value;
+        }
+        self
+    }
+
     #[must_use]
     pub fn default_selected_index(mut self, index: usize) -> Self {
         if let Some(ref mut spec) = self.widget_spec {

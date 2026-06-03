@@ -242,7 +242,7 @@ fn toolbar_section() -> Element {
                 .gap(8.0)
                 .child(button("Save").key("save").primary())
                 .child(button("Loading").key("loading-action"))
-                .child(input().key("search"))
+                .child(input().key("search").ime_enabled(true))
                 .child(checkbox().key("enabled").checked(true))
                 .child(radio().key("choice")),
         )

@@ -341,7 +341,7 @@ fn input_copy_cut_paste_shortcuts() {
 fn input_ime_preedit_and_commit() {
     let mut runtime = UiRuntime::default();
     runtime.update(FrameInput {
-        root: Element::column().child(input().key("txt")),
+        root: Element::column().child(input().key("txt").ime_enabled(true)),
         viewport: Size::new(200.0, 100.0),
         ..Default::default()
     });
@@ -388,7 +388,7 @@ fn input_ime_preedit_and_commit() {
     assert_eq!(runtime.text_state("txt").as_deref(), Some("日本"));
 
     let output2 = runtime.update(FrameInput {
-        root: Element::column().child(input().key("txt")),
+        root: Element::column().child(input().key("txt").ime_enabled(true)),
         viewport: Size::new(200.0, 100.0),
         ..Default::default()
     });

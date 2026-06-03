@@ -652,7 +652,8 @@ impl UiRuntime {
             if matches!(
                 self.widget_kind_by_key.get(&key),
                 Some(WidgetKind::Input | WidgetKind::Textarea)
-            ) {
+            ) && self.is_focused_ime_enabled()
+            {
                 if let Some(node) = self.node_for_key(&key) {
                     if let Some(state) = self.state_arena.get_mut::<InputState>(node) {
                         if preedit.text.is_empty() {
@@ -663,6 +664,29 @@ impl UiRuntime {
                     }
                 }
             }
+        }
+    }
+
+    /// Phase 2 / Plan 02-04: `true` if the focused node is an
+    /// `Input` or `Textarea` whose `InputSpec::ime_enabled` is set.
+    /// Walks the tree at the moment of the call — O(depth) — and
+    /// returns `false` if the focused node has no spec or the
+    /// `ime_enabled` flag is not set. Defaults to `false` (Latin
+    /// keyboard users get the simple direct-key path).
+    fn is_focused_ime_enabled(&self) -> bool {
+        let Some(node_id) = self.focused_node else {
+            return false;
+        };
+        let Some(tree) = self.tree.as_ref() else {
+            return false;
+        };
+        let Some(node) = tree.get(node_id) else {
+            return false;
+        };
+        match node.widget_spec.as_ref() {
+            Some(crate::widgets::WidgetSpec::Input(s)) => s.ime_enabled,
+            Some(crate::widgets::WidgetSpec::Textarea(_)) => true,
+            _ => false,
         }
     }
 
