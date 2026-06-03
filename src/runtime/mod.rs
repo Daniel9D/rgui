@@ -28,5 +28,8 @@ pub use reconcile::{
     DiffCounts, DiffOutput, ReconcileOutput, ReconcileStats, Reconciler,
 };
 pub use runtime::UiRuntime;
-pub use state::{BoolState, DragState, OpenOverlay, PointerCapture, ScrollState};
+pub use state::{
+    BoolState, DragState, LayoutCache, LayoutCacheStats, OpenOverlay, PointerCapture,
+    ScrollState,
+};
 pub use tree::{IdAllocator, UiNode, UiTree, stable_portal_child_id};

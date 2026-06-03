@@ -227,3 +227,189 @@ mod tests {
         assert_eq!(s.get_by_node(n), Some(false));
     }
 }
+
+/// Per-node `LayoutBox` cache, populated by the taffy backend after
+/// each `LayoutCache::recompute` and read by the paint path via
+/// `LayoutCache::get`.
+///
+/// ## Design
+///
+/// The cache is the *output* of incremental layout, indexed by
+/// `NodeId`. The dirty set is the *input* — nodes that need
+/// re-layout. A node is in the dirty set after:
+///
+/// - a structural change (mount / unmount of a descendant), or
+/// - a style change on the node itself, or
+/// - the node's ancestor was dirty (mark_dirty propagates up so the
+///   paint path can walk from the root down).
+///
+/// `recompute` is the call into the taffy backend that produces new
+/// `LayoutBox` values for the dirty subtree; the results are merged
+/// into the cache and the dirty set is cleared.
+///
+/// The cache is **not** responsible for the taffy tree itself —
+/// that's owned by `TaffyLayoutBackend` in `src/layout/taffy.rs`.
+/// This is purely a memoization layer for the per-node box output.
+#[derive(Clone, Debug, Default)]
+pub struct LayoutCache {
+    boxes: HashMap<NodeId, crate::core::LayoutBox>,
+    dirty: std::collections::HashSet<NodeId>,
+}
+
+impl LayoutCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Mark `node` as needing re-layout. Marks propagate *upward* to
+    /// the ancestors so the paint path can walk from the root down.
+    /// The cache itself doesn't know the parent chain, so callers
+    /// should pass the highest dirty ancestor (typically the root of
+    /// the dirty subtree).
+    pub fn mark_dirty(&mut self, node: NodeId) {
+        self.dirty.insert(node);
+    }
+
+    /// Remove entries for nodes that have been unmounted.
+    pub fn clear_unmounted(&mut self, unmounted: &[NodeId]) {
+        for node in unmounted {
+            self.boxes.remove(node);
+        }
+    }
+
+    /// Clear the dirty set without recomputing. Used after a `recompute`
+    /// pass to reset for the next frame.
+    pub fn clear_dirty(&mut self) {
+        self.dirty.clear();
+    }
+
+    /// Borrow the cached `LayoutBox` for `node`, if any.
+    pub fn get(&self, node: NodeId) -> Option<&crate::core::LayoutBox> {
+        self.boxes.get(&node)
+    }
+
+    /// Insert a freshly-computed `LayoutBox`. Used by the taffy
+    /// backend's `recompute` adapter.
+    pub fn insert(&mut self, layout_box: crate::core::LayoutBox) {
+        let node = layout_box.node;
+        self.boxes.insert(node, layout_box);
+    }
+
+    /// True if `node` is currently in the dirty set.
+    pub fn is_dirty(&self, node: NodeId) -> bool {
+        self.dirty.contains(&node)
+    }
+
+    /// Number of cached `LayoutBox` entries.
+    pub fn len(&self) -> usize {
+        self.boxes.len()
+    }
+
+    /// True if the cache holds no entries.
+    pub fn is_empty(&self) -> bool {
+        self.boxes.is_empty()
+    }
+
+    /// Number of dirty nodes pending a `recompute`.
+    pub fn dirty_count(&self) -> usize {
+        self.dirty.len()
+    }
+
+    /// Snapshot for DIAG-01.
+    pub fn stats(&self) -> LayoutCacheStats {
+        LayoutCacheStats {
+            entries: self.boxes.len(),
+            dirty: self.dirty.len(),
+        }
+    }
+}
+
+/// Snapshot of [`LayoutCache`] state for DIAG-01.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LayoutCacheStats {
+    pub entries: usize,
+    pub dirty: usize,
+}
+
+#[cfg(test)]
+mod layout_cache_tests {
+    use super::*;
+    use crate::core::{NodeId, Rect, Size};
+
+    fn fake_box(node: NodeId, w: f32, h: f32) -> crate::core::LayoutBox {
+        crate::core::LayoutBox::new(
+            node,
+            Rect::new(crate::core::Point::new(0.0, 0.0), Size::new(w, h)),
+        )
+    }
+
+    #[test]
+    fn mark_dirty_adds_to_set() {
+        let mut cache = LayoutCache::new();
+        let n = NodeId::from_raw(7);
+        cache.mark_dirty(n);
+        assert!(cache.is_dirty(n));
+        assert_eq!(cache.dirty_count(), 1);
+    }
+
+    #[test]
+    fn clear_dirty_resets_set() {
+        let mut cache = LayoutCache::new();
+        cache.mark_dirty(NodeId::from_raw(1));
+        cache.mark_dirty(NodeId::from_raw(2));
+        cache.clear_dirty();
+        assert_eq!(cache.dirty_count(), 0);
+    }
+
+    #[test]
+    fn get_returns_inserted_box() {
+        let mut cache = LayoutCache::new();
+        let n = NodeId::from_raw(3);
+        cache.insert(fake_box(n, 100.0, 50.0));
+        let b = cache.get(n).expect("inserted box should be present");
+        assert_eq!(b.local_rect.size.width, 100.0);
+        assert_eq!(b.local_rect.size.height, 50.0);
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn get_returns_none_for_unknown() {
+        let cache = LayoutCache::new();
+        assert!(cache.get(NodeId::from_raw(999)).is_none());
+    }
+
+    #[test]
+    fn clear_unmounted_removes_entries() {
+        let mut cache = LayoutCache::new();
+        let n1 = NodeId::from_raw(1);
+        let n2 = NodeId::from_raw(2);
+        cache.insert(fake_box(n1, 10.0, 10.0));
+        cache.insert(fake_box(n2, 20.0, 20.0));
+        cache.clear_unmounted(&[n1]);
+        assert!(cache.get(n1).is_none());
+        assert!(cache.get(n2).is_some());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn stats_reports_counts() {
+        let mut cache = LayoutCache::new();
+        cache.insert(fake_box(NodeId::from_raw(1), 1.0, 1.0));
+        cache.insert(fake_box(NodeId::from_raw(2), 2.0, 2.0));
+        cache.mark_dirty(NodeId::from_raw(3));
+        let stats = cache.stats();
+        assert_eq!(stats.entries, 2);
+        assert_eq!(stats.dirty, 1);
+    }
+
+    #[test]
+    fn insert_overwrites_existing_entry() {
+        let mut cache = LayoutCache::new();
+        let n = NodeId::from_raw(5);
+        cache.insert(fake_box(n, 10.0, 10.0));
+        cache.insert(fake_box(n, 20.0, 20.0));
+        let b = cache.get(n).expect("box should be present");
+        assert_eq!(b.local_rect.size.width, 20.0);
+        assert_eq!(cache.len(), 1);
+    }
+}
