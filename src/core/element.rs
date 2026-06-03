@@ -308,6 +308,23 @@ impl Element {
         self
     }
 
+    /// Phase 2 / Plan 02-03: per-axis overflow control. The
+    /// existing `Element::overflow()` sets both axes; these
+    /// setters configure one axis at a time for a scroll area
+    /// that scrolls only horizontally (trackpad pan) or only
+    /// vertically (mouse wheel).
+    #[must_use]
+    pub fn overflow_x(mut self, value: crate::core::Overflow) -> Self {
+        self.style.overflow_x = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn overflow_y(mut self, value: crate::core::Overflow) -> Self {
+        self.style.overflow_y = Some(value);
+        self
+    }
+
     #[must_use]
     pub fn default_selected_index(mut self, index: usize) -> Self {
         if let Some(ref mut spec) = self.widget_spec {
