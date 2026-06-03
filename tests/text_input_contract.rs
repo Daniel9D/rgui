@@ -6,7 +6,7 @@ use rgui::{Point, PointerButton, PointerEvent, Size, UiEvent};
 fn input_caret_hit_testing_uses_theme_metrics_text_rect() {
     let mut runtime = UiRuntime::default();
     let mut theme = rgui::Theme::light();
-    theme.widgets.metrics.input.horizontal_padding = 20.0;
+    theme.metrics.input.horizontal_padding = 20.0;
 
     let output = runtime.update(FrameInput {
         root: input().key("input").default_value("abcdef"),

@@ -68,7 +68,7 @@ fn local_select_part_styles_affect_trigger_and_selected_item() {
 #[test]
 fn select_theme_variant_applies_part_styles_and_local_styles_win() {
     let mut theme = Theme::light();
-    theme.widgets.select.variant("priority", |v| {
+    theme.select.variant("priority", |v| {
         v.trigger(
             Style::new()
                 .height(36.0)

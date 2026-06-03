@@ -267,7 +267,7 @@ fn intrinsic_widget_sizes_are_centralized_and_stable() {
             known_width: None,
             known_height: None,
         },
-        &theme.widgets.metrics,
+        &theme.metrics,
     );
     let input = intrinsic_widget_size(
         WidgetIntrinsicInput {
@@ -276,7 +276,7 @@ fn intrinsic_widget_sizes_are_centralized_and_stable() {
             known_width: None,
             known_height: None,
         },
-        &theme.widgets.metrics,
+        &theme.metrics,
     );
 
     assert_eq!(button.width, 72.0);
@@ -298,7 +298,7 @@ fn known_intrinsic_dimensions_override_defaults() {
             known_width: Some(220.0),
             known_height: Some(44.0),
         },
-        &theme.widgets.metrics,
+        &theme.metrics,
     );
 
     assert_eq!(size.width, 220.0);

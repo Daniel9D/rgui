@@ -67,8 +67,25 @@ pub struct Theme {
     pub radius: RadiusTokens,
     pub typography: TypographyTokens,
     pub shadows: ShadowTokens,
+    /// Per-widget sizing baselines and per-widget style
+    /// overrides. Bug fix 3.8: this used to be `widgets:
+    /// WidgetThemes` with `metrics` and `select` as nested
+    /// fields. The intermediate struct was an indirection that
+    /// didn't pay for itself (only two fields, both promoted
+    /// directly to `Theme`), so it's gone. The `components`
+    /// field is a `ComponentThemeMap` for future per-widget
+    /// style overrides (see [`ComponentTheme`]).
     pub components: ComponentThemeMap,
-    pub widgets: WidgetThemes,
+    /// Sizing baselines for every widget kind. See
+    /// [`WidgetMetrics::min_size_for`] for the canonical
+    /// query path.
+    pub metrics: WidgetMetrics,
+    /// Per-state style overrides for the `Select` widget. The
+    /// other widgets get their styles from the resolved style
+    /// path; `Select` is special because its part styles
+    /// (trigger, dropdown, etc.) are not reachable through
+    /// `ResolvedWidgetStyle`.
+    pub select: SelectTheme,
 }
 
 impl Theme {
@@ -114,7 +131,8 @@ impl Theme {
                 lg: vec![],
             },
             components: ComponentThemeMap::default(),
-            widgets: WidgetThemes::default(),
+            metrics: WidgetMetrics::default(),
+            select: SelectTheme::default(),
         }
     }
 
@@ -139,12 +157,33 @@ impl Default for Theme {
     }
 }
 
+/// Bug fix 3.8: this struct used to be the `widgets` field on
+/// [`Theme`]. It only carried two fields (`metrics` and
+/// `select`), so the intermediate struct added no value and
+/// the `theme.widgets.X` indirection was an unnecessary
+/// wrinkle. The fields are now directly on [`Theme`] and this
+/// type is gone.
+///
+/// The `3.8` review note: the alternative was to commit to
+/// `theme.components.get(WidgetKind)` as a uniform per-widget
+/// theme lookup. That requires every per-widget-metric call
+/// site to migrate through a `HashMap` lookup, which is
+/// slower and has no upside for a flat namespace like
+/// `WidgetMetrics`. Flat fields on `Theme` are the simpler
+/// path; `components` is kept as the future home for
+/// per-widget *style* overrides, which `WidgetMetrics` does
+/// not cover.
+#[deprecated(
+    since = "0.1.0",
+    note = "WidgetThemes was a 2-field wrapper. Use `Theme::metrics` and `Theme::select` directly."
+)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct WidgetThemes {
     pub select: SelectTheme,
     pub metrics: WidgetMetrics,
 }
 
+#[allow(deprecated)]
 impl Default for WidgetThemes {
     fn default() -> Self {
         Self {

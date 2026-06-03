@@ -28,9 +28,9 @@ fn update(runtime: &mut UiRuntime) -> rgui::runtime::FrameOutput {
 #[test]
 fn scrollbar_geometry_uses_theme_metrics() {
     let mut theme = rgui::Theme::light();
-    theme.widgets.metrics.scrollbar.width = 10.0;
-    theme.widgets.metrics.scrollbar.padding = 12.0;
-    theme.widgets.metrics.scrollbar.min_thumb_height = 34.0;
+    theme.metrics.scrollbar.width = 10.0;
+    theme.metrics.scrollbar.padding = 12.0;
+    theme.metrics.scrollbar.min_thumb_height = 34.0;
 
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {

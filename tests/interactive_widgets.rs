@@ -213,7 +213,7 @@ fn table_click_updates_selected_row() {
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let hit = output.hit_test.entries()[0].rect;
-    let metrics = rgui::Theme::light().widgets.metrics.table;
+    let metrics = rgui::Theme::light().metrics.table;
 
     click(
         &mut runtime,

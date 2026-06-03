@@ -701,11 +701,11 @@ fn base_taffy_style(
         taffy_style.flex_direction = taffy::FlexDirection::Column;
         taffy_style.padding.top = max_length_percentage(
             taffy_style.padding.top,
-            theme.widgets.metrics.tabs.tab_height,
+            theme.metrics.tabs.tab_height,
         );
     }
     if matches!(node.kind, ElementKind::Widget(WidgetKind::Menu)) {
-        let item_padding = theme.widgets.metrics.menu.item_padding;
+        let item_padding = theme.metrics.menu.item_padding;
         taffy_style.padding.top = max_length_percentage(taffy_style.padding.top, item_padding);
         taffy_style.padding.bottom =
             max_length_percentage(taffy_style.padding.bottom, item_padding);
@@ -1056,7 +1056,7 @@ fn measure_callback(
                     known_width: known.width,
                     known_height: known.height,
                 },
-                &theme.widgets.metrics,
+                &theme.metrics,
             );
             taffy::Size {
                 width: size.width,

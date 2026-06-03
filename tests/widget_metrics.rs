@@ -7,7 +7,7 @@ use rgui::{Size, Theme, WidgetKind};
 #[test]
 fn theme_exposes_widget_metrics_for_intrinsic_layout() {
     let theme = Theme::light();
-    let metrics = &theme.widgets.metrics;
+    let metrics = &theme.metrics;
 
     assert_eq!(metrics.input.min_size, Size::new(160.0, 36.0));
     assert_eq!(metrics.select.trigger_min_size, Size::new(120.0, 36.0));
@@ -19,7 +19,7 @@ fn theme_exposes_widget_metrics_for_intrinsic_layout() {
 
 #[test]
 fn widget_metrics_can_return_kind_defaults() {
-    let metrics = Theme::light().widgets.metrics;
+    let metrics = Theme::light().metrics;
 
     assert_eq!(
         metrics.min_size_for(WidgetKind::Input),
@@ -38,8 +38,8 @@ fn widget_metrics_can_return_kind_defaults() {
 #[test]
 fn intrinsic_widget_size_uses_theme_metrics() {
     let mut theme = Theme::light();
-    theme.widgets.metrics.input.min_size = Size::new(240.0, 44.0);
-    theme.widgets.metrics.select.trigger_min_size = Size::new(180.0, 40.0);
+    theme.metrics.input.min_size = Size::new(240.0, 44.0);
+    theme.metrics.select.trigger_min_size = Size::new(180.0, 40.0);
 
     let input = intrinsic_widget_size(
         WidgetIntrinsicInput {
@@ -48,7 +48,7 @@ fn intrinsic_widget_size_uses_theme_metrics() {
             known_width: None,
             known_height: None,
         },
-        &theme.widgets.metrics,
+        &theme.metrics,
     );
     let select = intrinsic_widget_size(
         WidgetIntrinsicInput {
@@ -57,7 +57,7 @@ fn intrinsic_widget_size_uses_theme_metrics() {
             known_width: None,
             known_height: None,
         },
-        &theme.widgets.metrics,
+        &theme.metrics,
     );
 
     assert_eq!(input, Size::new(240.0, 44.0));
@@ -67,8 +67,8 @@ fn intrinsic_widget_size_uses_theme_metrics() {
 #[test]
 fn button_intrinsic_size_combines_label_width_with_metric_padding() {
     let mut theme = Theme::light();
-    theme.widgets.metrics.button.horizontal_padding = 30.0;
-    theme.widgets.metrics.button.min_width = 90.0;
+    theme.metrics.button.horizontal_padding = 30.0;
+    theme.metrics.button.min_width = 90.0;
 
     let button = intrinsic_widget_size(
         WidgetIntrinsicInput {
@@ -77,11 +77,11 @@ fn button_intrinsic_size_combines_label_width_with_metric_padding() {
             known_width: None,
             known_height: None,
         },
-        &theme.widgets.metrics,
+        &theme.metrics,
     );
 
     assert_eq!(button.width, 110.0);
-    assert_eq!(button.height, theme.widgets.metrics.button.height);
+    assert_eq!(button.height, theme.metrics.button.height);
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn theme_body_size_affects_text_layout_measurement() {
 #[test]
 fn theme_metrics_affect_input_text_origin() {
     let mut theme = Theme::light();
-    theme.widgets.metrics.input.horizontal_padding = 20.0;
+    theme.metrics.input.horizontal_padding = 20.0;
 
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {
@@ -159,8 +159,8 @@ fn theme_metrics_affect_input_text_origin() {
 #[test]
 fn overlay_metrics_control_popover_minimum_size() {
     let mut theme = Theme::light();
-    theme.widgets.metrics.overlay.min_width = 220.0;
-    theme.widgets.metrics.overlay.min_height = 72.0;
+    theme.metrics.overlay.min_width = 220.0;
+    theme.metrics.overlay.min_height = 72.0;
 
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {
@@ -193,10 +193,10 @@ fn overlay_metrics_control_popover_minimum_size() {
 #[test]
 fn tabs_paint_geometry_uses_theme_metrics() {
     let mut theme = Theme::light();
-    theme.widgets.metrics.tabs.horizontal_padding = 24.0;
-    theme.widgets.metrics.tabs.tab_gap = 14.0;
-    theme.widgets.metrics.tabs.tab_height = 28.0;
-    theme.widgets.metrics.tabs.tab_min_width = 72.0;
+    theme.metrics.tabs.horizontal_padding = 24.0;
+    theme.metrics.tabs.tab_gap = 14.0;
+    theme.metrics.tabs.tab_height = 28.0;
+    theme.metrics.tabs.tab_min_width = 72.0;
 
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {
@@ -233,11 +233,11 @@ fn tabs_paint_geometry_uses_theme_metrics() {
 #[test]
 fn collection_painters_use_theme_row_metrics() {
     let mut theme = Theme::light();
-    theme.widgets.metrics.tree.row_height = 32.0;
-    theme.widgets.metrics.table.row_height = 36.0;
-    theme.widgets.metrics.table.cell_padding = 12.0;
-    theme.widgets.metrics.list.row_height = 38.0;
-    theme.widgets.metrics.list.item_padding = 14.0;
+    theme.metrics.tree.row_height = 32.0;
+    theme.metrics.table.row_height = 36.0;
+    theme.metrics.table.cell_padding = 12.0;
+    theme.metrics.list.row_height = 38.0;
+    theme.metrics.list.item_padding = 14.0;
 
     let mut runtime = UiRuntime::default();
     let output = runtime.update(FrameInput {
@@ -344,7 +344,7 @@ fn collection_painters_use_theme_row_metrics() {
 
 #[test]
 fn min_size_for_leaf_widgets_returns_nonzero() {
-    let metrics = Theme::light().widgets.metrics;
+    let metrics = Theme::light().metrics;
 
     for kind in [
         WidgetKind::Image,
@@ -365,7 +365,7 @@ fn min_size_for_leaf_widgets_returns_nonzero() {
 
 #[test]
 fn min_size_for_container_widgets_returns_sensible_default() {
-    let metrics = Theme::light().widgets.metrics;
+    let metrics = Theme::light().metrics;
 
     for kind in [
         WidgetKind::Card,
@@ -383,7 +383,7 @@ fn min_size_for_container_widgets_returns_sensible_default() {
 
 #[test]
 fn link_default_size_is_line_height() {
-    let metrics = Theme::light().widgets.metrics;
+    let metrics = Theme::light().metrics;
     let size = metrics.min_size_for(WidgetKind::Link);
     // Link is a leaf widget whose width comes from its label intrinsic
     // measurement, so the default is 0 wide with a single line height.

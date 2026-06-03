@@ -159,7 +159,7 @@ pub fn paint_node_themed(
                 &ResolvedStateFlags::default(),
             );
             let metrics = WidgetPaintMetrics {
-                metrics: &theme.widgets.metrics,
+                metrics: &theme.metrics,
             };
             canvas_commands(rect, Some(spec.name.as_str()), z_index, &style, metrics)
         }
@@ -186,7 +186,7 @@ pub fn paint_node_themed(
                 &ResolvedStateFlags::default(),
             );
             let metrics = WidgetPaintMetrics {
-                metrics: &theme.widgets.metrics,
+                metrics: &theme.metrics,
             };
             scroll_area_commands(rect, z_index, state, &style, metrics)
         }
@@ -233,7 +233,7 @@ fn paint_widget_themed(
     };
     let style = theme.resolve_widget_style(kind, variant, &flags);
     let metrics = WidgetPaintMetrics {
-        metrics: &theme.widgets.metrics,
+        metrics: &theme.metrics,
     };
     let mut ctx = PaintCtx {
         rect,
@@ -821,9 +821,9 @@ fn resolved_select_part_styles(
 ) -> crate::widgets::SelectPartStyles {
     let mut styles = crate::widgets::SelectPartStyles::default();
     if let Some(theme) = theme {
-        styles = merge_select_part_styles(styles, theme.widgets.select.base.clone());
+        styles = merge_select_part_styles(styles, theme.select.base.clone());
         if let Some(variant) = node.variant.as_ref() {
-            if let Some(variant_styles) = theme.widgets.select.variants.get(variant) {
+            if let Some(variant_styles) = theme.select.variants.get(variant) {
                 styles = merge_select_part_styles(styles, variant_styles.clone());
             }
         }

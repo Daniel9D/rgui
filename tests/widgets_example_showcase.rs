@@ -302,7 +302,7 @@ fn public_docs_cover_widget_metrics_and_hardcode_policy() {
     let docs = std::fs::read_to_string("docs/public-api.md").expect("public docs read");
     for expected in [
         "Widget Metrics",
-        "Theme::light().widgets.metrics",
+        "Theme::light().metrics",
         "Hardcode Policy",
         "visual constants",
         "LayoutDiagnostics",

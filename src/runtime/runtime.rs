@@ -88,7 +88,7 @@ fn text_hit_geometry_for_widget(
     theme: &Theme,
 ) -> (Point, f32, crate::core::ResolvedWidgetStyle) {
     let style = theme.resolve_widget_style(kind, None, &crate::ResolvedStateFlags::default());
-    let metrics = &theme.widgets.metrics;
+    let metrics = &theme.metrics;
     let (horizontal_padding, vertical_padding) = match kind {
         WidgetKind::Textarea => (
             metrics.textarea.horizontal_padding,
@@ -1180,14 +1180,14 @@ impl UiRuntime {
             &tabs,
             rect.origin,
             &mut self.text_system,
-            &self.theme.widgets.metrics,
+            &self.theme.metrics,
         );
         for (i, tab_rect) in rects.iter().enumerate() {
             let hit_rect = Rect::new(
                 Point::new(tab_rect.origin.x, rect.origin.y),
                 Size::new(
                     tab_rect.size.width,
-                    self.theme.widgets.metrics.tabs.min_size.height,
+                    self.theme.metrics.tabs.min_size.height,
                 ),
             );
             if hit_rect.contains(position) {
@@ -1201,7 +1201,7 @@ impl UiRuntime {
         let Some(rect) = self.widget_rect_by_key.get(key).copied() else {
             return;
         };
-        let tree_metrics = self.theme.widgets.metrics.tree;
+        let tree_metrics = self.theme.metrics.tree;
         let index = ((position.y - rect.origin.y - tree_metrics.indent * 0.5)
             / tree_metrics.row_height)
             .floor()
@@ -1228,7 +1228,7 @@ impl UiRuntime {
         if row_count == 0 {
             return;
         }
-        let table_metrics = self.theme.widgets.metrics.table;
+        let table_metrics = self.theme.metrics.table;
         let row = ((position.y - rect.origin.y - table_metrics.cell_padding)
             / table_metrics.row_height)
             .floor() as isize
@@ -1251,7 +1251,7 @@ impl UiRuntime {
                 _ => None,
             })
             .unwrap_or(1);
-        let list_metrics = self.theme.widgets.metrics.list;
+        let list_metrics = self.theme.metrics.list;
         let index = ((position.y - rect.origin.y - list_metrics.item_padding)
             / list_metrics.row_height)
             .floor()
@@ -1270,7 +1270,7 @@ impl UiRuntime {
             .get(scroll_key)
             .copied()
             .unwrap_or_default();
-        let track = self.theme.widgets.metrics.scrollbar.track_rect(rect);
+        let track = self.theme.metrics.scrollbar.track_rect(rect);
         let track_y = track.origin.y;
         let track_h = track.size.height;
         let ratio = ((position.y - track_y) / track_h).clamp(0.0, 1.0);
@@ -1632,7 +1632,7 @@ impl<'a> FrameBuilder<'a> {
             self.hit_test.push(hit_entry);
             if let Some(key) = node.key.as_ref() {
                 if layout.content_size.height > rect.size.height {
-                    let thumb_rect = self.theme.widgets.metrics.scrollbar.thumb_rect(
+                    let thumb_rect = self.theme.metrics.scrollbar.thumb_rect(
                         rect,
                         layout.content_size,
                         layout.scroll_offset,
@@ -2072,7 +2072,7 @@ impl<'a> FrameBuilder<'a> {
                 let option_key = select_option_key(key, index);
                 let mut element = crate::widgets::button(option.label.clone())
                     .key(option_key)
-                    .height(self.theme.widgets.metrics.menu.item_height);
+                    .height(self.theme.metrics.menu.item_height);
                 if option.disabled {
                     if let Some(crate::widgets::WidgetSpec::Button(spec)) =
                         element.widget_spec.as_mut()
@@ -2145,7 +2145,7 @@ fn overlay_root_element_for_layout(
     };
 
     let mut root_style = root.style.clone();
-    let metrics = &theme.widgets.metrics.overlay;
+    let metrics = &theme.metrics.overlay;
 
     let min_width = root_style
         .min_width
@@ -2216,10 +2216,10 @@ fn overlay_layout_max_size(
     let below = (viewport.height - root.anchor_rect.max_y()).max(0.0);
     let above = root.anchor_rect.origin.y.max(0.0);
     Size::new(
-        viewport.width.max(theme.widgets.metrics.overlay.min_width),
+        viewport.width.max(theme.metrics.overlay.min_width),
         below
             .max(above)
-            .max(theme.widgets.metrics.overlay.min_height),
+            .max(theme.metrics.overlay.min_height),
     )
 }
 
@@ -2358,9 +2358,9 @@ fn parse_select_option_key(key: &str) -> Option<(&str, usize)> {
 
 fn apply_widget_part_layout_styles(root: &mut crate::Element, theme: &Theme) {
     if let Some(crate::widgets::WidgetSpec::Select(spec)) = root.widget_spec.as_ref() {
-        let mut trigger = theme.widgets.select.base.trigger.clone();
+        let mut trigger = theme.select.base.trigger.clone();
         if let Some(variant) = root.variant.as_ref() {
-            if let Some(variant_styles) = theme.widgets.select.variants.get(variant) {
+            if let Some(variant_styles) = theme.select.variants.get(variant) {
                 trigger = merge_optional_style(trigger, variant_styles.trigger.clone());
             }
         }

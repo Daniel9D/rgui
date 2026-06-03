@@ -244,13 +244,13 @@ the panel relative to the anchor and constrains it to the viewport.
 ## Widget Metrics
 
 Widget intrinsic layout uses theme-owned metrics. Start with
-`Theme::light().widgets.metrics` and override individual widget metric groups
+`Theme::light().metrics` and override individual widget metric groups
 when an application needs different density or sizing.
 
 ```rust
 let mut theme = Theme::light();
-theme.widgets.metrics.input.min_size = Size::new(240.0, 44.0);
-theme.widgets.metrics.select.trigger_min_size = Size::new(180.0, 40.0);
+theme.metrics.input.min_size = Size::new(240.0, 44.0);
+theme.metrics.select.trigger_min_size = Size::new(180.0, 40.0);
 ```
 
 The layout pipeline resolves widget size in this order:
@@ -384,7 +384,7 @@ Themes can define widget part variants that local part styles may override:
 use rgui::{Style, Theme};
 
 let mut theme = Theme::light();
-theme.widgets.select.variant("priority", |v| {
+theme.select.variant("priority", |v| {
     v.trigger(Style::new().height(36.0));
 });
 ```
