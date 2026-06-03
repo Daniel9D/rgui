@@ -1,4 +1,4 @@
-use crate::{LayerKind, NodeId, Point, Rect, Vec2};
+use crate::{LayerKind, NodeId, Point, Rect, Vec2, WidgetKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PointerButton {
@@ -133,6 +133,67 @@ impl FocusManager {
 
     pub const fn focused(&self) -> Option<NodeId> {
         self.focused
+    }
+
+    /// Phase 2 / Plan 02-01: which widget kinds can take focus.
+    /// Button, Input, Checkbox, Radio, Select, Textarea, Switch,
+    /// Slider, Link. (Tabs(active) and MenuItem are deliberately
+    /// excluded — the runtime uses its own FocusSystem for the
+    /// scope-based overlay routing that those widgets need.)
+    pub const fn is_focusable(kind: WidgetKind) -> bool {
+        matches!(
+            kind,
+            WidgetKind::Button
+                | WidgetKind::Input
+                | WidgetKind::Checkbox
+                | WidgetKind::Radio
+                | WidgetKind::Select
+                | WidgetKind::Textarea
+                | WidgetKind::Switch
+                | WidgetKind::Slider
+                | WidgetKind::Link
+        )
+    }
+
+    /// Walk to the next focusable node in the candidate list. If
+    /// `current` is `None`, returns the first candidate. If
+    /// `current` is the last, wraps to the first. Returns `None`
+    /// only when the candidate list is empty.
+    ///
+    /// `candidates` must already be in DOM order, filtered to
+    /// focusable nodes. The runtime builds this list by walking
+    /// the `UiTree` and applying any modal `trap_focus` filter.
+    pub fn tab_next<I>(&mut self, candidates: I) -> Option<NodeId>
+    where
+        I: IntoIterator<Item = NodeId>,
+    {
+        let list: Vec<NodeId> = candidates.into_iter().collect();
+        if list.is_empty() {
+            return None;
+        }
+        let next = match self.focused.and_then(|cur| list.iter().position(|&id| id == cur)) {
+            Some(idx) => list[(idx + 1) % list.len()],
+            None => list[0],
+        };
+        self.focused = Some(next);
+        Some(next)
+    }
+
+    /// Walk to the previous focusable node (wrap from first to last).
+    pub fn tab_prev<I>(&mut self, candidates: I) -> Option<NodeId>
+    where
+        I: IntoIterator<Item = NodeId>,
+    {
+        let list: Vec<NodeId> = candidates.into_iter().collect();
+        if list.is_empty() {
+            return None;
+        }
+        let prev = match self.focused.and_then(|cur| list.iter().position(|&id| id == cur)) {
+            Some(0) | None => list[list.len() - 1],
+            Some(idx) => list[idx - 1],
+        };
+        self.focused = Some(prev);
+        Some(prev)
     }
 }
 
@@ -332,6 +393,83 @@ mod tests {
         assert_eq!(HIT_ENTRY.order, 0);
         assert!(HIT_ENTRY.key.is_none());
         assert!(HIT_ENTRY.visible_rect.is_none());
+    }
+
+    // Phase 2 / Plan 02-01: focus traversal via tab_next / tab_prev.
+    mod focus_traversal {
+        use super::*;
+
+        fn ids(raws: &[u64]) -> Vec<NodeId> {
+            raws.iter().map(|r| NodeId::from_raw(*r)).collect()
+        }
+
+        #[test]
+        fn is_focusable_predicate_covers_expected_widgets() {
+            // The full focusable set per Phase 2 / Plan 02-01.
+            for kind in [
+                WidgetKind::Button,
+                WidgetKind::Input,
+                WidgetKind::Checkbox,
+                WidgetKind::Radio,
+                WidgetKind::Select,
+                WidgetKind::Textarea,
+                WidgetKind::Switch,
+                WidgetKind::Slider,
+                WidgetKind::Link,
+            ] {
+                assert!(FocusManager::is_focusable(kind), "expected {kind:?} focusable");
+            }
+            // Non-focusable kinds.
+            for kind in [
+                WidgetKind::Modal,
+                WidgetKind::Popover,
+                WidgetKind::Tooltip,
+                WidgetKind::Divider,
+                WidgetKind::Icon,
+                WidgetKind::Image,
+                WidgetKind::Badge,
+                WidgetKind::Card,
+                WidgetKind::Alert,
+                WidgetKind::ProgressBar,
+                WidgetKind::Spinner,
+                WidgetKind::Avatar,
+            ] {
+                assert!(!FocusManager::is_focusable(kind), "expected {kind:?} NOT focusable");
+            }
+        }
+
+        #[test]
+        fn tab_next_from_none_returns_first() {
+            let mut f = FocusManager::default();
+            let next = f.tab_next(ids(&[1, 2, 3]));
+            assert_eq!(next, Some(NodeId::from_raw(1)));
+            assert_eq!(f.focused(), Some(NodeId::from_raw(1)));
+        }
+
+        #[test]
+        fn tab_next_from_last_wraps_to_first() {
+            let mut f = FocusManager::default();
+            f.request_focus(NodeId::from_raw(3));
+            let next = f.tab_next(ids(&[1, 2, 3]));
+            assert_eq!(next, Some(NodeId::from_raw(1)));
+        }
+
+        #[test]
+        fn tab_prev_from_first_wraps_to_last() {
+            let mut f = FocusManager::default();
+            f.request_focus(NodeId::from_raw(1));
+            let prev = f.tab_prev(ids(&[1, 2, 3]));
+            assert_eq!(prev, Some(NodeId::from_raw(3)));
+        }
+
+        #[test]
+        fn tab_next_with_unmounted_focused_returns_first() {
+            let mut f = FocusManager::default();
+            // Focused node 99 is not in the candidate list.
+            f.request_focus(NodeId::from_raw(99));
+            let next = f.tab_next(ids(&[1, 2, 3]));
+            assert_eq!(next, Some(NodeId::from_raw(1)));
+        }
     }
 
     // Phase 2 / Plan 02-02: shortcut suppression inside text inputs.

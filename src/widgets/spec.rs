@@ -227,6 +227,11 @@ pub struct ModalSpec {
     pub title: Option<String>,
     pub close_on_escape: bool,
     pub close_on_outside_click: bool,
+    /// Phase 2 / Plan 02-01: when `true`, Tab traversal is
+    /// restricted to the modal's subtree. Tab cycles inside the
+    /// modal; it does not move focus to nodes outside. Defaults to
+    /// `false` for the simple modal use case.
+    pub trap_focus: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
