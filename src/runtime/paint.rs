@@ -673,7 +673,7 @@ pub fn widget_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 /// Selection highlight color, consistent across List and Table.
-fn selection_color(theme: &Theme) -> Color {
+pub(super) fn selection_color(theme: &Theme) -> Color {
     if theme.mode == ThemeMode::Dark {
         Color::rgba(
             theme.colors.primary.r,
@@ -690,7 +690,7 @@ fn selection_color(theme: &Theme) -> Color {
 ///
 /// Appends to `cmds` starting at `ctx.z_index + 2` (above the template bg/border).
 /// Callers must pass the correct origin/top-left/width from their metrics.
-fn paint_text_field(
+pub(super) fn paint_text_field(
     ctx: &mut PaintCtx<'_>,
     text_origin: Point,
     text_top_left: Point,
@@ -771,7 +771,7 @@ fn paint_text_field(
 
 /// Module-level helper for recursive tree rendering.
 /// Lifted from the old inner `fn paint_tree_item` to avoid re-declaration on every call.
-fn paint_tree_items(
+pub(super) fn paint_tree_items(
     items: &[crate::TreeItemSpec],
     depth: usize,
     index: &mut usize,
@@ -871,7 +871,7 @@ fn merge_optional_style(
     }
 }
 
-fn font_weight_from_style(style: Option<&crate::Style>) -> FontWeight {
+pub(super) fn font_weight_from_style(style: Option<&crate::Style>) -> FontWeight {
     style
         .and_then(|style| style.text.as_ref())
         .map(|text| text.weight)
@@ -1529,7 +1529,7 @@ impl WidgetPainter for TooltipPainter {
 
 // ── Icon ──────────────────────────────────────────────────────────────────────
 
-fn icon_symbol(name: &str) -> String {
+pub(super) fn icon_symbol(name: &str) -> String {
     name.chars()
         .find(|ch| ch.is_ascii_alphanumeric())
         .map(|ch| ch.to_ascii_uppercase().to_string())
@@ -2120,7 +2120,7 @@ impl WidgetPainter for AvatarPainter {
 
 // ─── Low-level command builders ───────────────────────────────────────────────
 
-fn rect_command(rect: Rect, color: Color, radius: f32, z_index: i32) -> PaintedCommand {
+pub(super) fn rect_command(rect: Rect, color: Color, radius: f32, z_index: i32) -> PaintedCommand {
     PaintedCommand {
         command: PaintCommand::DrawRect(RectCmd {
             rect,
@@ -2136,21 +2136,21 @@ fn rect_command(rect: Rect, color: Color, radius: f32, z_index: i32) -> PaintedC
     }
 }
 
-fn text_at(text: String, origin: Point, color: Color, z_index: i32) -> PaintedCommand {
+pub(super) fn text_at(text: String, origin: Point, color: Color, z_index: i32) -> PaintedCommand {
     text_at_weight(text, origin, color, z_index, FontWeight::Normal)
 }
 
-fn text_at_weight(
+pub(super) fn text_at_weight(
     text: String,
     origin: Point,
     color: Color,
     z_index: i32,
     weight: FontWeight,
 ) -> PaintedCommand {
-    text_at_with_size_and_weight(text, origin, color, z_index, 14.0, weight)
+    text_at_with_size_and_weight(text, origin, color, z_index, DEFAULT_TEXT_SIZE, weight)
 }
 
-fn text_at_with_size_and_weight(
+pub(super) fn text_at_with_size_and_weight(
     text: String,
     origin: Point,
     color: Color,
@@ -2180,7 +2180,7 @@ fn text_at_with_size_and_weight(
     }
 }
 
-fn border_command(rect: Rect, color: Color, width: f32, z_index: i32) -> PaintedCommand {
+pub(super) fn border_command(rect: Rect, color: Color, width: f32, z_index: i32) -> PaintedCommand {
     PaintedCommand {
         command: PaintCommand::DrawBorder(BorderCmd {
             rect,
@@ -2232,7 +2232,7 @@ fn text_command(
     }
 }
 
-fn inset(rect: Rect, x: f32, y: f32) -> Rect {
+pub(super) fn inset(rect: Rect, x: f32, y: f32) -> Rect {
     Rect::new(
         Point::new(rect.origin.x + x, rect.origin.y + y),
         Size::new(
