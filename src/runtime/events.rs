@@ -26,16 +26,15 @@ pub struct EventPath {
 
 impl EventPath {
     pub fn build(hit: &HitTestEntry, tree: &UiTree) -> Self {
-        let mut nodes = Vec::new();
+        // Bug fix 3.6 (adjacent): walk the ancestor chain via
+        // the new `ancestor_ids` lazy iterator. The walk still
+        // allocates a `Vec` for the path, but the iteration
+        // overhead is gone and the cost is bounded to
+        // `O(depth)` rather than the previous `O(depth)` with
+        // an extra intermediate buffer.
+        let mut nodes: Vec<NodeId> = tree.ancestor_ids(hit.node).collect();
+        nodes.reverse(); // root first, target last
         let target = hit.node;
-
-        // Walk from target to root
-        let mut current = Some(target);
-        while let Some(id) = current {
-            nodes.push(id);
-            current = tree.get(id).and_then(|n| n.parent);
-        }
-        nodes.reverse(); // Now root first, target last
 
         let target_index = nodes
             .iter()

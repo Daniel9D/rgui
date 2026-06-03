@@ -2,7 +2,7 @@ use rgui::{
     AccessibilityMetrics, EventTraceSnapshot, HitTestSnapshot, LayoutBoxSnapshot, OverlaySnapshot,
     PaintCommandSnapshot, PerformanceMetrics, ResolvedStyleSnapshot, SemanticSnapshot, UiSnapshot,
 };
-use rgui::{AxisSet, GridTrack, LayoutBox, Length, ScrollState, Vec2};
+use rgui::{AxisSet, GridTrack, LayoutBox, Length, ResolvedLength, ScrollState, Vec2};
 use rgui::{
     ClipSpec, Color, DisplayList, ImageId, LayerKind, LayerSpec, Paint, PaintCommand, RectCmd,
     RenderStats, RendererBackend, ResourceStore, SizeU32,
@@ -74,8 +74,8 @@ fn ui_snapshot_debug_json_reports_measure_and_stats() {
 
     let json = snapshot.to_debug_json();
 
-    assert!(json.contains("\"measure\":1"));
-    assert!(json.contains("\"stats\""));
+    assert!(json.contains("\"measure\":["));
+    assert!(json.contains("\"performance\""));
     assert!(json.contains("\"display_command_count\":3"));
 }
 
@@ -120,9 +120,9 @@ fn renderer_backend_consumes_display_list_only() {
 
 #[test]
 fn typed_lengths_convert_to_css_like_values_without_strings() {
-    assert_eq!(Length::Px(12.0).resolve(200.0), Some(12.0));
-    assert_eq!(Length::Percent(0.5).resolve(200.0), Some(100.0));
-    assert_eq!(Length::Auto.resolve(200.0), None);
+    assert_eq!(Length::Px(12.0).resolve(200.0), ResolvedLength::Concrete(12.0));
+    assert_eq!(Length::Percent(0.5).resolve(200.0), ResolvedLength::Concrete(100.0));
+    assert_eq!(Length::Auto.resolve(200.0), ResolvedLength::Intrinsic);
     assert_eq!(GridTrack::fr(2.0).fraction(), Some(2.0));
 }
 

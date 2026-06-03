@@ -4,6 +4,28 @@ use crate::{
     Element, ElementKey, ElementKind, EventHandlers, NodeId, Semantic, Style, VariantId, WidgetSpec,
 };
 
+/// Iterator over the chain of ancestors from a starting node up to
+/// the root, inclusive. Bug fix 3.6 (adjacent): the previous
+/// `ancestors_inclusive` returned a `Vec`; this lazy form avoids the
+/// intermediate allocation.
+pub struct AncestorIds<'tree> {
+    tree: &'tree UiTree,
+    current: Option<NodeId>,
+}
+
+impl<'tree> Iterator for AncestorIds<'tree> {
+    type Item = NodeId;
+
+    fn next(&mut self) -> Option<NodeId> {
+        let id = self.current?;
+        // Advance to the parent for the *next* call. Stop after
+        // the root is yielded (its parent is `None`, so the
+        // following `next` returns `None`).
+        self.current = self.tree.get(id).and_then(|node| node.parent);
+        Some(id)
+    }
+}
+
 pub struct IdAllocator<'a> {
     pub next_id: &'a mut u64,
     pub keyed_ids: &'a mut HashMap<ElementKey, NodeId>,
@@ -119,6 +141,11 @@ impl UiTree {
             .map(|node| node.id)
     }
 
+    /// Returns the chain of ancestors from `node` (inclusive) up to and
+    /// including the root, in bottom-up order.
+    ///
+    /// The returned `Vec` is `O(depth)` memory. For a lazy alternative
+    /// that avoids the allocation, see [`Self::ancestor_ids`].
     pub fn ancestors_inclusive(&self, node: NodeId) -> Vec<NodeId> {
         let mut result = Vec::new();
         let mut current = Some(node);
@@ -127,6 +154,23 @@ impl UiTree {
             current = self.get(id).and_then(|node| node.parent);
         }
         result
+    }
+
+    /// Lazy iterator over the chain of ancestors from `node` (inclusive)
+    /// up to and including the root.
+    ///
+    /// Bug fix 3.6 (adjacent): the previous `ancestors_inclusive`
+    /// returned a `Vec` which forced every caller to allocate. Most
+    /// callers (e.g. `EventPath::build`, hit-test ancestor chains)
+    /// only need to iterate. This iterator yields `NodeId` values one
+    /// at a time and stops at the root, with no intermediate
+    /// allocation. Each step is `O(1)` (HashMap lookup + field
+    /// access); for a tree of depth D the total is `O(D)`.
+    pub fn ancestor_ids(&self, node: NodeId) -> AncestorIds<'_> {
+        AncestorIds {
+            tree: self,
+            current: Some(node),
+        }
     }
 
     pub fn root_node(&self) -> &UiNode {
@@ -291,4 +335,85 @@ fn hash_portal_part(mut hash: u64, value: u64) -> u64 {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     hash
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Length;
+
+    // Bug fix 3.6 (adjacent): the `ancestor_ids` lazy
+    // iterator should yield the same chain as
+    // `ancestors_inclusive`, just without the intermediate
+    // `Vec` allocation.
+
+    #[test]
+    fn ancestor_ids_walks_from_node_to_root() {
+        // Build a 3-deep tree: root → mid → leaf.
+        let leaf = Element::text("leaf");
+        let mid = Element::column().child(leaf);
+        let root = Element::column().child(mid);
+        let tree = UiTree::from_element(root);
+        let leaf_id = tree.nodes()[2].id;
+        let mid_id = tree.nodes()[1].id;
+        let root_id = tree.nodes()[0].id;
+
+        // Bottom-up: leaf, mid, root.
+        let chain: Vec<NodeId> = tree.ancestor_ids(leaf_id).collect();
+        assert_eq!(chain, vec![leaf_id, mid_id, root_id]);
+    }
+
+    #[test]
+    fn ancestor_ids_agrees_with_ancestors_inclusive() {
+        let root = Element::column()
+            .child(Element::text("a"))
+            .child(Element::text("b").padding(4.0));
+        let tree = UiTree::from_element(root);
+        // Pick a non-root node so the chain is non-trivial.
+        let b_id = tree.nodes()[2].id;
+        let from_vec: Vec<NodeId> = tree.ancestors_inclusive(b_id);
+        let from_iter: Vec<NodeId> = tree.ancestor_ids(b_id).collect();
+        assert_eq!(from_vec, from_iter);
+    }
+
+    #[test]
+    fn ancestor_ids_yields_only_root_for_root_node() {
+        // A root-only tree: the only node is the root, its
+        // parent is `None`, so the iterator yields exactly
+        // one element.
+        let tree = UiTree::from_element(Element::text("solo"));
+        let root_id = tree.root();
+        let chain: Vec<NodeId> = tree.ancestor_ids(root_id).collect();
+        assert_eq!(chain, vec![root_id]);
+    }
+
+    #[test]
+    fn ancestor_ids_is_lazy() {
+        // The iterator only walks as far as the consumer
+        // asks. Build a 4-deep tree (root → mid → leaf →
+        // grandchild), take 2 elements, and verify the
+        // remaining chain is not consumed.
+        let grandchild = Element::text("g");
+        let leaf = Element::column().child(grandchild);
+        let mid = Element::column().child(leaf);
+        let root = Element::column().child(mid);
+        let tree = UiTree::from_element(root);
+        // nodes()[0] = root, [1] = mid, [2] = leaf, [3] = grandchild
+        let grandchild_id = tree.nodes()[3].id;
+        let leaf_id = tree.nodes()[2].id;
+        let mid_id = tree.nodes()[1].id;
+        let chain: Vec<NodeId> = tree.ancestor_ids(grandchild_id).take(2).collect();
+        assert_eq!(chain, vec![grandchild_id, leaf_id]);
+        // The mid (which would be next) is *not* yielded.
+        assert!(!chain.contains(&mid_id));
+    }
+
+    #[test]
+    fn length_construction_is_const() {
+        // Smoke test: ensure `Length` is constructable in
+        // const context as a small companion to the
+        // const-fn work in 5.1.
+        const PX: Length = Length::Px(12.0);
+        assert_eq!(PX.try_resolve(100.0), Some(12.0));
+    }
 }

@@ -207,7 +207,7 @@ fn debug_snapshot_contains_pipeline_surfaces() {
     assert!(!snapshot.display_list.is_empty());
     assert!(!output.debug_snapshot().hit_test_entries.is_empty());
     assert!(snapshot.performance.frame_time_ms >= 0.0);
-    assert!(snapshot.to_debug_json().contains("\"hit_test\""));
+    assert!(snapshot.to_debug_json().contains("\"hit_test_entries\""));
 }
 
 #[test]

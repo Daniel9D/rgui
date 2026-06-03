@@ -39,7 +39,7 @@ pub use id::{ElementKey, NodeId};
 pub use layout::{
     Align, Constraints, Display, Edge, FlexDirection, FlexWrap, GridPlacement, GridTrack, Justify,
     LayoutBox, LayoutDebugSnapshot, LayoutDiagnostics, LayoutDirtyReason, LayoutResult, Length,
-    Overflow, Position,
+    Overflow, Position, ResolvedLength,
 };
 pub use overlay::{AnchorSpec, DismissPolicy, OverlayManager, OverlaySpec, Placement};
 pub use render::{
