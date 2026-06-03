@@ -167,8 +167,9 @@ Deferred to v1.x / v2.
 | RECON-02 | Phase 1 | Complete |
 | RECON-03 | Phase 1 | Complete |
 | RECON-04 | Phase 1 | Complete |
-| EVNT-01..06 | Phase 1 | Pending |
-| TEXT-01..04 | Phase 1 | Pending |
+| EVNT-01..06 | Phase 2 (widget keyboard nav) | Pending — Phase 2 covered the runtime event path (focus traversal, shortcut suppression, wheel 2D, IME gating) but EVNT-01..06 are widget-specific keyboard handlers not addressed here. Slated for a future widget-interaction phase. |
+| TEXT-01 | Phase 2 (runtime side) | Partial — runtime routes `ImePreedit`/`ImeCommit` when `InputSpec::ime_enabled = true`; preedit paints and commits. Host driver integration (winit/browser) remains the v1.x path. |
+| TEXT-02..04 | Phase 1 | Pending |
 | WIN-01..04 | Phase 2 | Pending |
 | REND-01..04 | Phase 2 | Pending |
 | API-01..04 | Phase 2 | Pending |
