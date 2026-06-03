@@ -28,8 +28,8 @@ pub use element::{
 };
 pub use event::{
     EventPhase, EventResult, FocusManager, HitTestEntry, HitTestTree, ImePreedit, KeyEvent,
-    PointerButton, PointerEvent, Shortcut, ShortcutRegistry, ShortcutScope, UiEvent,
-    WheelDeltaMode, WheelEvent,
+    PointerButton, PointerCancel, PointerEvent, Shortcut, ShortcutRegistry, ShortcutScope,
+    UiEvent, WheelDeltaMode, WheelEvent,
 };
 pub use geometry::{
     Point, Rect, Size, SizeU32, Vec2, clip_child, effective_clip, physical_pixel_snap,

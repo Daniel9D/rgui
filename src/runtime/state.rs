@@ -67,6 +67,29 @@ impl PointerCapture {
         self.key = None;
         self.node = None;
     }
+
+    /// Phase 1 / Plan 01-03: release the capture if the current key
+    /// is in `unmounted_keys`. Returns the captured node id (if any)
+    /// so the caller can emit a synthetic `PointerCancel` event to
+    /// that node, allowing drag handlers to clean up.
+    ///
+    /// `PointerCapture` holds at most one active capture (the most
+    /// recent), so this is a single check rather than a map walk.
+    pub fn release_matching(
+        &mut self,
+        unmounted_keys: &[String],
+    ) -> Option<crate::core::PointerCancel> {
+        let key = self.key.as_ref()?;
+        if unmounted_keys.iter().any(|k| k == key) {
+            let cancel = crate::core::PointerCancel {
+                node: self.node?,
+                button: None,
+            };
+            self.clear();
+            return Some(cancel);
+        }
+        None
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -329,6 +352,49 @@ impl LayoutCache {
 pub struct LayoutCacheStats {
     pub entries: usize,
     pub dirty: usize,
+}
+
+#[cfg(test)]
+mod pointer_capture_release_tests {
+    use super::*;
+
+    #[test]
+    fn release_matching_clears_capture_for_matching_key() {
+        let mut cap = PointerCapture::default();
+        cap.set("btn".to_string(), Some(NodeId::from_raw(7)));
+        let cancel = cap.release_matching(&["btn".to_string()]);
+        assert!(cancel.is_some(), "should produce a cancel for the matching key");
+        let cancel = cancel.unwrap();
+        assert_eq!(cancel.node, NodeId::from_raw(7));
+        assert!(!cap.is_active(), "capture should be cleared");
+    }
+
+    #[test]
+    fn release_matching_returns_none_for_non_matching_key() {
+        let mut cap = PointerCapture::default();
+        cap.set("btn".to_string(), Some(NodeId::from_raw(7)));
+        let cancel = cap.release_matching(&["menu".to_string()]);
+        assert!(cancel.is_none(), "no cancel should be produced for an unrelated key");
+        assert!(cap.is_active(), "capture should still be active");
+    }
+
+    #[test]
+    fn release_matching_handles_inactive_capture() {
+        let mut cap = PointerCapture::default();
+        let cancel = cap.release_matching(&["btn".to_string()]);
+        assert!(cancel.is_none(), "no cancel should be produced for an inactive capture");
+    }
+
+    #[test]
+    fn release_matching_works_for_multiple_keys() {
+        let mut cap = PointerCapture::default();
+        cap.set("menu".to_string(), Some(NodeId::from_raw(2)));
+        let cancel = cap.release_matching(&["btn".to_string(), "menu".to_string()]);
+        assert!(cancel.is_some(), "should match menu in the list");
+        let cancel = cancel.unwrap();
+        assert_eq!(cancel.node, NodeId::from_raw(2));
+        assert!(!cap.is_active());
+    }
 }
 
 #[cfg(test)]

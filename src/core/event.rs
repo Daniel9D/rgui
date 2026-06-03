@@ -14,6 +14,16 @@ pub struct PointerEvent {
     pub modifiers: u32,
 }
 
+/// Phase 1 / Plan 01-03: a synthetic cancel event for a captured
+/// node that was just unmounted. The `node` is the captured
+/// target; dispatch bypasses hit-testing and routes the event
+/// directly there.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PointerCancel {
+    pub node: NodeId,
+    pub button: Option<PointerButton>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyEvent {
     pub key: String,
@@ -46,6 +56,15 @@ pub enum UiEvent {
     PointerDown(PointerEvent),
     PointerMove(PointerEvent),
     PointerUp(PointerEvent),
+    /// Synthetic pointer-cancel: emitted when a captured node is
+    /// unmounted by the reconciler (Phase 1 / Plan 01-03). The
+    /// `node` is the captured target — dispatch bypasses hit-testing
+    /// and routes the event directly to that node so any drag
+    /// handler can clean up.
+    PointerCancel {
+        node: NodeId,
+        button: Option<PointerButton>,
+    },
     Wheel(WheelEvent),
     KeyDown(KeyEvent),
     KeyUp(KeyEvent),

@@ -175,6 +175,18 @@ impl UiRuntime {
         self.pointer_capture.clear();
     }
 
+    /// Phase 1 / Plan 01-03: release any pointer capture whose key
+    /// appears in `unmounted_keys` and return the synthetic
+    /// `PointerCancel` event for the captured node. The runtime
+    /// caller is expected to dispatch the cancel event so any drag
+    /// handler on the captured node can clean up.
+    pub fn release_captures_for_unmounted(
+        &mut self,
+        unmounted_keys: &[String],
+    ) -> Option<crate::core::PointerCancel> {
+        self.pointer_capture.release_matching(unmounted_keys)
+    }
+
     pub fn pointer_capture_key(&self) -> Option<String> {
         self.pointer_capture.key.clone()
     }
