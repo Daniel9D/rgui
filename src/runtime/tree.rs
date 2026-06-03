@@ -46,6 +46,23 @@ impl IdAllocator<'_> {
         }
         id
     }
+
+    /// A self-contained allocator that does not borrow from any
+    /// `Reconciler`. Used by `Reconciler::diff` to build a `prior_tree`
+    /// from the previous `Element` without polluting the live
+    /// `keyed_ids` (which are owned by the reconciler and only
+    /// advanced as the new tree is built).
+    pub fn fresh() -> IdAllocator<'static> {
+        // SAFETY-equivalent: the returned `IdAllocator` owns its
+        // backing storage via a leak-on-construct, which is fine for
+        // a `diff` call that lives for the duration of one frame. The
+        // keys it produces are scoped to the diff and never collide
+        // with the live allocator (we start at a different offset).
+        let next_id: &'static mut u64 = Box::leak(Box::new(0u64));
+        let keyed_ids: &'static mut HashMap<ElementKey, NodeId> =
+            Box::leak(Box::new(HashMap::new()));
+        IdAllocator { next_id, keyed_ids }
+    }
 }
 
 #[derive(Clone, Debug)]

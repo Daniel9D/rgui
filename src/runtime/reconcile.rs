@@ -20,6 +20,11 @@ use crate::core::{Element, ElementKey, ElementKind, NodeId, Style};
 
 use super::{DirtyFlags, IdAllocator, UiNode, UiTree};
 
+#[inline]
+fn spec_signature(spec: &crate::widgets::WidgetSpec) -> u64 {
+    crate::widgets::spec::spec_signature(spec)
+}
+
 #[derive(Default)]
 pub struct Reconciler {
     next_id: u64,
@@ -97,6 +102,185 @@ impl Reconciler {
         ReconcileOutput { tree, dirty_by_key }
     }
 
+    /// Diff a prior `Element` root against a new `Element` root and
+    /// produce the minimal per-node update set: which nodes were
+    /// mounted (newly added), unmounted (removed), and patched (kept
+    /// in place but possibly dirty), plus per-node `DirtyFlags` for
+    /// downstream passes.
+    ///
+    /// For v1 the diff is *positional*: prior[i] is paired with new[i].
+    /// If the pair's `WidgetKind` is the same, it's a PATCH and state
+    /// is preserved. If the kinds differ, the old is unmounted and the
+    /// new is mounted (state reset). If the lists are different
+    /// lengths, excess old are unmounted and excess new are mounted.
+    ///
+    /// Keyed reorder is a future enhancement; the current `keyed_ids`
+    /// allocator ensures keyed nodes *do* preserve their `NodeId`
+    /// across rebuilds, so a keyed node at the same position will be
+    /// recognized as a PATCH (and stay alive) even when surrounding
+    /// unkeyed nodes change.
+    ///
+    /// The returned `DiffOutput.tree` is the freshly-built tree for
+    /// the new root. `mounted` / `unmounted` / `patched` are disjoint
+    /// and cover every node in the union of prior + new.
+    pub fn diff(&mut self, prior: Element, new: Element) -> DiffOutput {
+        // Build the prior tree with a *fresh* allocator (so we can
+        // compare ids back without polluting `self.keyed_ids`).
+        let mut prior_allocator = IdAllocator::fresh();
+        let prior_tree = UiTree::from_element_with_ids(prior, &mut prior_allocator);
+        // Build the new tree with the *live* allocator — keyed nodes
+        // will get the same `NodeId` as on the previous frame.
+        let mut new_allocator = IdAllocator {
+            next_id: &mut self.next_id,
+            keyed_ids: &mut self.keyed_ids,
+        };
+        let new_tree = UiTree::from_element_with_ids(new, &mut new_allocator);
+        let mut output = DiffOutput {
+            tree: new_tree.clone(),
+            mounted: Vec::new(),
+            unmounted: Vec::new(),
+            patched: Vec::new(),
+            dirty: HashMap::new(),
+        };
+        Self::diff_node(
+            &prior_tree,
+            Some(prior_tree.root()),
+            &new_tree,
+            new_tree.root(),
+            &mut output,
+        );
+        self.record_fingerprints(&new_tree);
+        output
+    }
+
+    /// Snapshot of the reconciler's counters; the observability hook
+    /// for DIAG-01.
+    pub fn stats(&self) -> ReconcileStats {
+        ReconcileStats {
+            keyed_node_count: self.keyed_ids.len(),
+            fingerprint_count: self.keyed_fingerprints.len(),
+        }
+    }
+
+    fn diff_node(
+        prior_tree: &UiTree,
+        prior_node: Option<NodeId>,
+        new_tree: &UiTree,
+        new_node: NodeId,
+        output: &mut DiffOutput,
+    ) {
+        let prior_style = prior_node
+            .and_then(|id| prior_tree.get(id))
+            .map(|n| n.style.clone());
+        let new_style = new_tree.get(new_node).map(|n| n.style.clone());
+        let prior_text = prior_node.and_then(|id| prior_tree.get(id)).and_then(text_for_node);
+        let new_text = new_tree.get(new_node).and_then(text_for_node);
+        let prior_children = prior_node
+            .and_then(|id| prior_tree.get(id))
+            .map(|n| n.children.clone())
+            .unwrap_or_default();
+        let new_children = new_tree
+            .get(new_node)
+            .map(|n| n.children.clone())
+            .unwrap_or_default();
+
+        let same_kind = match (prior_node, new_node) {
+            (Some(p), n) => {
+                let p_node = prior_tree.get(p);
+                let n_node = new_tree.get(n);
+                match (p_node, n_node) {
+                    (Some(a), Some(b)) => kind_signature(a) == kind_signature(b),
+                    _ => false,
+                }
+            }
+            (None, _) => false,
+        };
+
+        match (prior_node, same_kind) {
+            (Some(_p), true) => {
+                // PATCH — state preserved
+                output.patched.push(new_node);
+                let mut dirty = DirtyFlags::default();
+                if prior_style != new_style {
+                    dirty.insert(DirtyFlags::STYLE);
+                    dirty.insert(DirtyFlags::LAYOUT);
+                    dirty.insert(DirtyFlags::PAINT);
+                }
+                if prior_text != new_text {
+                    dirty.insert(DirtyFlags::TEXT);
+                    dirty.insert(DirtyFlags::LAYOUT);
+                    dirty.insert(DirtyFlags::PAINT);
+                }
+                if prior_children.len() != new_children.len() {
+                    dirty.insert(DirtyFlags::STRUCTURE);
+                    dirty.insert(DirtyFlags::LAYOUT);
+                    dirty.insert(DirtyFlags::PAINT);
+                    dirty.insert(DirtyFlags::HIT_TEST);
+                }
+                if !dirty.is_empty() {
+                    output.dirty.insert(new_node, dirty);
+                }
+            }
+            (Some(p), false) => {
+                // Kinds differ — unmount old, mount new
+                output.unmounted.push(p);
+                output.mounted.push(new_node);
+                output.dirty.insert(
+                    new_node,
+                    DirtyFlags::LAYOUT
+                        | DirtyFlags::STRUCTURE
+                        | DirtyFlags::PAINT
+                        | DirtyFlags::HIT_TEST,
+                );
+            }
+            (None, _) => {
+                // New only — mount
+                output.mounted.push(new_node);
+                output.dirty.insert(
+                    new_node,
+                    DirtyFlags::LAYOUT
+                        | DirtyFlags::STRUCTURE
+                        | DirtyFlags::PAINT
+                        | DirtyFlags::HIT_TEST,
+                );
+            }
+        }
+
+        // Recurse positionally
+        let common = prior_children.len().min(new_children.len());
+        for i in 0..common {
+            Self::diff_node(
+                prior_tree,
+                Some(prior_children[i]),
+                new_tree,
+                new_children[i],
+                output,
+            );
+        }
+        for &old_child in &prior_children[common..] {
+            output.unmounted.push(old_child);
+            if let Some(parent) = new_node_optional(new_node) {
+                output.dirty.insert(
+                    parent,
+                    DirtyFlags::LAYOUT
+                        | DirtyFlags::STRUCTURE
+                        | DirtyFlags::PAINT
+                        | DirtyFlags::HIT_TEST,
+                );
+            }
+        }
+        for &new_child in &new_children[common..] {
+            output.mounted.push(new_child);
+            output.dirty.insert(
+                new_node,
+                DirtyFlags::LAYOUT
+                    | DirtyFlags::STRUCTURE
+                    | DirtyFlags::PAINT
+                    | DirtyFlags::HIT_TEST,
+            );
+        }
+    }
+
     fn record_fingerprints(&mut self, tree: &UiTree) {
         self.keyed_fingerprints.clear();
         for node in tree.nodes() {
@@ -108,11 +292,51 @@ impl Reconciler {
     }
 }
 
-fn fingerprint_for_node(tree: &UiTree, node: &UiNode) -> NodeFingerprint {
-    let text = match &node.kind {
+/// Helper used by `diff_node` to keep the "no-op" return type tidy;
+/// returns `Some(node)` so the caller can use it as a map key.
+#[inline]
+fn new_node_optional(node: NodeId) -> Option<NodeId> {
+    Some(node)
+}
+
+fn text_for_node(node: &UiNode) -> Option<String> {
+    if let Some(label) = crate::widgets::spec_label(&node.widget_spec.clone().unwrap_or(
+        crate::widgets::WidgetSpec::Divider,
+    )) {
+        return Some(label);
+    }
+    match &node.kind {
         ElementKind::Text(spec) => Some(spec.text.clone()),
         _ => None,
-    };
+    }
+}
+
+/// Compute a kind-level signature for an `ElementKind` / widget spec
+/// pair. Two nodes with the same signature can be patched in place;
+/// different signatures force an unmount + mount.
+///
+/// For nodes with a `WidgetSpec`, this delegates to `spec_signature`,
+/// which encodes the actual `WidgetKind`. For nodes that *don't* have
+/// a spec (e.g. plain `Row` containers, or `Text` leaves), we hash
+/// the `ElementKind` discriminant so a `Row` and a `Column` are
+/// recognized as different kinds (they would render and lay out
+/// differently).
+fn kind_signature(node: &UiNode) -> u64 {
+    use std::hash::{Hash, Hasher};
+    if let Some(spec) = &node.widget_spec {
+        spec_signature(spec)
+    } else {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        std::mem::discriminant(&node.kind).hash(&mut h);
+        if let ElementKind::Text(text) = &node.kind {
+            text.text.hash(&mut h);
+        }
+        h.finish()
+    }
+}
+
+fn fingerprint_for_node(tree: &UiTree, node: &UiNode) -> NodeFingerprint {
+    let text = text_for_node(node);
     let child_keys = node
         .children
         .iter()
@@ -144,4 +368,41 @@ impl ReconcileOutput {
             .find(|(candidate, _)| candidate.as_str() == key)
             .map(|(_, dirty)| *dirty)
     }
+}
+
+/// The output of [`Reconciler::diff`] — the new tree plus a per-node
+/// classification into `mounted` / `unmounted` / `patched`, with
+/// per-node `DirtyFlags` for downstream passes.
+#[derive(Clone, Debug)]
+pub struct DiffOutput {
+    pub tree: UiTree,
+    pub mounted: Vec<NodeId>,
+    pub unmounted: Vec<NodeId>,
+    pub patched: Vec<NodeId>,
+    pub dirty: HashMap<NodeId, DirtyFlags>,
+}
+
+impl DiffOutput {
+    /// Counters for the observability hook (DIAG-01).
+    pub fn counts(&self) -> DiffCounts {
+        DiffCounts {
+            mounted: self.mounted.len(),
+            unmounted: self.unmounted.len(),
+            patched: self.patched.len(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DiffCounts {
+    pub mounted: usize,
+    pub unmounted: usize,
+    pub patched: usize,
+}
+
+/// Snapshot of [`Reconciler`] state for DIAG-01.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReconcileStats {
+    pub keyed_node_count: usize,
+    pub fingerprint_count: usize,
 }

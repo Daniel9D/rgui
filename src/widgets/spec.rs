@@ -407,3 +407,25 @@ pub fn spec_label_str(spec: &WidgetSpec) -> Option<&str> {
         _ => None,
     }
 }
+
+/// Compute a stable 64-bit signature of the spec **kind** for use by
+/// the reconciler.
+///
+/// Two specs with the same signature can be treated as a *patch* by the
+/// reconciler (state preserved, dirty flags set on style/text changes).
+/// Different signatures mean the reconciler should unmount the old and
+/// mount a fresh node (state reset).
+///
+/// The signature intentionally hashes **only** the `WidgetKind` — not the
+/// spec's text content (`label`, `value`, etc.) — because for v1 the
+/// reconciler treats label changes as a *patch* (state preserved, just
+/// the displayed text is updated). State lives in the runtime's
+/// `BoolState` / `Value` / etc., keyed by `NodeId`, so a label change
+/// that preserves the same `NodeId` keeps the state. (A future
+/// spec-shape-change detection could re-include shape fields here.)
+pub fn spec_signature(spec: &WidgetSpec) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (spec.kind() as u8).hash(&mut h);
+    h.finish()
+}

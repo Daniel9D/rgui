@@ -24,7 +24,9 @@ pub use events::{
 };
 pub use frame::{FrameInput, FrameOutput};
 pub use portal_pass::{PortalChildren, PortalRoot, PortalTree};
-pub use reconcile::{ReconcileOutput, Reconciler};
+pub use reconcile::{
+    DiffCounts, DiffOutput, ReconcileOutput, ReconcileStats, Reconciler,
+};
 pub use runtime::UiRuntime;
 pub use state::{BoolState, DragState, OpenOverlay, PointerCapture, ScrollState};
 pub use tree::{IdAllocator, UiNode, UiTree, stable_portal_child_id};
