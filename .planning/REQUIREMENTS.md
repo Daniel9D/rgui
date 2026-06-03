@@ -7,10 +7,10 @@
 
 ### Reconciliation (RECON)
 
-- [ ] **RECON-01**: Runtime can diff a new `Element` root against the prior `UiTree` and update only changed subtrees
-- [ ] **RECON-02**: Pointer-capture state is released when the captured node is removed from the tree
-- [ ] **RECON-03**: Layout runs incrementally on dirty regions (not full-tree re-layout on every frame)
-- [ ] **RECON-04**: Widget spec hash mismatch triggers a re-mount of the affected node
+- [x] **RECON-01**: Runtime can diff a new `Element` root against the prior `UiTree` and update only changed subtrees
+- [x] **RECON-02**: Pointer-capture state is released when the captured node is removed from the tree
+- [x] **RECON-03**: Layout runs incrementally on dirty regions (not full-tree re-layout on every frame)
+- [x] **RECON-04**: Widget spec hash mismatch triggers a re-mount of the affected node
 
 ### Event / input (EVNT)
 
@@ -163,10 +163,10 @@ Deferred to v1.x / v2.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RECON-01 | Phase 1 | Pending |
-| RECON-02 | Phase 1 | Pending |
-| RECON-03 | Phase 1 | Pending |
-| RECON-04 | Phase 1 | Pending |
+| RECON-01 | Phase 1 | Complete |
+| RECON-02 | Phase 1 | Complete |
+| RECON-03 | Phase 1 | Complete |
+| RECON-04 | Phase 1 | Complete |
 | EVNT-01..06 | Phase 1 | Pending |
 | TEXT-01..04 | Phase 1 | Pending |
 | WIN-01..04 | Phase 2 | Pending |
