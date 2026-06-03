@@ -171,7 +171,18 @@ impl ShortcutRegistry {
         self.shortcuts.push(shortcut);
     }
 
-    pub fn resolve(&self, chord: &str, focused: Option<NodeId>) -> Option<&str> {
+    /// Phase 2 / Plan 02-02: when the focused node is a text input
+    /// (an `Input`, `Textarea`, or `Select`), only modifier-prefixed
+    /// shortcuts fire — bare letter / digit / punctuation /
+    /// function-key shortcuts are suppressed so the user can type
+    /// freely. Modifier-only chords (containing `Cmd+`, `Ctrl+`, or
+    /// `Alt+`) always fire, even inside a text field.
+    pub fn resolve(
+        &self,
+        chord: &str,
+        focused: Option<NodeId>,
+        focused_is_text_input: bool,
+    ) -> Option<&str> {
         self.shortcuts
             .iter()
             .find(|shortcut| {
@@ -191,8 +202,23 @@ impl ShortcutRegistry {
                     shortcut.chord == chord && shortcut.scope == ShortcutScope::Application
                 })
             })
-            .map(|shortcut| shortcut.action.as_str())
+            .and_then(|shortcut| {
+                if focused_is_text_input && !is_modifier_chord(&shortcut.chord) {
+                    None
+                } else {
+                    Some(shortcut.action.as_str())
+                }
+            })
     }
+}
+
+/// Phase 2 / Plan 02-02: a chord is "modifier-prefixed" if it
+/// contains `Cmd+`, `Ctrl+`, or `Alt+`. These chords always fire
+/// (e.g. `Cmd+K` to open a palette from inside a text field).
+/// Bare chords like `"a"`, `"?"`, or `"Enter"` are suppressed
+/// inside text inputs.
+pub fn is_modifier_chord(chord: &str) -> bool {
+    chord.contains("Cmd+") || chord.contains("Ctrl+") || chord.contains("Alt+")
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -306,5 +332,47 @@ mod tests {
         assert_eq!(HIT_ENTRY.order, 0);
         assert!(HIT_ENTRY.key.is_none());
         assert!(HIT_ENTRY.visible_rect.is_none());
+    }
+
+    // Phase 2 / Plan 02-02: shortcut suppression inside text inputs.
+    mod shortcut_suppression {
+        use super::*;
+
+        fn reg() -> ShortcutRegistry {
+            let mut r = ShortcutRegistry::default();
+            r.register(Shortcut::new("a", ShortcutScope::Window, "approve"));
+            r.register(Shortcut::new("Cmd+a", ShortcutScope::Window, "select_all"));
+            r.register(Shortcut::new("?", ShortcutScope::Window, "help"));
+            r.register(Shortcut::new("Enter", ShortcutScope::Window, "submit"));
+            r
+        }
+
+        #[test]
+        fn plain_letter_suppressed_in_text_input() {
+            let r = reg();
+            let action = r.resolve("a", None, true);
+            assert_eq!(action, None, "bare letter must be suppressed inside a text input");
+        }
+
+        #[test]
+        fn modifier_prefixed_chord_fires_in_text_input() {
+            let r = reg();
+            let action = r.resolve("Cmd+a", None, true);
+            assert_eq!(action, Some("select_all"));
+        }
+
+        #[test]
+        fn plain_letter_fires_outside_text_input() {
+            let r = reg();
+            let action = r.resolve("a", None, false);
+            assert_eq!(action, Some("approve"));
+        }
+
+        #[test]
+        fn digit_and_punctuation_suppressed_in_text_input() {
+            let r = reg();
+            assert_eq!(r.resolve("?", None, true), None);
+            assert_eq!(r.resolve("Enter", None, true), None);
+        }
     }
 }

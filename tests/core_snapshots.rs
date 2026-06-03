@@ -248,7 +248,7 @@ fn shortcuts_resolve_local_scope_before_window_scope() {
     ));
 
     let action = registry
-        .resolve("Ctrl+S", Some(NodeId::from_raw(2)))
+        .resolve("Ctrl+S", Some(NodeId::from_raw(2)), false)
         .expect("shortcut resolves");
 
     assert_eq!(action, "node-save");
