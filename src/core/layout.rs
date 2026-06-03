@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::{NodeId, Rect, Size, Vec2};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -311,7 +313,7 @@ pub struct LayoutDiagnostics {
     pub layout_warnings: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct LayoutDebugSnapshot {
     pub engine: String,
     pub taffy_node_count: usize,

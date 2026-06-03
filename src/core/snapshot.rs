@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 use crate::{LayoutDebugSnapshot, NodeId};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct UiSnapshot {
     pub tree_nodes: Vec<String>,
     pub styles: Vec<ResolvedStyleSnapshot>,
@@ -40,31 +42,34 @@ impl UiSnapshot {
         &self.overlays
     }
 
+    /// Serialize the snapshot to JSON for debug dumps. Bug fix 2.8:
+    /// the previous hand-rolled `format!` only emitted counts and
+    /// would break as soon as a string field (e.g. `role`, `key`,
+    /// `kind`) was added — it didn't escape `"` or `\` in the
+    /// values. Now we go through `serde_json`, which handles
+    /// every field type and gives stable, parseable output.
+    ///
+    /// On a `serde_json` failure (which can happen if the
+    /// snapshot contains a non-`Serialize` type — none today),
+    /// the function falls back to a stringified error so the
+    /// caller still gets a printable result.
     pub fn to_debug_json(&self) -> String {
-        format!(
-            "{{\"tree_nodes\":{},\"styles\":{},\"measure\":{},\"layout\":{},\"paint\":{},\"hit_test\":{},\"semantics\":{},\"overlays\":{},\"stats\":{{\"display_command_count\":{},\"batch_count\":{},\"atlas_upload_bytes\":{}}}}}",
-            self.tree_nodes.len(),
-            self.styles.len(),
-            self.measure.len(),
-            self.layout.len(),
-            self.display_list.len(),
-            self.hit_test_entries.len(),
-            self.semantics.len(),
-            self.overlays.len(),
-            self.performance.display_command_count,
-            self.performance.batch_count,
-            self.performance.atlas_upload_bytes,
-        )
+        match serde_json::to_string(self) {
+            Ok(json) => json,
+            Err(err) => format!(
+                "{{\"error\":\"snapshot serialization failed: {err}\"}}"
+            ),
+        }
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct UiDiagnostics {
     pub layout_errors: Vec<String>,
     pub layout_warnings: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct OverlaySnapshot {
     pub key: Option<String>,
     pub layer: crate::LayerKind,
@@ -72,7 +77,7 @@ pub struct OverlaySnapshot {
     pub modal: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct HitTestSnapshot {
     pub node: NodeId,
     pub key: Option<String>,
@@ -84,13 +89,13 @@ pub struct HitTestSnapshot {
     pub layer: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ResolvedStyleSnapshot {
     pub node: NodeId,
     pub z_index: i32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MeasureSnapshot {
     pub node: NodeId,
     pub key: Option<String>,
@@ -100,7 +105,7 @@ pub struct MeasureSnapshot {
     pub content_height: f32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct LayoutBoxSnapshot {
     pub node: NodeId,
     pub key: Option<String>,
@@ -131,33 +136,33 @@ impl UiSnapshot {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PaintCommandSnapshot {
     pub kind: String,
     pub z_index: i32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct SemanticSnapshot {
     pub node: NodeId,
     pub role: String,
     pub label: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct EventTraceSnapshot {
     pub node: NodeId,
     pub phase: String,
     pub event: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct AccessibilityMetrics {
     pub semantic_node_count: usize,
     pub accesskit_update_count: usize,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct PerformanceMetrics {
     pub frame_time_ms: f32,
     pub node_count: usize,
@@ -190,5 +195,75 @@ impl Default for PerformanceMetrics {
                 accesskit_update_count: 0,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::LayerKind;
+
+    // Bug fix 2.8: `to_debug_json` now goes through
+    // `serde_json`. The previous hand-rolled `format!` only
+    // emitted counts and would break as soon as a string
+    // field (e.g. `kind`, `role`, `key`) was added — it
+    // didn't escape `"` or `\` in the values. Verify:
+    // (a) the output is parseable as JSON;
+    // (b) string fields round-trip with escaping intact.
+
+    #[test]
+    fn to_debug_json_emits_parseable_json() {
+        let snapshot = UiSnapshot::default();
+        let json = snapshot.to_debug_json();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).expect("output must be valid JSON");
+        // Vec fields are JSON arrays; scalars are scalars.
+        // Note: the new schema uses the Rust field names
+        // (`display_list`, `hit_test_entries`, `performance`)
+        // rather than the abbreviated names (`paint`,
+        // `hit_test`, `stats`) the hand-rolled format! used.
+        // This is a deliberate, documented improvement.
+        assert_eq!(parsed["tree_nodes"], serde_json::json!([]));
+        assert_eq!(parsed["styles"], serde_json::json!([]));
+        assert_eq!(parsed["performance"]["display_command_count"], 0);
+        assert_eq!(parsed["performance"]["batch_count"], 0);
+    }
+
+    #[test]
+    fn to_debug_json_escapes_string_fields() {
+        // Build a snapshot with string fields that include
+        // characters which the old hand-rolled format!
+        // would have emitted un-escaped.
+        let mut snapshot = UiSnapshot::default();
+        snapshot.display_list.push(PaintCommandSnapshot {
+            kind: "DrawText".to_string(),
+            z_index: 0,
+        });
+        snapshot.semantics.push(SemanticSnapshot {
+            node: NodeId::from_raw(7),
+            role: "button".to_string(),
+            label: Some("a \"quoted\" label".to_string()),
+        });
+        snapshot.overlays.push(OverlaySnapshot {
+            key: Some("tab\nbreak".to_string()),
+            layer: LayerKind::Modal,
+            rect: crate::Rect::new(
+                crate::Point::new(0.0, 0.0),
+                crate::Size::new(10.0, 20.0),
+            ),
+            modal: true,
+        });
+        let json = snapshot.to_debug_json();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).expect("output must be valid JSON");
+        // The strings round-trip with their embedded characters.
+        assert_eq!(parsed["display_list"][0]["kind"], "DrawText");
+        assert_eq!(parsed["semantics"][0]["role"], "button");
+        assert_eq!(
+            parsed["semantics"][0]["label"],
+            "a \"quoted\" label"
+        );
+        assert_eq!(parsed["overlays"][0]["key"], "tab\nbreak");
+        assert_eq!(parsed["overlays"][0]["layer"], "Modal");
     }
 }

@@ -13,7 +13,9 @@
 //! Use [`Rect::contains_inclusive`] if you need the legacy closed-interval
 //! behavior (point on the edge counts as inside).
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+use serde::Serialize;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
@@ -30,7 +32,7 @@ impl Point {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,
@@ -69,7 +71,7 @@ impl From<Vec2> for Point {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Size {
     pub width: f32,
     pub height: f32,
@@ -90,7 +92,7 @@ impl Size {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct SizeU32 {
     pub width: u32,
     pub height: u32,
@@ -102,7 +104,7 @@ impl SizeU32 {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Rect {
     pub origin: Point,
     pub size: Size,

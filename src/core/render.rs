@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::{FontStyle, FontWeight, Point, Rect, SizeU32};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -87,7 +89,7 @@ pub enum Paint {
     Image(ImageId),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub enum LayerKind {
     Document,
     Floating,
