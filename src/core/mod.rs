@@ -67,7 +67,7 @@ pub use theme::{
     ResolvedStateFlags, ResolvedWidgetStyle, ScrollbarMetrics, SelectMetrics, SelectTheme,
     ShadowTokens, SpacingTokens, TableMetrics, TabsMetrics, TextareaMetrics, Theme, ThemeMode,
     ThemeScope, TooltipMetrics, TreeMetrics, TypographyTokens, VariantId, WidgetKind,
-    WidgetMetrics, WidgetThemes,
+    WidgetMetrics,
 };
 pub use theme_base::{
     MODAL_CONTENT_Z_BASE, MODAL_PANEL_Z_BASE, OVERLAY_BACKDROP_HIT_TEST_ORDER,

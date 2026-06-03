@@ -250,8 +250,14 @@ fn paint_widget_themed(
 
 // ─── Widget paint metrics ─────────────────────────────────────────────────────
 
+/// Lightweight view of [`crate::WidgetMetrics`] for use by
+/// [`WidgetPainter`] impls. The struct is `pub(crate)` so it
+/// can be the public field type of [`PaintCtx`] (private
+/// inner types are a warning) without being exposed to
+/// downstream consumers; paint helpers live next to the
+/// trait.
 #[derive(Clone, Copy, Debug)]
-struct WidgetPaintMetrics<'a> {
+pub(crate) struct WidgetPaintMetrics<'a> {
     metrics: &'a crate::WidgetMetrics,
 }
 
@@ -329,7 +335,12 @@ pub struct PaintCtx<'a> {
     pub z_index: i32,
     pub state: &'a VisualState,
     pub style: &'a ResolvedWidgetStyle,
-    pub metrics: WidgetPaintMetrics<'a>,
+    /// Bug fix: `WidgetPaintMetrics` is `pub(crate)` because the
+    /// helper methods (`input_text_origin`, etc.) are internal
+    /// to the runtime. Marking the field itself `pub(crate)`
+    /// rather than `pub` keeps the struct usable for `pub`
+    /// painters without leaking the inner type to downstream.
+    pub(crate) metrics: WidgetPaintMetrics<'a>,
     pub node: &'a UiNode,
     pub theme: &'a Theme,
     pub text: &'a mut TextSystem,
