@@ -208,6 +208,17 @@ impl Rect {
         self.size.width <= 0.0 || self.size.height <= 0.0
     }
 
+    /// Convert to a `kurbo::Rect` for interop with the `kurbo`
+    /// crate (the wgpu renderer uses kurbo for vector math
+    /// and the canvas painter). `pub(crate)` because
+    /// cross-crate interop is intentionally limited; the
+    /// `kurbo` types are not part of the public surface.
+    ///
+    /// `#[allow(dead_code)]` because the wgpu renderer
+    /// doesn't yet exercise this path; it is kept
+    /// available for the SVG / canvas painters and the
+    /// glyph atlas where the integration is planned.
+    #[allow(dead_code)]
     pub(crate) fn to_kurbo(self) -> kurbo::Rect {
         kurbo::Rect::new(
             self.origin.x as f64,
@@ -217,6 +228,10 @@ impl Rect {
         )
     }
 
+    /// Inverse of [`Rect::to_kurbo`]. See that function's
+    /// docs for the rationale on visibility and
+    /// `#[allow(dead_code)]`.
+    #[allow(dead_code)]
     pub(crate) fn from_kurbo(rect: kurbo::Rect) -> Rect {
         Rect::new(
             Point::new(rect.x0 as f32, rect.y0 as f32),
@@ -279,6 +294,10 @@ pub fn physical_pixel_snap(rect: Rect, scale_factor: f32) -> Rect {
     )
 }
 
+/// `kurbo` interop for [`Rect`] with a [`crate::core::Radius`].
+/// See [`Rect::to_kurbo`] for the visibility / dead-code
+/// rationale; same constraints apply here.
+#[allow(dead_code)]
 pub(crate) fn rounded_rect_to_kurbo(rect: Rect, radius: crate::core::Radius) -> kurbo::RoundedRect {
     kurbo::RoundedRect::from_rect(
         rect.to_kurbo(),
