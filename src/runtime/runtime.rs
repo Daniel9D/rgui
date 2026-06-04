@@ -12,9 +12,10 @@ use crate::state::{ButtonState, CheckboxState, InputState, StateArena};
 use crate::text_engine::TextSystem;
 
 use super::{
-    BoolState, CommandQueue, DragState, FocusSystem, FrameInput, FrameOutput, ImeHostDriver,
-    ImeUpdateSink, NoopDriver, OpenOverlay, PointerCapture, ProcessContext, Reconciler,
-    ScrollState, UiCommand, UiNode, UiTree, WindowId, paint, stable_portal_child_id,
+    AppEvent, AppEventOutcome, AppShortcuts, BoolState, CommandQueue, DragState, FocusSystem,
+    FrameInput, FrameOutput, ImeHostDriver, ImeUpdateSink, NoopDriver, OpenOverlay,
+    PointerCapture, ProcessContext, Reconciler, ScrollState, UiCommand, UiNode, UiTree,
+    WindowId, paint, stable_portal_child_id,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -162,6 +163,9 @@ pub struct UiRuntime {
     pub a11y_backend: Option<Box<dyn crate::core::AccessibilityBackend>>,
     a11y_update_count: usize,
     drag: Option<DragState>,
+    /// Phase 4 / Plan 04-01: host-defined cross-window shortcut
+    /// bindings. See [`AppShortcuts`].
+    app_shortcuts: AppShortcuts,
 }
 
 impl Default for UiRuntime {
@@ -236,6 +240,7 @@ impl UiRuntime {
             a11y_update_count: 0,
             drag: None,
             driver: Box::new(NoopDriver),
+            app_shortcuts: AppShortcuts::new(),
         }
     }
 
@@ -454,6 +459,15 @@ impl UiRuntime {
     }
 
     pub fn dispatch(&mut self, event: UiEvent) {
+        self.dispatch_to_window(event);
+    }
+
+    /// Phase 4 / Plan 04-01: per-window dispatch seam for the
+    /// winit host loop. Identical to `dispatch` today; the
+    /// dedicated name signals that the runtime is the per-window
+    /// target (D-10, D-11). The existing `dispatch` method is
+    /// kept as a thin forwarder for backward compatibility.
+    pub fn dispatch_to_window(&mut self, event: UiEvent) {
         match event {
             UiEvent::PointerDown(pointer) => self.handle_pointer_down(pointer),
             UiEvent::PointerUp(pointer) => self.handle_pointer_up(pointer),
@@ -463,6 +477,41 @@ impl UiRuntime {
             UiEvent::KeyDown(key) => self.handle_key_down(key),
             UiEvent::Wheel(wheel) => self.handle_wheel(wheel),
             other => self.handle_misc_event(other),
+        }
+    }
+
+    /// Phase 4 / Plan 04-01: dispatch a cross-window [`AppEvent`].
+    /// See [`AppEvent`] for per-variant behavior.
+    pub fn dispatch_app_event(&mut self, event: AppEvent) -> AppEventOutcome {
+        match event {
+            AppEvent::Quit => AppEventOutcome::Consumed,
+            AppEvent::FocusWindow(target) => {
+                if target == self.window_id {
+                    AppEventOutcome::Consumed
+                } else {
+                    AppEventOutcome::Ignored
+                }
+            }
+            AppEvent::ThemeChanged(theme) => {
+                self.theme = theme;
+                AppEventOutcome::Consumed
+            }
+            AppEvent::AppShortcut(name) => {
+                // Take the binding out (releasing the borrow on
+                // `self.app_shortcuts`), invoke it on `self`, then
+                // re-insert. The take/re-insert dance is forced
+                // by the borrow checker: the closure needs
+                // `&mut self` (the whole runtime) as its
+                // argument, which conflicts with a method call on
+                // `&mut self.app_shortcuts`.
+                if let Some(f) = self.app_shortcuts.bindings.remove(&name) {
+                    f(self);
+                    self.app_shortcuts.bindings.insert(name, f);
+                    AppEventOutcome::Consumed
+                } else {
+                    AppEventOutcome::Ignored
+                }
+            }
         }
     }
 
@@ -2586,3 +2635,58 @@ fn estimate_render_item_count(display_list: &DisplayList) -> usize {
 // the local-sink indirection keeps the borrow checker happy and
 // is also faster (one drain per frame, no extra heap traffic
 // outside the events themselves).
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::PointerEvent;
+
+    #[test]
+    fn for_window_sets_window_id() {
+        let ctx = ProcessContext::new();
+        let rt = UiRuntime::for_window(WindowId::new(7), &ctx);
+        assert_eq!(rt.window_id(), WindowId::new(7));
+    }
+
+    #[test]
+    fn default_runtime_has_unknown_window_id() {
+        let rt = UiRuntime::default();
+        assert_eq!(rt.window_id(), WindowId::unknown());
+    }
+
+    #[test]
+    fn dispatch_to_window_does_not_panic() {
+        let mut rt = UiRuntime::default();
+        // A pointer move on an empty tree: the dispatcher either
+        // consumes the event (it landed in the hit-test machinery)
+        // or ignores it. Both are valid outcomes; we just check
+        // the call compiles, returns unit, and doesn't panic.
+        rt.dispatch_to_window(UiEvent::PointerMove(PointerEvent {
+            position: Point::new(0.0, 0.0),
+            button: None,
+            modifiers: 0,
+        }));
+    }
+
+    #[test]
+    fn app_event_quit_is_consumed() {
+        let mut rt = UiRuntime::default();
+        assert!(matches!(
+            rt.dispatch_app_event(AppEvent::Quit),
+            AppEventOutcome::Consumed
+        ));
+    }
+
+    #[test]
+    fn app_event_focus_window_only_consumed_for_self() {
+        let mut rt = UiRuntime::default();
+        assert!(matches!(
+            rt.dispatch_app_event(AppEvent::FocusWindow(rt.window_id())),
+            AppEventOutcome::Consumed
+        ));
+        assert!(matches!(
+            rt.dispatch_app_event(AppEvent::FocusWindow(WindowId::new(99))),
+            AppEventOutcome::Ignored
+        ));
+    }
+}

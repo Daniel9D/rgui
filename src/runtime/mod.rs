@@ -1,5 +1,6 @@
 pub mod animation;
 pub mod app;
+pub mod app_event;
 pub mod command;
 pub mod debug;
 pub mod dirty;
@@ -19,6 +20,7 @@ pub mod window_id;
 
 pub use animation::{AnimationClock, AnimationId};
 pub use app::{App, AppOptions};
+pub use app_event::{AppEvent, AppEventOutcome, AppShortcuts};
 pub use command::{CommandQueue, UiCommand};
 pub use dirty::DirtyFlags;
 pub use events::{
