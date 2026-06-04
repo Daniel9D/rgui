@@ -18,8 +18,8 @@ fn lowers_rect_commands_to_solid_items_with_order_and_z_index() {
         z_index: 7,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("valid display list lowers");
 
     assert_eq!(items.len(), 1);
@@ -62,8 +62,8 @@ fn render_items_preserve_layer_clip_z_and_order() {
     list.push(PaintCommand::PopClip);
     list.push(PaintCommand::PopLayer);
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("valid display list lowers");
 
     assert_eq!(items.len(), 2);
@@ -94,8 +94,8 @@ fn render_items_skip_text_when_glyphon_is_default() {
     list.push(PaintCommand::PopClip);
     list.push(PaintCommand::PopLayer);
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("display lowers to items");
     let batches = build_batches_from_items(&items);
 
@@ -123,8 +123,8 @@ fn popover_layer_sorts_above_document_even_with_lower_z_index() {
     }));
     list.push(PaintCommand::PopLayer);
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("valid display list lowers");
 
     assert_eq!(items.last().unwrap().layer, LayerKind::Popover);
@@ -151,8 +151,8 @@ fn composite_text_subitems_keep_command_order_relative_to_later_rects() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("valid display list lowers");
 
     assert_eq!(
@@ -175,8 +175,8 @@ fn batches_adjacent_items_with_same_pipeline_and_z_index() {
         }));
     }
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("valid display list lowers");
     let batches = build_batches_from_items(&items);
 
@@ -205,8 +205,8 @@ fn batches_split_when_layer_or_clip_changes() {
     }));
     list.push(PaintCommand::PopClip);
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("valid display list lowers");
     let batches = build_batches_from_items(&items);
 
@@ -226,8 +226,8 @@ fn zero_size_rects_validate_but_do_not_lower_to_render_items() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("zero-size geometry is accepted at display-list level");
 
     assert!(items.is_empty());
@@ -247,8 +247,8 @@ fn text_lowering_reports_glyphon_when_bitmap_fallback_is_disabled() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("text lowers");
 
     assert!(
@@ -271,8 +271,8 @@ fn render_item_limit_does_not_apply_to_default_glyphon_text_bridge() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("glyphon text is prepared outside render item lowering");
 
     assert!(items.is_empty());
@@ -292,8 +292,8 @@ fn render_item_limit_stops_lowering_before_unbounded_allocation() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("lowering may fill up to the item limit");
 
     assert!(items.len() <= MAX_RENDER_ITEMS_PER_FRAME);
@@ -309,7 +309,7 @@ fn missing_image_lowers_to_visible_fallback_rect() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
+    let renderer = WgpuRenderer::new_headless_for_tests();
     let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("missing image should still lower");
 
@@ -363,7 +363,7 @@ fn render_debug_formatters_report_items_and_batches() {
         z_index: 0,
     }));
 
-    let mut renderer = WgpuRenderer::new_headless_for_tests();
+    let renderer = WgpuRenderer::new_headless_for_tests();
     let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("items lower");
     let batches = build_batches_from_items(&items);
