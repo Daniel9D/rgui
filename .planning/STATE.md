@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: "Phase 3 complete — all 3 plans executed (03-01 ImeHostDriver + MockDriver, 03-02 CJK + Arabic shaping + ci-install-fonts, 03-03 TextCacheStats 3-surface observability + clear_text_cache). 9 new tests pass. ROADMAP.md Phase 3 checkbox ticked. Next: Phase 4 (Multi-Window) `/gsd-discuss-phase 4`."
-last_updated: "2026-06-04T01:15:00.000Z"
-last_activity: "2026-06-04 — Phase 3 executed: IME host driver abstraction (tests/ime_host_driver.rs, 4 tests), CJK+RTL shaping tests (tests/text_shaping_cjk_rtl.rs, 4 tests, skip-with-warning on missing fonts), TextCacheStats on UiRuntime + UiSnapshot + RenderStats (tests/text_cache_observability.rs, 4 tests)"
+stopped_at: "Phase 4 (Multi-Window) context complete. 19 decisions captured across 6 areas in .planning/phases/04-multi-window/04-CONTEXT.md. Key primitives: WindowId newtype, ProcessContext { NodeIdAllocator, SharedAccessibility }, SharedWgpuDevice with shared GpuAtlas, dispatch_to_window + AppEvent, ImeHostDriver: Send + Sync. 5 winit examples migrate to WindowId; new examples/multi_window.rs demonstrates two windows. Next: `/gsd-plan-phase 4`."
+last_updated: "2026-06-04T02:05:00.000Z"
+last_activity: "2026-06-04 — Phase 4 context gathered: 19 locked decisions (WindowId invariant on UiRuntime; SharedWgpuDevice with shared atlas; host HashMap<WindowId, AppWindow> ownership; dispatch_to_window + AppEvent; ProcessContext bundles global NodeId + shared a11y; ImeHostDriver + AccessibilityBackend gain Send + Sync; static assert on UiRuntime: Send + Sync)"
 progress:
   total_phases: 8
   completed_phases: 0
@@ -107,6 +107,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04 01:15
-Stopped at: Phase 3 complete — all 3 plans executed and committed. 11/30 plans (37%) done. Next: `/gsd-discuss-phase 4` (Multi-Window) or `/gsd-progress` to verify.
+Last session: 2026-06-04 02:05
+Stopped at: Phase 4 context gathered. 19 decisions locked in `.planning/phases/04-multi-window/04-CONTEXT.md`. Next: `/gsd-plan-phase 4` (3 plans expected: 04-01 window_id + dispatch_to_window, 04-02 ProcessContext + SharedAccessibility, 04-03 SharedWgpuDevice + examples/multi_window.rs + 5 example migrations).
 Resume file: None
