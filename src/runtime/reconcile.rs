@@ -18,16 +18,15 @@ use std::collections::HashMap;
 
 use crate::core::{Element, ElementKey, ElementKind, NodeId, Style};
 
-use super::{DirtyFlags, IdAllocator, UiNode, UiTree};
+use super::{DirtyFlags, IdAllocator, NodeIdAllocator, UiNode, UiTree};
 
 #[inline]
 fn spec_signature(spec: &crate::widgets::WidgetSpec) -> u64 {
     crate::widgets::spec::spec_signature(spec)
 }
 
-#[derive(Default)]
 pub struct Reconciler {
-    next_id: u64,
+    node_ids: NodeIdAllocator,
     keyed_ids: HashMap<ElementKey, NodeId>,
     keyed_fingerprints: HashMap<ElementKey, NodeFingerprint>,
 }
@@ -40,10 +39,34 @@ struct NodeFingerprint {
     child_keys: Vec<Option<ElementKey>>,
 }
 
+impl Default for Reconciler {
+    fn default() -> Self {
+        Self {
+            node_ids: NodeIdAllocator::new(),
+            keyed_ids: HashMap::new(),
+            keyed_fingerprints: HashMap::new(),
+        }
+    }
+}
+
 impl Reconciler {
+    /// Phase 4 / Plan 04-02: construct a `Reconciler` with a
+    /// pre-supplied `NodeIdAllocator` (cloned from the runtime's
+    /// `node_ids`). This is how the live tree shares the
+    /// process-global counter; the default `Reconciler::default()`
+    /// starts a fresh counter (used by tests that don't care
+    /// about the global space).
+    pub fn with_node_ids(node_ids: NodeIdAllocator) -> Self {
+        Self {
+            node_ids,
+            keyed_ids: HashMap::new(),
+            keyed_fingerprints: HashMap::new(),
+        }
+    }
+
     pub fn reconcile(&mut self, root: Element) -> UiTree {
         let mut allocator = IdAllocator {
-            next_id: &mut self.next_id,
+            node_ids: &self.node_ids,
             keyed_ids: &mut self.keyed_ids,
         };
         let tree = UiTree::from_element_with_ids(root, &mut allocator);
@@ -53,7 +76,7 @@ impl Reconciler {
 
     pub fn reconcile_with_dirty(&mut self, root: Element) -> ReconcileOutput {
         let mut allocator = IdAllocator {
-            next_id: &mut self.next_id,
+            node_ids: &self.node_ids,
             keyed_ids: &mut self.keyed_ids,
         };
         let tree = UiTree::from_element_with_ids(root, &mut allocator);
@@ -131,7 +154,7 @@ impl Reconciler {
         // Build the new tree with the *live* allocator — keyed nodes
         // will get the same `NodeId` as on the previous frame.
         let mut new_allocator = IdAllocator {
-            next_id: &mut self.next_id,
+            node_ids: &self.node_ids,
             keyed_ids: &mut self.keyed_ids,
         };
         let new_tree = UiTree::from_element_with_ids(new, &mut new_allocator);

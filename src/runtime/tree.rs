@@ -4,6 +4,8 @@ use crate::{
     Element, ElementKey, ElementKind, EventHandlers, NodeId, Semantic, Style, VariantId, WidgetSpec,
 };
 
+use super::NodeIdAllocator;
+
 /// Iterator over the chain of ancestors from a starting node up to
 /// the root, inclusive. Bug fix 3.6 (adjacent): the previous
 /// `ancestors_inclusive` returned a `Vec`; this lazy form avoids the
@@ -26,8 +28,13 @@ impl<'tree> Iterator for AncestorIds<'tree> {
     }
 }
 
+/// Per-frame id allocator. Phase 4 / Plan 04-02: the counter is
+/// now borrowed from a `&NodeIdAllocator` (process-global) rather
+/// than from a `&mut u64` on the reconciler. The `keyed_ids` map
+/// is still borrowed from the reconciler so keyed nodes preserve
+/// their `NodeId` across frames.
 pub struct IdAllocator<'a> {
-    pub next_id: &'a mut u64,
+    pub node_ids: &'a NodeIdAllocator,
     pub keyed_ids: &'a mut HashMap<ElementKey, NodeId>,
 }
 
@@ -39,8 +46,8 @@ impl IdAllocator<'_> {
             }
         }
 
-        *self.next_id += 1;
-        let id = NodeId::from_raw(*self.next_id);
+        // Issue the next id from the process-global counter.
+        let id = NodeId::from_raw(self.node_ids.fresh());
         if let Some(key) = key {
             self.keyed_ids.insert(key.clone(), id);
         }
@@ -52,16 +59,20 @@ impl IdAllocator<'_> {
     /// from the previous `Element` without polluting the live
     /// `keyed_ids` (which are owned by the reconciler and only
     /// advanced as the new tree is built).
+    ///
+    /// Phase 4 / Plan 04-02: the counter is now a fresh,
+    /// process-local `NodeIdAllocator` (no Box::leak). The keys
+    /// it produces are scoped to the diff and do not collide
+    /// with the live allocator.
     pub fn fresh() -> IdAllocator<'static> {
-        // SAFETY-equivalent: the returned `IdAllocator` owns its
-        // backing storage via a leak-on-construct, which is fine for
-        // a `diff` call that lives for the duration of one frame. The
-        // keys it produces are scoped to the diff and never collide
-        // with the live allocator (we start at a different offset).
-        let next_id: &'static mut u64 = Box::leak(Box::new(0u64));
+        let node_ids: &'static NodeIdAllocator =
+            Box::leak(Box::new(NodeIdAllocator::new()));
         let keyed_ids: &'static mut HashMap<ElementKey, NodeId> =
             Box::leak(Box::new(HashMap::new()));
-        IdAllocator { next_id, keyed_ids }
+        IdAllocator {
+            node_ids,
+            keyed_ids,
+        }
     }
 }
 

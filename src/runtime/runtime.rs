@@ -221,7 +221,7 @@ impl UiRuntime {
     /// with `WindowId::unknown()` and a fresh `ProcessContext`.
     pub fn for_window(id: WindowId, ctx: &ProcessContext) -> Self {
         Self {
-            reconciler: Default::default(),
+            reconciler: Reconciler::with_node_ids(ctx.node_ids().clone()),
             text_system: Default::default(),
             window_id: id,
             node_ids: ctx.node_ids().clone(),
