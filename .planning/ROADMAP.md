@@ -128,7 +128,7 @@ Plans:
 Plans:
 
 - [x] 05-01: Visual goldens on a second GPU backend
-- [ ] 05-02: Stress-test scene in `examples/`
+- [x] 05-02: Stress-test scene in `examples/`
 - [ ] 05-03: Vulkan validation layers in CI
 - [ ] 05-04: Frame budget micro-benchmark test
 
@@ -210,7 +210,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Event & Input Hardening | 4/4 | Complete | 2026-06-03 |
 | 3. Text & IME | 3/3 | Complete | 2026-06-04 |
 | 4. Multi-Window | 3/3 | Complete    | 2026-06-04 |
-| 5. Render Path Stress | 1/4 | In Progress|  |
+| 5. Render Path Stress | 2/4 | In Progress|  |
 | 6. Public API Hardening | 0/3 | Not started | - |
 | 7. Theme v2 + Animation + DnD | 0/5 | Not started | - |
 | 8. Virtualization + Canvas + i18n + Docs | 0/4 | Not started | - |
