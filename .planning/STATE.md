@@ -1,6 +1,11 @@
 ---
-gsd_state_version: '1.0'
-status: in_progress
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: completed
+stopped_at: "Phase 3 `03-CONTEXT.md` written; 6 locked decisions recorded; STATE.md + REQUIREMENTS.md updated. Next: `/gsd-plan-phase 3` (3 plans: 03-01 ImeHostDriver + MockDriver, 03-02 CJK + Arabic shaping, 03-03 TextCacheStats 3-surface observability + `clear_text_cache`)."
+last_updated: "2026-06-04T00:26:51.081Z"
+last_activity: "2026-06-03 — Phase 3 `03-CONTEXT.md` written with 6 locked decisions (ImeHostDriver producer-side trait, system fonts / CI installs Noto, Arabic RTL, 3-surface TextCacheStats, preedit in existing InputState, Shaping::Advanced default)"
 progress:
   total_phases: 8
   completed_phases: 0
@@ -31,6 +36,7 @@ Progress: [████████░░░░] 27% (8/30 plans)
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 8
 - Average duration: — min
 - Total execution time: 0.0 hours
