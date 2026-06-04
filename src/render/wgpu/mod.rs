@@ -15,6 +15,7 @@ pub mod options;
 pub mod pipeline;
 pub mod readback;
 pub mod shaders;
+pub mod shared_device;
 pub mod surface;
 pub mod text;
 
@@ -29,7 +30,10 @@ pub use options::{RenderConfig, RendererOptions};
 pub use pipeline::{InstanceRaw, PipelineCache, PipelineKind};
 pub use readback::read_rgba8_texture;
 pub use shaders::SHADER_SOURCE;
+pub use shared_device::SharedWgpuDevice;
 pub use surface::SurfaceRenderer;
+
+use std::sync::{Arc, Mutex};
 
 use crate::core::{
     AtlasEntryKind, DisplayList, ImageId, RenderStats, RendererBackend, ResourceStore, SizeU32,
@@ -38,7 +42,12 @@ use crate::core::{
 pub struct WgpuRenderer {
     context: WgpuContext,
     pipelines: PipelineCache,
-    atlas: GpuAtlas,
+    /// Phase 4 / Plan 04-03: the atlas is wrapped in
+    /// `Arc<Mutex<>>` so multiple `WgpuRenderer` instances can share
+    /// one atlas (D-07, D-09). The single-window path wraps a fresh
+    /// atlas; the multi-window path clones the `SharedWgpuDevice`'s
+    /// `Arc`.
+    atlas: Arc<Mutex<GpuAtlas>>,
     text_bridge: GlyphonTextBridge,
     instance_buffer: wgpu::Buffer,
     instance_capacity: usize,
@@ -52,11 +61,11 @@ impl WgpuRenderer {
 
     pub fn from_context(context: WgpuContext) -> RendererResult<Self> {
         let pipelines = PipelineCache::new(context.device(), context.format());
-        let atlas = GpuAtlas::new(
+        let atlas = Arc::new(Mutex::new(GpuAtlas::new(
             context.device(),
             SizeU32::new(1, 1),
             pipelines.bind_group_layout(),
-        );
+        )));
         let text_bridge =
             GlyphonTextBridge::new(context.device(), context.queue(), context.format());
         let instance_buffer = context.device().create_buffer(&wgpu::BufferDescriptor {
@@ -65,6 +74,66 @@ impl WgpuRenderer {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        Ok(Self {
+            context,
+            pipelines,
+            atlas,
+            text_bridge,
+            instance_buffer,
+            instance_capacity: constants::INITIAL_INSTANCE_CAPACITY,
+        })
+    }
+
+    /// Phase 4 / Plan 04-03: build a per-window renderer that shares
+    /// the atlas (and adapter / device / queue) with other renderers
+    /// built from the same [`SharedWgpuDevice`].
+    ///
+    /// The `surface` is borrowed for capability detection (format);
+    /// the host owns the `wgpu::Surface` per the wgpu 29 + winit 0.30
+    /// surface model. Each window's `SurfaceRenderer` calls
+    /// `surface.configure(...)` with the format returned here.
+    ///
+    /// The shared atlas is wrapped in `Arc<Mutex<GpuAtlas>>` (D-09):
+    /// per-frame bind group construction locks the mutex briefly,
+    /// and glyph uploads also lock the mutex. Contention is rare in
+    /// practice (most frames don't upload new glyphs). Profiling
+    /// can guide a future swap to `RwLock` if contention becomes a
+    /// bottleneck.
+    pub fn with_shared_device(
+        shared: &SharedWgpuDevice,
+        surface: &wgpu::Surface<'static>,
+        opts: RendererOptions,
+    ) -> RendererResult<Self> {
+        let capabilities = surface.get_capabilities(shared.adapter());
+        let format = capabilities
+            .formats
+            .iter()
+            .copied()
+            .find(wgpu::TextureFormat::is_srgb)
+            .unwrap_or(opts.format);
+        let size = opts.initial_size;
+
+        let instance = wgpu::Instance::new(context::instance_descriptor(opts.backends));
+        let context = WgpuContext::from_parts(
+            instance,
+            (**shared.adapter()).clone(),
+            (**shared.device()).clone(),
+            (**shared.queue()).clone(),
+            format,
+            size,
+        );
+        let pipelines = PipelineCache::new(shared.device(), format);
+        let atlas = Arc::clone(shared.atlas());
+        let text_bridge = GlyphonTextBridge::new(shared.device(), shared.queue(), format);
+        let instance_buffer =
+            shared
+                .device()
+                .create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("rgui-instance-buffer"),
+                    size: std::mem::size_of::<InstanceRaw>() as u64,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
         Ok(Self {
             context,
             pipelines,
@@ -88,21 +157,29 @@ impl WgpuRenderer {
         &mut self.context
     }
 
-    pub fn atlas(&self) -> &GpuAtlas {
+    /// Handle to the shared atlas. The handle is the same one every
+    /// `WgpuRenderer` built from the same `SharedWgpuDevice` holds;
+    /// all renderers see the same atlas contents. The single-window
+    /// path returns the `Arc<Mutex<GpuAtlas>>` for the local atlas
+    /// (the only renderer referencing it is this one).
+    pub fn atlas(&self) -> &Arc<Mutex<GpuAtlas>> {
         &self.atlas
     }
 
-    pub fn atlas_mut(&mut self) -> &mut GpuAtlas {
-        &mut self.atlas
-    }
-
+    /// Upload an RGBA8 image to the shared atlas. The atlas mutex
+    /// is locked for the duration of the upload (a single
+    /// `queue.write_texture` call).
     pub fn upload_atlas_rgba8(
         &mut self,
         id: ImageId,
         size: SizeU32,
         rgba: &[u8],
     ) -> RendererResult<()> {
-        self.atlas
+        let mut atlas = self
+            .atlas
+            .lock()
+            .map_err(|_| RendererError::InvalidDisplayList("atlas mutex poisoned".into()))?;
+        atlas
             .upload_rgba8(self.context.queue(), AtlasEntryKind::Image(id), size, rgba)
             .ok_or_else(|| RendererError::InvalidDisplayList("atlas allocation failed".into()))?;
         Ok(())
@@ -125,7 +202,13 @@ impl WgpuRenderer {
         // (a) the ResourceStore does not always own the raw bytes (they may
         // live in the host's own cache), and (b) the host usually wants to
         // own the upload timing to avoid uploading every frame.
-        let items = build_render_items(display_list, resources, &mut self.atlas)?;
+        let items = {
+            let mut atlas = self
+                .atlas
+                .lock()
+                .map_err(|_| RendererError::InvalidDisplayList("atlas mutex poisoned".into()))?;
+            build_render_items(display_list, resources, &mut atlas)?
+        };
         let batches = build_batches_from_items(&items);
         let text_stats = self.text_bridge.prepare(
             self.context.device(),
@@ -172,7 +255,14 @@ impl WgpuRenderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_bind_group(0, self.atlas.bind_group(), &[]);
+            // Lock the atlas briefly to read the bind group handle.
+            // The lock is held for the `set_bind_group` call only.
+            let atlas = self
+                .atlas
+                .lock()
+                .map_err(|_| RendererError::InvalidDisplayList("atlas mutex poisoned".into()))?;
+            pass.set_bind_group(0, atlas.bind_group(), &[]);
+            drop(atlas);
             pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
             for batch in &batches {
                 let Some(scissor) = scissor_rect(batch.key.clip_rect, self.context.size()) else {
