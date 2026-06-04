@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: "Phase 4 (Multi-Window) context complete. 19 decisions captured across 6 areas in .planning/phases/04-multi-window/04-CONTEXT.md. Key primitives: WindowId newtype, ProcessContext { NodeIdAllocator, SharedAccessibility }, SharedWgpuDevice with shared GpuAtlas, dispatch_to_window + AppEvent, ImeHostDriver: Send + Sync. 5 winit examples migrate to WindowId; new examples/multi_window.rs demonstrates two windows. Next: `/gsd-plan-phase 4`."
-last_updated: "2026-06-04T02:05:00.000Z"
-last_activity: "2026-06-04 — Phase 4 context gathered: 19 locked decisions (WindowId invariant on UiRuntime; SharedWgpuDevice with shared atlas; host HashMap<WindowId, AppWindow> ownership; dispatch_to_window + AppEvent; ProcessContext bundles global NodeId + shared a11y; ImeHostDriver + AccessibilityBackend gain Send + Sync; static assert on UiRuntime: Send + Sync)"
+stopped_at: "Phase 4 (Multi-Window) plans complete. 3 plans (04-01, 04-02, 04-03) written inline (GSD subagents unavailable in this runtime). 04-01: WindowId newtype + for_window + dispatch_to_window + AppEvent + 5 example migrations + D-19 static assert. 04-02: ProcessContext { NodeIdAllocator, SharedAccessibility } + Send+Sync on ImeHostDriver + AccessibilityBackend + per-frame IdAllocator rewired to global counter. 04-03: SharedWgpuDevice + WgpuRenderer::with_shared_device + examples/multi_window.rs + 3 WIN-02/03/04 verification tests. All 19 CONTEXT decisions covered. Next: `/gsd-execute-phase 4`."
+last_updated: "2026-06-04T03:30:00.000Z"
+last_activity: "2026-06-04 — Phase 4 plans written inline: 04-01 (window_id seam + AppEvent + example migration, 6 tasks), 04-02 (ProcessContext + NodeIdAllocator + SharedAccessibility + Send+Sync bounds, 6 tasks), 04-03 (SharedWgpuDevice + with_shared_device + multi_window.rs + 3 integration tests, 8 tasks). 19 CONTEXT decisions covered, no contradictions. Ready for /gsd-execute-phase 4."
 progress:
   total_phases: 8
   completed_phases: 0
@@ -26,18 +26,18 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 ## Current Position
 
-Phase: 4 of 8 (Multi-Window) — context complete; planning next
-Plan: 0 of 3 in current phase
-Status: Context complete; ready for `/gsd-plan-phase 4`
-Last activity: 2026-06-04 — Phase 4 context gathered: 19 locked decisions (WindowId invariant on UiRuntime; SharedWgpuDevice with shared atlas; host HashMap<WindowId, AppWindow> ownership; dispatch_to_window + AppEvent; ProcessContext bundles global NodeId + shared a11y; ImeHostDriver + AccessibilityBackend gain Send + Sync; static assert on UiRuntime: Send + Sync)
+Phase: 4 of 8 (Multi-Window) — plans complete; ready for execution
+Plan: 3 of 3 in current phase
+Status: Plans complete; ready for `/gsd-execute-phase 4`
+Last activity: 2026-06-04 — Phase 4 plans written inline (GSD `gsd-planner` / `gsd-plan-checker` subagents unavailable in this runtime): 04-01 (WindowId + for_window + dispatch_to_window + AppEvent + 5 example migrations + D-19 static assert), 04-02 (ProcessContext + NodeIdAllocator + SharedAccessibility + Send+Sync on ImeHostDriver + AccessibilityBackend + per-frame IdAllocator rewired to global counter), 04-03 (SharedWgpuDevice + WgpuRenderer::with_shared_device + SurfaceRenderer::with_shared_device + examples/multi_window.rs + 3 WIN-02/03/04 integration tests). All 19 CONTEXT decisions covered. Manual plan-quality check (no plan-checker agent) confirmed: 19/19 decisions mapped, no contradictions, dependencies between plans form a valid DAG (04-01 → 04-02 → 04-03).
 
-Progress: [████████░░░░] 27% (8/30 plans)
+Progress: [████████░░░░] 37% (11/30 plans; Phase 4 plans written but not yet executed)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 11
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -62,6 +62,7 @@ Progress: [████████░░░░] 27% (8/30 plans)
 
 See `PROJECT.md` Key Decisions table for the full log. Recent:
 
+- **Phase 4 plans (2026-06-04)**: 3 plans written inline (GSD `gsd-planner` / `gsd-plan-checker` subagents unavailable in this runtime). 04-01 stubs `ProcessContext` as a zero-sized placeholder so the `for_window(id, &ctx)` signature is stable; 04-02 expands the stub to the full D-13 struct (`NodeIdAllocator` + `Option<SharedAccessibility>`). 04-01 lands the D-19 static `UiRuntime: Send + Sync` assert forward-looking; 04-02's trait bounds (`ImeHostDriver: Send + Sync` at `src/runtime/ime_host.rs:56-60`; `AccessibilityBackend: Send + Sync` at `src/core/a11y.rs:129`) make the assert meaningful. 04-02's per-frame `IdAllocator` is rewired to consume process-global ids from `NodeIdAllocator::fresh()` (D-14). 04-03's `SharedWgpuDevice` wraps `Arc<Adapter>` + `Arc<Device>` + `Arc<Queue>` + `Arc<Mutex<GpuAtlas>>`; `with_shared_device` is additive (existing `from_context` constructor stays for single-window back-compat). 3 new integration tests pin WIN-02 (coexistence), WIN-03 (event routing), WIN-04 (snapshot isolation). Manual plan-quality check (no plan-checker agent) confirmed 19/19 decisions mapped, no contradictions, valid inter-plan DAG (04-01 → 04-02 → 04-03). All `AppEvent::AppShortcut` handling lives in 04-01 (bindings are the smallest home for the variant).
 - **Phase 3 implementation (2026-06-04)**: `UiRuntime::text_cache_stats` is captured at the start of `update()` (before `text_system` is mutably borrowed by `FrameBuilder`); the value is the previous frame's final cache state. `RenderStats::text_cache` is added for forward-compat (the wgpu backend currently leaves it `default()`; the runtime populates it in its own `RenderStats` build path). `TextCacheStats` derives `serde::Serialize` so it can ride the `to_debug_json` round-trip.
 - **Phase 3 context (2026-06-03)**: `ImeHostDriver` is a producer-side trait (runtime calls `driver.poll(&mut sink)` per frame; sink pushes `UiEvent::ImePreedit` / `UiEvent::ImeCommit`). `MockDriver` replays a `Vec<ImeOp>` script for tests. CJK + Arabic shaping tests rely on system fonts (`fonts-noto-cjk`, `fonts-noto`); CI installs via `scripts/ci-install-fonts.sh`; `RGUI_REQUIRE_FONTS=1` opt-in to fail-fast. Arabic is the v1 RTL reference (isolated + contextual + bidi cases). `TextCacheStats` surfaces in three places: `UiRuntime::text_cache_stats()` public method, `UiSnapshot.text_cache` field, `RendererStats.text_cache` field. Heuristic `clear_metrics_cache()` and shape/layout `clear_text_cache()` (new) clear the two caches symmetrically. `Shaping::Advanced` is the v1 default for all scripts. No winit/AppKit/browser adapters in v1 (apps wire their own).
 - **Phase 2 implementation (2026-06-03)**: `ShortcutRegistry::resolve` gained a `focused_is_text_input: bool` argument that suppresses non-modifier-prefixed chords inside `Input`/`Textarea`/`Select`. `FocusManager::is_focusable(WidgetKind)` + `tab_next`/`tab_prev` helpers provide a tree-walking focus traversal alternative to the existing `FocusSystem` (which the runtime continues to use for the scope-based overlay routing). `ModalSpec::trap_focus: bool` flag (default `false`) lets modals opt into focus trapping. `InputSpec::ime_enabled: bool` (default `false`) gates IME preedit routing so CJK users can opt in to the preedit-then-commit path. `Element::overflow_x(Overflow)` / `overflow_y(Overflow)` setters enable per-axis scroll configuration; the runtime's `handle_wheel` was already 2D — the new tests pin the per-axis clamping behavior.
@@ -107,6 +108,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04 02:05
-Stopped at: Phase 4 context gathered. 19 decisions locked in `.planning/phases/04-multi-window/04-CONTEXT.md`. Next: `/gsd-plan-phase 4` (3 plans expected: 04-01 window_id + dispatch_to_window, 04-02 ProcessContext + SharedAccessibility, 04-03 SharedWgpuDevice + examples/multi_window.rs + 5 example migrations).
+Last session: 2026-06-04 03:30
+Stopped at: Phase 4 plans written inline (GSD subagents unavailable in this runtime). 3 plans in `.planning/phases/04-multi-window/04-0{1,2,3}-PLAN.md`. 04-01: WindowId newtype + for_window + dispatch_to_window + AppEvent + 5 example migrations + D-19 static assert (6 tasks). 04-02: ProcessContext { NodeIdAllocator, Option<SharedAccessibility> } + Send+Sync on ImeHostDriver + AccessibilityBackend + per-frame IdAllocator rewired to global counter (6 tasks). 04-03: SharedWgpuDevice + WgpuRenderer::with_shared_device + SurfaceRenderer::with_shared_device + examples/multi_window.rs + tests/multi_window_coexistence + tests/multi_window_event_routing + tests/multi_window_snapshot_isolation (8 tasks). 19/19 CONTEXT decisions covered. Manual plan-quality check (no plan-checker agent in this runtime) confirmed: decision coverage 100%, no contradictions, valid inter-plan DAG. Next: `/gsd-execute-phase 4` to run the plans (likely inline again, as GSD executor subagent is also unavailable).
 Resume file: None
