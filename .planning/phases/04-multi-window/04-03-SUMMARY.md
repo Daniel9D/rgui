@@ -61,6 +61,15 @@ rewritten to use the real API and still prove the same invariants.
    pass-scissor / draw calls). Rustdoc on `with_shared_device` documents
    the D-09 lock pattern. **Commit `7c233ca`.**
 
+   **Post-review fix (`07cea4b`, 2026-06-04):** removing
+   `atlas_mut()` broke the pre-existing
+   `tests/render_wgpu_render_items.rs` (which used
+   `renderer.atlas_mut()` to feed `build_render_items`). Restored
+   `atlas_mut()` with a `MutexGuard<'_, GpuAtlas>` return type;
+   the test now uses `&mut *renderer.atlas_mut()`. The lock is
+   held for the same scope as the original `&mut GpuAtlas` borrow
+   was.
+
 3. **Task 3** — `SurfaceRenderer::with_shared_device(shared, window,
    options)` in `src/render/wgpu/surface.rs`. The winit-facing wrapper
    for the multi-window path: creates a `wgpu::Instance` for the
