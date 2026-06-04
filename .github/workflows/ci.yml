@@ -76,6 +76,12 @@ jobs:
           # hardware GPU.
           VK_ICD_FILENAMES: ${{ matrix.os == 'windows-latest' && 'C:\Windows\System32\ vulkaninfo.json' || '' }}
 
+      # Phase 5 / Plan 05-04 (REND-04): 50-widget UI must render in
+      # < 8ms CPU. Runs in release mode only; debug builds are 10x
+      # slower and the 8ms budget is not meaningful.
+      - name: Frame budget test
+        run: cargo test --release --test frame_budget
+
   # Plan 05-03: lint job. Runs on Ubuntu (faster CI cycle, no need
   # for Windows for a lint pass). `cargo clippy --all-targets
   # --all-features -- -D warnings` fails the build on any warning,
