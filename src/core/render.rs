@@ -716,4 +716,79 @@ mod tests {
             assert_eq!(format!("{err}"), expected, "for {err:?}");
         }
     }
+
+    // Phase 5 / Plan 05-02 (REND-02): stress-scene lib unit tests
+    // proving that `RenderStats.command_count` is stable across runs
+    // and that culling keeps the count bounded by the visible viewport,
+    // not the total item count. These tests are the fast feedback loop
+    // for regressions — no wgpu device needed.
+
+    use crate::runtime::{FrameInput, UiRuntime};
+    use crate::widgets::{list, scroll_area};
+
+    fn build_row_list(n: usize) -> crate::Element {
+        let items: Vec<String> = (0..n).map(|i| format!("Row {i}")).collect();
+        scroll_area()
+            .key(format!("stats-scroll-{n}"))
+            .width(400.0)
+            .height(600.0)
+            .child(list().key(format!("stats-list-{n}")).items(items))
+    }
+
+    #[test]
+    fn stress_stats_command_count_is_stable_across_runs() {
+        let mut runtime = UiRuntime::default();
+        let first = runtime
+            .update(FrameInput {
+                root: build_row_list(10_000),
+                ..Default::default()
+            })
+            .stats
+            .command_count;
+        let second = runtime
+            .update(FrameInput {
+                root: build_row_list(10_000),
+                ..Default::default()
+            })
+            .stats
+            .command_count;
+        assert_eq!(
+            first, second,
+            "RenderStats.command_count must be deterministic across runs; \
+             first={first} second={second}",
+        );
+    }
+
+    #[test]
+    fn stress_stats_command_count_does_not_grow_with_list_size() {
+        let mut runtime = UiRuntime::default();
+        let count_100 = runtime
+            .update(FrameInput {
+                root: build_row_list(100),
+                ..Default::default()
+            })
+            .stats
+            .command_count;
+        let count_1k = runtime
+            .update(FrameInput {
+                root: build_row_list(1_000),
+                ..Default::default()
+            })
+            .stats
+            .command_count;
+        let count_10k = runtime
+            .update(FrameInput {
+                root: build_row_list(10_000),
+                ..Default::default()
+            })
+            .stats
+            .command_count;
+        let max = count_100.max(count_1k).max(count_10k);
+        let min = count_100.min(count_1k).min(count_10k);
+        assert!(
+            max <= 2 * min.max(1),
+            "RenderStats.command_count depends on total rows, not viewport-visible rows: \
+             100={count_100} 1k={count_1k} 10k={count_10k} (max={max} min={min})",
+        );
+    }
 }
