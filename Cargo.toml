@@ -33,6 +33,11 @@ tailwind = []
 css = []
 canvas = []
 bitmap-text-fallback = []
+# Plan 05-01 (REND-01): gates `tests/visual_goldens_vulkan.rs`, the
+# cross-backend visual-golden mirror. Off by default because not every
+# developer's machine has a working Vulkan ICD; CI (plan 05-03) enables
+# it on `windows-latest` + `ubuntu-latest` runners.
+vulkan-goldens = []
 
 [[example]]
 name = "rml_showcase"
