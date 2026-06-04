@@ -135,3 +135,14 @@ impl SemanticTree {
 pub trait AccessibilityBackend: Send + Sync {
     fn update(&mut self, tree: &SemanticTree);
 }
+
+/// The default `AccessibilityBackend` implementation: a unit
+/// struct that ignores every `update` call. Hosts that don't
+/// need a screen reader (the common case for v1.x) wire this in
+/// via [`crate::SharedAccessibility::none()`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct NullAccessibility;
+
+impl AccessibilityBackend for NullAccessibility {
+    fn update(&mut self, _tree: &SemanticTree) {}
+}

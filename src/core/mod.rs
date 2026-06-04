@@ -9,6 +9,7 @@ pub mod overlay;
 pub mod prelude;
 pub mod render;
 pub mod scroll;
+pub mod shared_a11y;
 pub mod snapshot;
 pub mod style;
 pub mod text;
@@ -16,8 +17,8 @@ pub mod theme;
 pub mod theme_base;
 
 pub use a11y::{
-    AccessibilityBackend, KeyboardNav, Role, SemanticAction, SemanticNode, SemanticStates,
-    SemanticTree, SemanticValue, role_for_widget_kind,
+    AccessibilityBackend, KeyboardNav, NullAccessibility, Role, SemanticAction, SemanticNode,
+    SemanticStates, SemanticTree, SemanticValue, role_for_widget_kind,
 };
 pub use component::{
     CommandQueue as ComponentCommandQueue, Component, ComponentCx, PaintCx, StateStore, Widget,
@@ -48,6 +49,7 @@ pub use render::{
     RenderStats, RendererBackend, ResourceStore, ShadowCmd, SvgCmd, SvgId, TextCmd,
 };
 pub use scroll::{Axis, AxisSet, ScrollState, ScrollbarPolicy};
+pub use shared_a11y::SharedAccessibility;
 pub use snapshot::{
     AccessibilityMetrics, EventTraceSnapshot, HitTestSnapshot, LayoutBoxSnapshot, MeasureSnapshot,
     OverlaySnapshot, PaintCommandSnapshot, PerformanceMetrics, ResolvedStyleSnapshot,
