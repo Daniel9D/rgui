@@ -213,6 +213,7 @@ impl WgpuRenderer {
             skipped_text_area_count: text_stats.skipped_text_area_count,
             glyph_count: text_stats.glyph_count,
             fallback_used: text_stats.fallback_used,
+            text_cache: crate::text_engine::TextCacheStats::default(),
         })
     }
 

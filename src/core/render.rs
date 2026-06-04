@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::{FontStyle, FontWeight, Point, Rect, SizeU32};
+use crate::{FontStyle, FontWeight, Point, Rect, SizeU32, text_engine::TextCacheStats};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ImageId(u64);
@@ -486,6 +486,12 @@ pub struct RenderStats {
     pub skipped_text_area_count: usize,
     pub glyph_count: usize,
     pub fallback_used: bool,
+    /// Phase 3 / Plan 03-03: text shape / layout cache stats
+    /// captured at the time the stats struct is built. Render
+    /// backends that don't read the cache don't have to populate
+    /// this (it will be `TextCacheStats::default()`); the `wgpu`
+    /// path populates it from `TextSystem::cache_stats()`.
+    pub text_cache: TextCacheStats,
 }
 
 pub trait RendererBackend {

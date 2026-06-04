@@ -98,6 +98,7 @@ impl RendererBackend for CountingRenderer {
             skipped_text_area_count: 0,
             glyph_count: 0,
             fallback_used: false,
+            text_cache: Default::default(),
         }
     }
 }
@@ -469,6 +470,7 @@ fn ui_snapshot_collects_all_regression_surfaces() {
         layout_debug: Default::default(),
         performance: PerformanceMetrics::default(),
         diagnostics: Default::default(),
+        text_cache: Default::default(),
     };
 
     assert_eq!(snapshot.display_list[0].kind, "DrawRect");

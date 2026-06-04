@@ -224,6 +224,23 @@ impl UiRuntime {
         runtime
     }
 
+    /// Phase 3 / Plan 03-03: snapshot of the shape / layout text
+    /// cache. Use `clear_text_cache` to evict entries; the
+    /// per-thread heuristic cache has a sibling `metrics_cache_stats`
+    /// / `clear_metrics_cache` (see `runtime::text_metrics`).
+    pub fn text_cache_stats(&self) -> crate::text_engine::TextCacheStats {
+        self.text_system.cache_stats()
+    }
+
+    /// Phase 3 / Plan 03-03: clear the shape / layout text cache.
+    /// Returns `(shape_evicted, layout_evicted)`. Hit / miss
+    /// counters are preserved (they accumulate across clears so
+    /// the hit rate stays meaningful). The per-thread heuristic
+    /// `MetricsCache` is cleared via `text_metrics::clear_metrics_cache`.
+    pub fn clear_text_cache(&mut self) -> (usize, usize) {
+        self.text_system.clear_caches()
+    }
+
     pub fn set_scroll_offset_for_key(&mut self, key: impl Into<String>, offset: crate::core::Vec2) {
         self.scroll_state.set_offset(key.into(), offset);
     }
@@ -976,6 +993,15 @@ impl UiRuntime {
         for event in sink.events {
             self.dispatch(event);
         }
+        // Phase 3 / Plan 03-03: capture the text cache stats before
+        // the `text_system` is mutably borrowed by `FrameBuilder`.
+        // The snapshot is the same value either way (the cache is
+        // only modified inside the FrameBuilder through the
+        // `measure` calls it makes during paint; we record the
+        // pre-paint value, which is the previous frame's final
+        // state). Apps that want the post-paint value can call
+        // `text_cache_stats()` again after `update()` returns.
+        let text_cache_stats = self.text_system.cache_stats();
         self.viewport = input.viewport;
         self.theme = input.theme.clone();
         let mut root = input.root;
@@ -1071,6 +1097,7 @@ impl UiRuntime {
             skipped_text_area_count: 0,
             glyph_count: 0,
             fallback_used: false,
+            text_cache: text_cache_stats,
         };
         if let Some(backend) = self.a11y_backend.as_mut() {
             backend.update(&builder.semantics);
@@ -1130,6 +1157,8 @@ impl UiRuntime {
 
         let mut frame_commands = CommandQueue::default();
         std::mem::swap(&mut self.command_queue, &mut frame_commands);
+
+        builder.snapshot.text_cache = text_cache_stats;
 
         let output = FrameOutput {
             display_list: builder.display_list,

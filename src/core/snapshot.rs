@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::{LayoutDebugSnapshot, NodeId};
+use crate::text_engine::TextCacheStats;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct UiSnapshot {
@@ -16,6 +17,10 @@ pub struct UiSnapshot {
     pub layout_debug: LayoutDebugSnapshot,
     pub performance: PerformanceMetrics,
     pub diagnostics: UiDiagnostics,
+    /// Phase 3 / Plan 03-03: shape / layout text cache stats at
+    /// the moment the snapshot was built. Populated by
+    /// `UiRuntime::update` after the frame is built.
+    pub text_cache: TextCacheStats,
 }
 
 impl Default for UiSnapshot {
@@ -33,6 +38,7 @@ impl Default for UiSnapshot {
             layout_debug: LayoutDebugSnapshot::default(),
             performance: PerformanceMetrics::default(),
             diagnostics: UiDiagnostics::default(),
+            text_cache: TextCacheStats::default(),
         }
     }
 }
