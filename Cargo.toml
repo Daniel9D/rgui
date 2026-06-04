@@ -38,6 +38,13 @@ bitmap-text-fallback = []
 # developer's machine has a working Vulkan ICD; CI (plan 05-03) enables
 # it on `windows-latest` + `ubuntu-latest` runners.
 vulkan-goldens = []
+# Plan 05-03 (REND-03): enables wgpu validation layers (Vulkan:
+# VK_LAYER_KHR_validation, Metal: Metal Validation, DX12: D3D12 Debug
+# Layer) by setting `wgpu::InstanceFlags::VALIDATION` on every
+# `InstanceDescriptor`. Imposes a 2-5x render time cost. Used in CI to
+# surface buffer-alignment, push-constants, and other validation issues
+# that the default release path silently allows. Not for production.
+validation-layers = []
 
 [[example]]
 name = "rml_showcase"

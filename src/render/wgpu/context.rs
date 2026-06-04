@@ -98,5 +98,15 @@ impl WgpuContext {
 pub(crate) fn instance_descriptor(backends: wgpu::Backends) -> wgpu::InstanceDescriptor {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     descriptor.backends = backends;
+    // Plan 05-03 (REND-03): when the `validation-layers` Cargo feature
+    // is enabled, set `wgpu::InstanceFlags::VALIDATION` on the
+    // `InstanceDescriptor`. The validation layer must be installed on
+    // the host (Vulkan: `VK_LAYER_KHR_validation` via the Vulkan SDK;
+    // Metal: built into macOS; DX12: installed with the Windows SDK).
+    // Default builds leave the flags empty so the release path is
+    // unaffected.
+    if cfg!(feature = "validation-layers") {
+        descriptor.flags = wgpu::InstanceFlags::VALIDATION;
+    }
     descriptor
 }

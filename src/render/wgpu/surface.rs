@@ -14,8 +14,10 @@ pub struct SurfaceRenderer {
 
 impl SurfaceRenderer {
     pub async fn new(window: &Window, options: RendererOptions) -> RendererResult<Self> {
-        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-        desc.backends = options.backends;
+        // Plan 05-03 (REND-03): route through `context::instance_descriptor`
+        // so the `validation-layers` Cargo feature is honored on the
+        // winit/Surface path too (not just the headless path).
+        let desc = super::context::instance_descriptor(options.backends);
         let instance = wgpu::Instance::new(desc);
         // SAFETY: The window outlives the surface renderer in all examples and usage patterns
         let surface = unsafe {
