@@ -13,8 +13,8 @@ use crate::text_engine::TextSystem;
 
 use super::{
     BoolState, CommandQueue, DragState, FocusSystem, FrameInput, FrameOutput, ImeHostDriver,
-    ImeUpdateSink, NoopDriver, OpenOverlay, PointerCapture, Reconciler, ScrollState, UiCommand,
-    UiNode, UiTree, paint, stable_portal_child_id,
+    ImeUpdateSink, NoopDriver, OpenOverlay, PointerCapture, ProcessContext, Reconciler,
+    ScrollState, UiCommand, UiNode, UiTree, WindowId, paint, stable_portal_child_id,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -112,6 +112,9 @@ fn text_hit_geometry_for_widget(
 pub struct UiRuntime {
     reconciler: Reconciler,
     text_system: TextSystem,
+    /// Phase 4 / Plan 04-01: per-window identity invariant.
+    /// Set once via [`UiRuntime::for_window`]. Never mutated.
+    window_id: WindowId,
     tree: Option<UiTree>,
     key_to_node: HashMap<String, NodeId>,
     node_to_key: HashMap<NodeId, String>,
@@ -163,9 +166,33 @@ pub struct UiRuntime {
 
 impl Default for UiRuntime {
     fn default() -> Self {
+        Self::for_window(WindowId::unknown(), &ProcessContext::new())
+    }
+}
+
+impl UiRuntime {
+    /// Phase 3 / Plan 03-01: construct a `UiRuntime` with a custom
+    /// `ImeHostDriver`. Everything else is the same as `default()`.
+    /// Use this with `MockDriver` for tests; production drivers
+    /// (winit, AppKit) live in app-side adapters in v1.x.
+    pub fn with_driver(driver: Box<dyn ImeHostDriver>) -> Self {
+        let mut runtime = Self::default();
+        runtime.driver = driver;
+        runtime
+    }
+
+    /// Phase 4 / Plan 04-01: construct a `UiRuntime` bound to a
+    /// specific window. The `window_id` is set once and is
+    /// invariant for the runtime's lifetime. The `ProcessContext`
+    /// is the per-process shared state (Phase 4 / D-13); the 04-01
+    /// stub takes no parameters. `UiRuntime::default()` is a
+    /// backward-compat single-window shortcut that delegates here
+    /// with `WindowId::unknown()`.
+    pub fn for_window(id: WindowId, _ctx: &ProcessContext) -> Self {
         Self {
             reconciler: Default::default(),
             text_system: Default::default(),
+            window_id: id,
             tree: None,
             key_to_node: HashMap::new(),
             node_to_key: HashMap::new(),
@@ -211,17 +238,12 @@ impl Default for UiRuntime {
             driver: Box::new(NoopDriver),
         }
     }
-}
 
-impl UiRuntime {
-    /// Phase 3 / Plan 03-01: construct a `UiRuntime` with a custom
-    /// `ImeHostDriver`. Everything else is the same as `default()`.
-    /// Use this with `MockDriver` for tests; production drivers
-    /// (winit, AppKit) live in app-side adapters in v1.x.
-    pub fn with_driver(driver: Box<dyn ImeHostDriver>) -> Self {
-        let mut runtime = Self::default();
-        runtime.driver = driver;
-        runtime
+    /// Phase 4 / Plan 04-01: read the invariant `window_id` set
+    /// via [`UiRuntime::for_window`]. Returns `WindowId::unknown()`
+    /// for the single-window back-compat `UiRuntime::default()`.
+    pub fn window_id(&self) -> WindowId {
+        self.window_id
     }
 
     /// Phase 3 / Plan 03-03: snapshot of the shape / layout text

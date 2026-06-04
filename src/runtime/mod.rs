@@ -9,6 +9,7 @@ pub mod ime_host;
 pub mod overlay_pass;
 pub mod paint;
 pub mod portal_pass;
+pub mod process_context;
 pub mod reconcile;
 pub mod runtime;
 pub mod state;
@@ -28,6 +29,7 @@ pub use frame::{FrameInput, FrameOutput};
 pub use ime_host::{ImeEventSink, ImeHostDriver, ImeOp, MockDriver, NoopDriver};
 pub(crate) use ime_host::ImeUpdateSink;
 pub use portal_pass::{PortalChildren, PortalRoot, PortalTree};
+pub use process_context::ProcessContext;
 pub use reconcile::{
     DiffCounts, DiffOutput, ReconcileOutput, ReconcileStats, Reconciler,
 };
