@@ -1928,6 +1928,7 @@ impl<'a> FrameBuilder<'a> {
             z_index,
             layout.content_size,
             layout.scroll_offset,
+            layout.clip_rect,
         );
         // Collect overlay for deferred painting outside document clip stack
         self.collect_overlay(tree, node, rect);
@@ -2114,10 +2115,12 @@ impl<'a> FrameBuilder<'a> {
         z_index: i32,
         content_size: Size,
         scroll_offset: Vec2,
+        clip_rect: Option<Rect>,
     ) {
         let mut state = self.visual_state_for_node(tree, node);
         state.content_size = content_size;
         state.scroll_offset = scroll_offset;
+        state.clip_rect = clip_rect;
         for painted in paint::paint_node_themed(
             node,
             rect,
@@ -2177,6 +2180,7 @@ impl<'a> FrameBuilder<'a> {
             preedit,
             content_size: Size::default(),
             scroll_offset: Vec2::default(),
+            clip_rect: None,
             tree_expanded: key
                 .and_then(|key| self.tree_expanded_by_key.get(key))
                 .cloned()

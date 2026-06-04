@@ -58,6 +58,12 @@ pub struct VisualState {
     pub preedit: Option<crate::core::ImePreedit>,
     pub content_size: Size,
     pub scroll_offset: crate::core::Vec2,
+    /// Phase 5 / Plan 05-02 (REND-02): the inherited clip rect from
+    /// the node's ancestors. Painters that emit per-row or per-item
+    /// commands (List, Table, Tree) can cull items that fall outside
+    /// this rect to keep the command count bounded by the visible
+    /// viewport instead of scaling with the total item count.
+    pub clip_rect: Option<Rect>,
     pub tree_expanded: std::collections::HashMap<usize, bool>,
     pub table_selected_row: Option<usize>,
     pub list_selected_index: Option<usize>,
@@ -98,6 +104,7 @@ pub(crate) fn visual_state_for_element(element: &Element) -> VisualState {
         preedit: None,
         content_size: Size::default(),
         scroll_offset: crate::core::Vec2::default(),
+        clip_rect: None,
         tree_expanded: std::collections::HashMap::new(),
         table_selected_row: None,
         list_selected_index: None,
@@ -1332,6 +1339,13 @@ impl WidgetPainter for ListPainter {
     }
 
     /// Item rows with selection highlight and alternating text colors.
+    ///
+    /// Phase 5 / Plan 05-02 (REND-02): culls off-viewport rows using
+    /// `ctx.state.clip_rect` (the inherited ancestor clip). The
+    /// `DisplayList` command count is bounded by the visible row count
+    /// instead of scaling with the total item count. This is what
+    /// makes a 10,000-row list inside a 600px scroll_area produce
+    /// ~25 row paint commands + chrome, not 10,000.
     fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
         let mut spec_items: &Vec<String> = &vec![];
         if let Some(crate::WidgetSpec::List(ref list_spec)) = ctx.node.widget_spec {
@@ -1347,21 +1361,38 @@ impl WidgetPainter for ListPainter {
             if spec_items.is_empty() { &default_items } else { spec_items };
         let selection_bg = selection_color(ctx.theme);
 
+        let row_height = ctx.metrics.metrics.list.row_height;
+        let item_padding = ctx.metrics.metrics.list.item_padding;
+        let visible_top = ctx.state
+            .clip_rect
+            .map(|c| c.origin.y)
+            .unwrap_or(ctx.rect.origin.y);
+        let visible_bottom = ctx
+            .state
+            .clip_rect
+            .map(|c| c.origin.y + c.size.height)
+            .unwrap_or(ctx.rect.origin.y + ctx.rect.size.height);
+
         for (i, label) in items.iter().enumerate() {
-            let y = ctx.rect.origin.y
-                + ctx.metrics.metrics.list.item_padding
-                + i as f32 * ctx.metrics.metrics.list.row_height;
+            let y = ctx.rect.origin.y + item_padding + i as f32 * row_height;
+            // Skip rows that fall entirely above or below the visible
+            // clip. Comparison is on the row's top edge; a row that
+            // starts at `visible_bottom` is one full row past the
+            // viewport and can be safely culled.
+            if y + row_height <= visible_top || y >= visible_bottom {
+                continue;
+            }
             if ctx.state.list_selected_index == Some(i) {
                 cmds.push(rect_command(
                     Rect::new(
                         Point::new(
-                            ctx.rect.origin.x + ctx.metrics.metrics.list.item_padding,
+                            ctx.rect.origin.x + item_padding,
                             y - 2.0,
                         ),
                         Size::new(
-                            (ctx.rect.size.width - ctx.metrics.metrics.list.item_padding * 2.0)
+                            (ctx.rect.size.width - item_padding * 2.0)
                                 .max(0.0),
-                            (ctx.metrics.metrics.list.row_height - 4.0).max(1.0),
+                            (row_height - 4.0).max(1.0),
                         ),
                     ),
                     selection_bg,
@@ -1370,10 +1401,10 @@ impl WidgetPainter for ListPainter {
                 ));
             }
             let text_y =
-                y + ctx.metrics.metrics.list.row_height * 0.5 + ctx.style.font_size * 0.3;
+                y + row_height * 0.5 + ctx.style.font_size * 0.3;
             cmds.push(text_at(
                 format!("  {}", label),
-                Point::new(ctx.rect.origin.x + ctx.metrics.metrics.list.item_padding, text_y),
+                Point::new(ctx.rect.origin.x + item_padding, text_y),
                 if i % 2 == 0 { ctx.style.text_color } else { ctx.style.text_muted_color },
                 ctx.z_index + 3,
             ));
