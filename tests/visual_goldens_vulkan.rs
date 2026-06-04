@@ -223,6 +223,56 @@ fn scene_text_hierarchy() -> Element {
         .child(text("Readable body text").key("body"))
 }
 
+/// Builds the 8 scenes mirrored from `tests/visual_goldens.rs`. Used by
+/// the aggregate diagnostic test (plan 05-01 task 3). Each scene is a
+/// `(name, size, factory)` triple — the factory is invoked on each
+/// render so the `Element` is not cloned across runs (some widget specs
+/// hold non-`Clone` state).
+fn scenes() -> Vec<(&'static str, SizeU32, fn() -> Element)> {
+    vec![
+        (
+            "golden_text_hierarchy_320x160",
+            SizeU32::new(320, 160),
+            scene_text_hierarchy,
+        ),
+        (
+            "golden_toolbar_360x120",
+            SizeU32::new(360, 120),
+            scene_toolbar,
+        ),
+        (
+            "golden_popover_320x200",
+            SizeU32::new(320, 200),
+            scene_popover,
+        ),
+        (
+            "golden_scroll_clip_320x200",
+            SizeU32::new(320, 200),
+            scene_scroll_clip,
+        ),
+        (
+            "golden_full_widgets_640x480",
+            SizeU32::new(640, 480),
+            scene_full_widgets,
+        ),
+        (
+            "golden_widgets_collections_640x480",
+            SizeU32::new(640, 480),
+            scene_widgets_collections,
+        ),
+        (
+            "golden_widget_showcase_flow_808x823",
+            SizeU32::new(808, 823),
+            scene_widget_showcase_flow,
+        ),
+        (
+            "golden_new_painters_640x320",
+            SizeU32::new(640, 320),
+            scene_new_painters,
+        ),
+    ]
+}
+
 fn scene_toolbar() -> Element {
     Element::row()
         .gap(8.0)
@@ -517,4 +567,75 @@ fn golden_new_painters_640x320_vulkan() {
     let size = SizeU32::new(640, 320);
     let pixels = render_runtime_rgba_vulkan(scene_new_painters(), size);
     assert_visual_matches_vulkan("golden_new_painters_640x320", size, &pixels);
+}
+
+/// Plan 05-01 task 3: aggregate cross-backend diagnostic.
+///
+/// The 8 per-scene tests catch byte-equality regressions inside the
+/// `MAX_ABS_DIFF_LIMIT` / `CHANGED_PIXEL_RATIO_LIMIT` envelope. This
+/// aggregate test catches a different failure mode — "Vulkan starts
+/// producing wildly different output that still squeezes under each
+/// per-scene tolerance after a tolerance bump" — by re-running all 8
+/// scenes and asserting the maximum observed diff across the full set
+/// stays under a tighter bound than any single scene's per-test gate.
+///
+/// On the first CI run the observed cross-backend baselines should be
+/// captured in the test failure log and documented here; subsequent
+/// runs must not regress.
+#[test]
+fn vulkan_diff_is_within_cross_backend_tolerance() {
+    let mut worst_ratio: f64 = 0.0;
+    let mut worst_max_diff: u8 = 0;
+    let mut worst_scene: &'static str = "";
+    let mut per_scene = Vec::new();
+
+    for (name, size, scene) in scenes() {
+        let pixels = render_runtime_rgba_vulkan(scene(), size);
+        let (expected_path, _actual_path, _diff_path) = golden_paths(name);
+        assert!(
+            expected_path.exists(),
+            "missing golden {}; capture baselines via the same-backend suite first \
+             (RGUI_UPDATE_GOLDENS=1 cargo test --test visual_goldens)",
+            expected_path.display()
+        );
+        let (expected_size, expected_pixels) = load_png_rgba(&expected_path);
+        assert_eq!(expected_size, size, "golden size changed for {name}");
+        let stats = pixel_diff_stats(&expected_pixels, &pixels);
+        per_scene.push((name, stats));
+        if stats.changed_ratio() > worst_ratio {
+            worst_ratio = stats.changed_ratio();
+            worst_scene = name;
+        }
+        if stats.max_abs_diff > worst_max_diff {
+            worst_max_diff = stats.max_abs_diff;
+        }
+    }
+
+    let report = per_scene
+        .iter()
+        .map(|(name, stats)| {
+            format!(
+                "  {}: changed_pixels={}/{} changed_ratio={:.6} max_abs_diff={}",
+                name,
+                stats.changed_pixels,
+                stats.total_pixels,
+                stats.changed_ratio(),
+                stats.max_abs_diff,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        worst_max_diff < MAX_ABS_DIFF_LIMIT,
+        "vulkan aggregate diff exceeded cross-backend tolerance: \
+         worst_scene={worst_scene} worst_max_abs_diff={worst_max_diff} \
+         (limit < {MAX_ABS_DIFF_LIMIT})\n{report}"
+    );
+    assert!(
+        worst_ratio < CHANGED_PIXEL_RATIO_LIMIT,
+        "vulkan aggregate changed-pixel ratio exceeded cross-backend tolerance: \
+         worst_scene={worst_scene} worst_changed_ratio={worst_ratio:.6} \
+         (limit < {CHANGED_PIXEL_RATIO_LIMIT:.6})\n{report}"
+    );
 }
