@@ -1095,6 +1095,16 @@ impl UiRuntime {
     fn handle_misc_event(&mut self, _event: UiEvent) {}
 
     pub fn update(&mut self, input: FrameInput) -> FrameOutput {
+        // Phase 5 / Plan 05-04 (REND-04): capture the wall-clock start
+        // time so the final `PerformanceMetrics.frame_time_ms` field is
+        // populated (it was previously zeroed by
+        // `..PerformanceMetrics::default()` at runtime.rs:1250). The
+        // measurement covers the CPU-side cost of `update`: event
+        // dispatch + layout + paint + display-list assembly. The wgpu
+        // submit + present cost is not measured here; that is a
+        // host-side concern and is profiled separately via
+        // `WgpuRenderer::render`.
+        let frame_start = std::time::Instant::now();
         // Phase 3 / Plan 03-01: poll the IME driver at the start of
         // every frame so driver-sourced events land in the same
         // event queue as host-sourced events. We can't call
@@ -1240,6 +1250,13 @@ impl UiRuntime {
         }
 
         builder.snapshot.performance = PerformanceMetrics {
+            // Phase 5 / Plan 05-04 (REND-04): wall-clock duration of
+            // this `update` call in milliseconds. Measured from
+            // `frame_start` at the function entry to here, which
+            // covers event dispatch + layout + paint + display-list
+            // assembly. The wgpu submit + present cost is profiled
+            // separately on the host's render path.
+            frame_time_ms: frame_start.elapsed().as_secs_f32() * 1000.0,
             node_count: builder.snapshot.tree_nodes.len(),
             layout_recompute_count,
             display_command_count: stats.command_count,

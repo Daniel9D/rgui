@@ -272,4 +272,35 @@ mod tests {
         assert_eq!(parsed["overlays"][0]["key"], "tab\nbreak");
         assert_eq!(parsed["overlays"][0]["layer"], "Modal");
     }
+
+    // Phase 5 / Plan 05-04 (REND-04): unit test that pins the
+    // `frame_time_ms` field is now populated by `UiRuntime::update`,
+    // not zeroed by `..PerformanceMetrics::default()`. The test
+    // builds a non-trivial element tree (one `Element::row` with
+    // three child labels), runs `update` once, and asserts
+    // `frame_time_ms > 0.0`. This is the sanity check for the
+    // Phase 4 deviation that plan 05-04 fixes.
+
+    #[test]
+    fn frame_time_ms_field_is_populated_by_runtime() {
+        let mut runtime = crate::runtime::UiRuntime::default();
+        let output = runtime.update(crate::runtime::FrameInput {
+            root: crate::Element::row()
+                .key("frame-budget-test")
+                .gap(8.0)
+                .child(crate::widgets::text("alpha"))
+                .child(crate::widgets::text("beta"))
+                .child(crate::widgets::text("gamma")),
+            ..Default::default()
+        });
+        let frame_time_ms = output
+            .debug_snapshot()
+            .performance
+            .frame_time_ms;
+        assert!(
+            frame_time_ms > 0.0,
+            "PerformanceMetrics.frame_time_ms must be populated by UiRuntime::update, \
+             not zeroed. Got {frame_time_ms}.",
+        );
+    }
 }
