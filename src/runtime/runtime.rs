@@ -179,19 +179,18 @@ pub struct UiRuntime {
     app_shortcuts: AppShortcuts,
 }
 
-// D-19: regression guard. Will be added when `UiRuntime: Send + Sync`
-// is achievable. Today, the embedded `TaffyLayoutBackend` is `!Send`
-// because `taffy::TaffyTree` (taffy 0.10.1) stores a `*const ()` in
-// its internal slot map. Plan 04-02 lands the fix (likely wrapping
-// `TaffyLayoutBackend` in a `Mutex`); once the runtime is `Send +
-// Sync`, the static assert can be enabled:
-//
-//   const _: fn() = || { fn assert<T: Send + Sync>() {} assert::<UiRuntime>(); };
-//
-// The trait bounds on `ImeHostDriver: Send + Sync` and
-// `AccessibilityBackend: Send + Sync` (D-17) are already in place
-// (also landed early in 04-01) so the assert will only need the
-// taffy fix to compile.
+// D-19: regression guard. Phase 4 / Plan 04-02 activates this
+// assert: `unsafe impl Send + Sync` for `TaffyLayoutBackend` (in
+// `src/layout/taffy.rs`) unblocks `UiRuntime: Send + Sync`. The
+// trait bounds on `ImeHostDriver: Send + Sync` and
+// `AccessibilityBackend: Send + Sync` (D-17) are also in place
+// (landed early in 04-01). If a future change makes `UiRuntime`
+// `!Send` or `!Sync`, this line stops compiling — a type-level
+// regression detector for the multi-window seam (WIN-03).
+const _: fn() = || {
+    fn assert<T: Send + Sync>() {}
+    assert::<UiRuntime>();
+};
 
 impl Default for UiRuntime {
     fn default() -> Self {
