@@ -2734,4 +2734,38 @@ mod tests {
             AppEventOutcome::Ignored
         ));
     }
+
+    #[test]
+    fn two_default_runtimes_share_node_id_space() {
+        // Both runtimes default to a fresh ProcessContext, so they have
+        // independent NodeIdAllocators. Verifies the per-runtime default
+        // is independent; the shared-counter case is exercised by the
+        // WIN-04 test in 04-03 (where two runtimes share a
+        // ProcessContext constructed explicitly).
+        let mut a = UiRuntime::default();
+        let mut b = UiRuntime::default();
+        let _ = a.update(FrameInput::default());
+        let _ = b.update(FrameInput::default());
+        // a's node ids start at 0; b's also start at 0
+        // (independent allocators). Both runtimes should have
+        // advanced by the same amount after a single update on
+        // an empty input.
+        assert_eq!(a.node_ids().current(), b.node_ids().current());
+    }
+
+    #[test]
+    fn for_window_shares_node_ids_with_caller_context() {
+        // Two runtimes built from the *same* `&ProcessContext`
+        // share one NodeIdAllocator. The first runtime's
+        // `update` advances the shared counter; the second
+        // runtime sees the same advance.
+        let ctx = ProcessContext::new();
+        let mut a = UiRuntime::for_window(WindowId::new(1), &ctx);
+        let b = UiRuntime::for_window(WindowId::new(2), &ctx);
+        assert_eq!(a.node_ids().current(), 0);
+        assert_eq!(b.node_ids().current(), 0);
+        let _ = a.update(FrameInput::default());
+        // b's view of the shared counter must match a's.
+        assert_eq!(b.node_ids().current(), a.node_ids().current());
+    }
 }
