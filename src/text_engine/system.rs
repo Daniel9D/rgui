@@ -45,7 +45,7 @@ impl TextShapeKey {
 /// without a stats hook, a misconfigured app (e.g. one that
 /// scrolls a 10k-character text field) would silently grow the
 /// cache without anyone noticing.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct TextCacheStats {
     pub shape_hits: u64,
     pub shape_misses: u64,
@@ -96,6 +96,19 @@ impl TextSystem {
             shape_entries: self.shape_cache.len(),
             layout_entries: self.layout_cache.len(),
         }
+    }
+
+    /// Phase 3 / Plan 03-03: clear both the shape and layout
+    /// caches, returning `(shape_evicted, layout_evicted)`. Hit /
+    /// miss counters are NOT reset — they accumulate over the
+    /// lifetime of the `TextSystem` so the hit rate stays
+    /// meaningful across explicit clears.
+    pub fn clear_caches(&mut self) -> (usize, usize) {
+        let shape_evicted = self.shape_cache.len();
+        let layout_evicted = self.layout_cache.len();
+        self.shape_cache.clear();
+        self.layout_cache.clear();
+        (shape_evicted, layout_evicted)
     }
 }
 
@@ -510,5 +523,59 @@ mod tests {
             "second measure with same key should hit layout cache"
         );
         assert_eq!(after_second.layout_entries, after_first.layout_entries);
+    }
+
+    // Phase 3 / Plan 03-03: clear_caches evicts the entries from
+    // both caches and returns the count. The hit/miss counters
+    // are NOT reset by clear_caches — they accumulate so the
+    // hit rate stays meaningful across explicit clears.
+    #[test]
+    fn clear_caches_evicts_shape_and_layout_entries() {
+        let mut sys = TextSystem::default();
+        // Populate the layout cache (which also touches the
+        // shape path inside `layout_with_cosmic`).
+        let _ = sys.measure("a", 14.0, FontWeight::Normal, FontStyle::Normal, 100.0);
+        let _ = sys.measure("b", 14.0, FontWeight::Normal, FontStyle::Normal, 100.0);
+        let _ = sys.measure("c", 14.0, FontWeight::Normal, FontStyle::Normal, 100.0);
+        // Also shape distinct strings so the shape cache is
+        // non-empty (shape_with_size populates it directly).
+        let _ = sys.shape_with_size("x", 100.0, 14.0, FontWeight::Normal, FontStyle::Normal);
+        let _ = sys.shape_with_size("y", 100.0, 14.0, FontWeight::Normal, FontStyle::Normal);
+        let _ = sys.shape_with_size("z", 100.0, 14.0, FontWeight::Normal, FontStyle::Normal);
+
+        let before = sys.cache_stats();
+        assert!(before.layout_entries >= 3, "expected at least 3 layout entries");
+        assert!(before.shape_entries >= 3, "expected at least 3 shape entries");
+
+        let (shape_evicted, layout_evicted) = sys.clear_caches();
+        let after = sys.cache_stats();
+        assert_eq!(shape_evicted, before.shape_entries);
+        assert_eq!(layout_evicted, before.layout_entries);
+        assert_eq!(after.shape_entries, 0);
+        assert_eq!(after.layout_entries, 0);
+    }
+
+    #[test]
+    fn clear_caches_preserves_hit_and_miss_counters() {
+        let mut sys = TextSystem::default();
+        // Generate some hits and misses.
+        let _ = sys.measure("a", 14.0, FontWeight::Normal, FontStyle::Normal, 100.0);
+        let _ = sys.measure("a", 14.0, FontWeight::Normal, FontStyle::Normal, 100.0);
+        let _ = sys.measure("b", 14.0, FontWeight::Normal, FontStyle::Normal, 100.0);
+
+        let before = sys.cache_stats();
+        assert!(before.layout_misses >= 2, "expected at least 2 layout misses");
+        assert!(before.layout_hits >= 1, "expected at least 1 layout hit");
+
+        let _ = sys.clear_caches();
+        let after = sys.cache_stats();
+        assert_eq!(
+            after.layout_misses, before.layout_misses,
+            "clear_caches must not reset miss counters"
+        );
+        assert_eq!(
+            after.layout_hits, before.layout_hits,
+            "clear_caches must not reset hit counters"
+        );
     }
 }

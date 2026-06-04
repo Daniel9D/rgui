@@ -7,7 +7,7 @@ pub mod layout;
 pub mod system;
 
 pub use layout::{TextGlyphPosition, TextLayout};
-pub use system::{TextShapeKey, TextSystem};
+pub use system::{TextCacheStats, TextShapeKey, TextSystem};
 
 #[derive(Default)]
 pub struct CosmicTextEngine {
