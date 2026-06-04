@@ -14,9 +14,9 @@ each phase's emit).
 
 ## Phases
 
-- [ ] **Phase 1: Incremental Reconciliation** — runtime updates only changed subtrees; layout runs incrementally
-- [ ] **Phase 2: Event & Input Hardening** — Tree/List/Tabs/Slider/Switch keyboard nav, full integration test coverage
-- [ ] **Phase 3: Text & IME** — preedit composition under real drivers, RTL / CJK shaping
+- [x] **Phase 1: Incremental Reconciliation** — runtime updates only changed subtrees; layout runs incrementally
+- [x] **Phase 2: Event & Input Hardening** — Tree/List/Tabs/Slider/Switch keyboard nav, full integration test coverage
+- [x] **Phase 3: Text & IME** — preedit composition under real drivers, RTL / CJK shaping
 - [ ] **Phase 4: Multi-Window** — per-window `UiRuntime`, event routing, isolated snapshots
 - [ ] **Phase 5: Render Path Stress** — Vulkan + Metal goldens, validation layers, frame budget tests
 - [ ] **Phase 6: Public API Hardening** — doctests, no-`unwrap` audit, custom widget contract
@@ -42,10 +42,10 @@ each phase's emit).
 
 Plans:
 
-- [ ] 01-01: `Reconciler::diff` between prior and new `UiTree`
-- [ ] 01-02: Dirty-region tracking on `LayoutBox`; `taffy` partial re-layout
-- [ ] 01-03: Pointer-capture release on node removal
-- [ ] 01-04: `WidgetSpec` hash → re-mount; existing state preserved otherwise
+- [x] 01-01: `Reconciler::diff` between prior and new `UiTree`
+- [x] 01-02: Dirty-region tracking on `LayoutBox`; `taffy` partial re-layout
+- [x] 01-03: Pointer-capture release on node removal
+- [x] 01-04: `WidgetSpec` hash → re-mount; existing state preserved otherwise
 
 ### Phase 2: Event & Input Hardening
 
@@ -64,10 +64,10 @@ Plans:
 
 Plans:
 
-- [ ] 02-01: Tree / List keyboard navigation
-- [ ] 02-02: Tabs keyboard navigation (arrow keys + Ctrl-Tab)
-- [ ] 02-03: Slider + Switch keyboard + drag handlers
-- [ ] 02-04: ProgressBar click contract + integration test gaps closed
+- [x] 02-01: Tree / List keyboard navigation
+- [x] 02-02: Tabs keyboard navigation (arrow keys + Ctrl-Tab)
+- [x] 02-03: Slider + Switch keyboard + drag handlers
+- [x] 02-04: ProgressBar click contract + integration test gaps closed
 
 ### Phase 3: Text & IME
 
@@ -85,9 +85,9 @@ Plans:
 **Plans**: 3 plans
 Plans:
 
-- [ ] 03-01: IME preedit on Windows + macOS drivers
-- [ ] 03-02: CJK + RTL shaping in `glyphon` integration
-- [ ] 03-03: `TextCacheStats` observability + `clear_metrics_cache` public API
+- [x] 03-01: IME preedit on Windows + macOS drivers
+- [x] 03-02: CJK + RTL shaping in `glyphon` integration
+- [x] 03-03: `TextCacheStats` observability + `clear_metrics_cache` public API
 
 ### Phase 4: Multi-Window
 
@@ -206,9 +206,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Incremental Reconciliation | 0/4 | Not started | - |
-| 2. Event & Input Hardening | 0/4 | Not started | - |
-| 3. Text & IME | 0/3 | Not started | - |
+| 1. Incremental Reconciliation | 4/4 | Complete | 2026-06-03 |
+| 2. Event & Input Hardening | 4/4 | Complete | 2026-06-03 |
+| 3. Text & IME | 3/3 | Complete | 2026-06-04 |
 | 4. Multi-Window | 0/3 | Not started | - |
 | 5. Render Path Stress | 0/4 | Not started | - |
 | 6. Public API Hardening | 0/3 | Not started | - |

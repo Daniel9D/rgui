@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: "Phase 3 `03-CONTEXT.md` written; 6 locked decisions recorded; STATE.md + REQUIREMENTS.md updated. Next: `/gsd-plan-phase 3` (3 plans: 03-01 ImeHostDriver + MockDriver, 03-02 CJK + Arabic shaping, 03-03 TextCacheStats 3-surface observability + `clear_text_cache`)."
-last_updated: "2026-06-04T00:26:51.081Z"
-last_activity: "2026-06-03 — Phase 3 `03-CONTEXT.md` written with 6 locked decisions (ImeHostDriver producer-side trait, system fonts / CI installs Noto, Arabic RTL, 3-surface TextCacheStats, preedit in existing InputState, Shaping::Advanced default)"
+stopped_at: "Phase 3 complete — all 3 plans executed (03-01 ImeHostDriver + MockDriver, 03-02 CJK + Arabic shaping + ci-install-fonts, 03-03 TextCacheStats 3-surface observability + clear_text_cache). 9 new tests pass. ROADMAP.md Phase 3 checkbox ticked. Next: Phase 4 (Multi-Window) `/gsd-discuss-phase 4`."
+last_updated: "2026-06-04T01:15:00.000Z"
+last_activity: "2026-06-04 — Phase 3 executed: IME host driver abstraction (tests/ime_host_driver.rs, 4 tests), CJK+RTL shaping tests (tests/text_shaping_cjk_rtl.rs, 4 tests, skip-with-warning on missing fonts), TextCacheStats on UiRuntime + UiSnapshot + RenderStats (tests/text_cache_observability.rs, 4 tests)"
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 8
-  percent: 27
+  completed_plans: 11
+  percent: 37
 ---
 
 # Project State
@@ -47,7 +47,7 @@ Progress: [████████░░░░] 27% (8/30 plans)
 |-------|-------|-------|----------|
 | 1. Incremental Reconciliation | 4/4 | — | — |
 | 2. Event & Input Hardening | 4/4 | — | — |
-| 3. Text & IME | 0/3 | — | — |
+| 3. Text & IME | 3/3 | — | — |
 | 4. Multi-Window | 0/3 | — | — |
 | 5. Render Path Stress | 0/4 | — | — |
 | 6. Public API Hardening | 0/3 | — | — |
@@ -62,6 +62,7 @@ Progress: [████████░░░░] 27% (8/30 plans)
 
 See `PROJECT.md` Key Decisions table for the full log. Recent:
 
+- **Phase 3 implementation (2026-06-04)**: `UiRuntime::text_cache_stats` is captured at the start of `update()` (before `text_system` is mutably borrowed by `FrameBuilder`); the value is the previous frame's final cache state. `RenderStats::text_cache` is added for forward-compat (the wgpu backend currently leaves it `default()`; the runtime populates it in its own `RenderStats` build path). `TextCacheStats` derives `serde::Serialize` so it can ride the `to_debug_json` round-trip.
 - **Phase 3 context (2026-06-03)**: `ImeHostDriver` is a producer-side trait (runtime calls `driver.poll(&mut sink)` per frame; sink pushes `UiEvent::ImePreedit` / `UiEvent::ImeCommit`). `MockDriver` replays a `Vec<ImeOp>` script for tests. CJK + Arabic shaping tests rely on system fonts (`fonts-noto-cjk`, `fonts-noto`); CI installs via `scripts/ci-install-fonts.sh`; `RGUI_REQUIRE_FONTS=1` opt-in to fail-fast. Arabic is the v1 RTL reference (isolated + contextual + bidi cases). `TextCacheStats` surfaces in three places: `UiRuntime::text_cache_stats()` public method, `UiSnapshot.text_cache` field, `RendererStats.text_cache` field. Heuristic `clear_metrics_cache()` and shape/layout `clear_text_cache()` (new) clear the two caches symmetrically. `Shaping::Advanced` is the v1 default for all scripts. No winit/AppKit/browser adapters in v1 (apps wire their own).
 - **Phase 2 implementation (2026-06-03)**: `ShortcutRegistry::resolve` gained a `focused_is_text_input: bool` argument that suppresses non-modifier-prefixed chords inside `Input`/`Textarea`/`Select`. `FocusManager::is_focusable(WidgetKind)` + `tab_next`/`tab_prev` helpers provide a tree-walking focus traversal alternative to the existing `FocusSystem` (which the runtime continues to use for the scope-based overlay routing). `ModalSpec::trap_focus: bool` flag (default `false`) lets modals opt into focus trapping. `InputSpec::ime_enabled: bool` (default `false`) gates IME preedit routing so CJK users can opt in to the preedit-then-commit path. `Element::overflow_x(Overflow)` / `overflow_y(Overflow)` setters enable per-axis scroll configuration; the runtime's `handle_wheel` was already 2D — the new tests pin the per-axis clamping behavior.
 - **Phase 1 implementation (2026-06-03)**: `Reconciler::diff(prior, new) -> DiffOutput` is positional (children paired by index) with `kind_signature` comparing `WidgetSpec` signature for state preservation. New `LayoutCache` wraps the existing `TaffyLayoutBackend` and indexes `LayoutBox` per `NodeId` for the paint path. `PointerCapture::release_matching` returns a `PointerCancel` for the captured node when the capture's key is in the unmounted list. The new `diff` is *not yet* wired into `runtime::update` — the existing `reconcile_with_dirty` (keyed-only) is still the production path; the diff is exercised by tests/recon and ready for the Phase 6 (Public API Hardening) wiring.
@@ -106,6 +107,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-03 20:00
-Stopped at: Phase 3 `03-CONTEXT.md` written; 6 locked decisions recorded; STATE.md + REQUIREMENTS.md updated. Next: `/gsd-plan-phase 3` (3 plans: 03-01 ImeHostDriver + MockDriver, 03-02 CJK + Arabic shaping, 03-03 TextCacheStats 3-surface observability + `clear_text_cache`).
+Last session: 2026-06-04 01:15
+Stopped at: Phase 3 complete — all 3 plans executed and committed. 11/30 plans (37%) done. Next: `/gsd-discuss-phase 4` (Multi-Window) or `/gsd-progress` to verify.
 Resume file: None
