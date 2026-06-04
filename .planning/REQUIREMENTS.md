@@ -30,10 +30,10 @@
 
 ### Multi-window (WIN)
 
-- [ ] **WIN-01**: `FrameInput` carries a `window_id` field
-- [ ] **WIN-02**: Multiple `UiRuntime` instances can coexist in one process
-- [ ] **WIN-03**: Events route to the correct window's runtime
-- [ ] **WIN-04**: Each window has its own `DisplayList` and `UiSnapshot`
+- [x] **WIN-01**: `FrameInput` carries a `window_id` field
+- [x] **WIN-02**: Multiple `UiRuntime` instances can coexist in one process
+- [x] **WIN-03**: Events route to the correct window's runtime
+- [x] **WIN-04**: Each window has its own `DisplayList` and `UiSnapshot`
 
 ### Render path (REND)
 
@@ -105,41 +105,50 @@
 Deferred to v1.x / v2.
 
 ### Multi-window (v2)
+
 - **WIN-05**: Drag a widget between windows
 - **WIN-06**: Modal that spans multiple windows
 
 ### Animation (v2)
+
 - **ANIM-05**: Physics-based motion (springs, gravity)
 - **ANIM-06**: Layout transitions (FLIP)
 
 ### DnD (v2)
+
 - **DND-05**: Drag from an external app (OS-level)
 - **DND-06**: Drop an OS file into a window
 
 ### Virtualization (v2)
+
 - **VIRT-05**: Multi-column windowed grids
 - **VIRT-06**: Variable-height rows
 
 ### Diagnostics (v2)
+
 - **DIAG-04**: Performance profiler overlay
 - **DIAG-05**: Tree inspector overlay
 
 ### Accessibility (v2)
+
 - **A11Y-01**: Voice control integration
 - **A11Y-02**: High-contrast theme variant shipped
 - **A11Y-03**: Color-blind theme variants shipped
 
 ### Internationalization (v2)
+
 - **I18N-03**: Locale-aware number / date / currency formatting
 - **I18N-04**: Right-to-left text shaping for Arabic / Hebrew
 - **I18N-05**: CJK vertical text layout
 
 ### Mobile / touch (v2)
+
 - **MOBL-01**: Touch-event support
 - **MOBL-02**: Gesture recognition (pinch / pan)
 - **MOBL-03**: Soft keyboard integration
 
 ### WASM (v2)
+
 - **WASM-01**: WebGPU backend production-grade
 - **WASM-02**: Browser DOM fallback for unsupported wgpu features
 
@@ -168,21 +177,24 @@ Deferred to v1.x / v2.
 | RECON-03 | Phase 1 | Complete |
 | RECON-04 | Phase 1 | Complete |
 | EVNT-01..06 | Phase 2 (widget keyboard nav) | Pending — Phase 2 covered the runtime event path (focus traversal, shortcut suppression, wheel 2D, IME gating) but EVNT-01..06 are widget-specific keyboard handlers not addressed here. Slated for a future widget-interaction phase. |
-| TEXT-01 | Phase 2 (runtime side) | Partial — runtime routes `ImePreedit`/`ImeCommit` when `InputSpec::ime_enabled = true`; preedit paints and commits. Host driver integration (winit/browser) remains the v1.x path. |
-| TEXT-02..04 | Phase 1 | Pending |
-| WIN-01..04 | Phase 2 | Pending |
-| REND-01..04 | Phase 2 | Pending |
-| API-01..04 | Phase 2 | Pending |
-| THEM-01..04 | Phase 3 | Pending |
-| ANIM-01..04 | Phase 3 | Pending |
-| DND-01..04 | Phase 3 | Pending |
-| VIRT-01..04 | Phase 4 | Pending |
-| LOUT-01..03 | Phase 4 | Pending |
-| DIAG-01..03 | Phase 4 | Pending |
-| I18N-01..02 | Phase 5 | Pending |
-| CUST-01..03 | Phase 5 | Pending |
+| TEXT-01 | Phase 3 (runtime side) | Partial — runtime routes `ImePreedit`/`ImeCommit` when `InputSpec::ime_enabled = true`; preedit paints and commits. Host driver integration (winit/browser) remains the v1.x path. |
+| TEXT-02 | Phase 3 | Complete — CJK + Arabic shaping tests land in Phase 3 (03-02). |
+| TEXT-03 | Phase 3 | Complete — caret position is correct under preedit (verified by the 4 IME tests in `tests/ime_host_driver.rs`). |
+| TEXT-04 | Phase 3 | Complete — `TextCacheStats` is exposed via `UiRuntime::text_cache_stats()`, `UiSnapshot.text_cache`, and `RenderStats.text_cache`; `clear_metrics_cache()` is a public API. |
+| WIN-01..04 | Phase 4 | Complete — `WindowId` newtype, `UiRuntime::for_window`, `dispatch_to_window`, `ProcessContext` (NodeIdAllocator + SharedAccessibility), D-19 `UiRuntime: Send + Sync` static assert active, `SharedWgpuDevice` + `WgpuRenderer::with_shared_device` + `SurfaceRenderer::with_shared_device`, `examples/multi_window.rs`, 3 integration tests (WIN-02/03/04) all pass. |
+| REND-01..04 | Phase 5 | Pending |
+| API-01..04 | Phase 6 | Pending |
+| THEM-01..04 | Phase 7 | Pending |
+| ANIM-01..04 | Phase 7 | Pending |
+| DND-01..04 | Phase 7 | Pending |
+| VIRT-01..04 | Phase 8 | Pending |
+| LOUT-01..03 | Phase 8 | Pending |
+| DIAG-01..03 | Phase 8 | Pending |
+| I18N-01..02 | Phase 8 | Pending |
+| CUST-01..03 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 60 total
 - Mapped to phases: 60
 - Unmapped: 0 ✓

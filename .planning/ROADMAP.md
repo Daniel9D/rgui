@@ -17,7 +17,7 @@ each phase's emit).
 - [x] **Phase 1: Incremental Reconciliation** — runtime updates only changed subtrees; layout runs incrementally
 - [x] **Phase 2: Event & Input Hardening** — Tree/List/Tabs/Slider/Switch keyboard nav, full integration test coverage
 - [x] **Phase 3: Text & IME** — preedit composition under real drivers, RTL / CJK shaping
-- [ ] **Phase 4: Multi-Window** — per-window `UiRuntime`, event routing, isolated snapshots
+- [x] **Phase 4: Multi-Window** — per-window `UiRuntime`, event routing, isolated snapshots (completed 2026-06-04)
 - [ ] **Phase 5: Render Path Stress** — Vulkan + Metal goldens, validation layers, frame budget tests
 - [ ] **Phase 6: Public API Hardening** — doctests, no-`unwrap` audit, custom widget contract
 - [ ] **Phase 7: Theme v2 + Animation + DnD** — `ComponentTheme` lookup, tween/spring, drag source + drop target
@@ -106,9 +106,9 @@ Plans:
 
 Plans:
 
-- [ ] 04-01: `FrameInput.window_id` + per-window event routing
-- [ ] 04-02: Multi-runtime coexistence; `Send + Sync` on the runtime
-- [ ] 04-03: Per-window `DisplayList` + `UiSnapshot` isolation
+- [x] 04-01: `FrameInput.window_id` + per-window event routing
+- [x] 04-02: Multi-runtime coexistence; `Send + Sync` on the runtime
+- [x] 04-03: Per-window `DisplayList` + `UiSnapshot` isolation
 
 ### Phase 5: Render Path Stress
 
@@ -209,7 +209,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Incremental Reconciliation | 4/4 | Complete | 2026-06-03 |
 | 2. Event & Input Hardening | 4/4 | Complete | 2026-06-03 |
 | 3. Text & IME | 3/3 | Complete | 2026-06-04 |
-| 4. Multi-Window | 0/3 | Not started | - |
+| 4. Multi-Window | 3/3 | Complete    | 2026-06-04 |
 | 5. Render Path Stress | 0/4 | Not started | - |
 | 6. Public API Hardening | 0/3 | Not started | - |
 | 7. Theme v2 + Animation + DnD | 0/5 | Not started | - |
