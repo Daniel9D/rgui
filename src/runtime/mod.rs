@@ -7,6 +7,7 @@ pub mod dirty;
 pub mod events;
 pub mod frame;
 pub mod ime_host;
+pub mod node_id_allocator;
 pub mod overlay_pass;
 pub mod paint;
 pub mod portal_pass;
@@ -30,6 +31,7 @@ pub use events::{
 pub use frame::{FrameInput, FrameOutput};
 pub use ime_host::{ImeEventSink, ImeHostDriver, ImeOp, MockDriver, NoopDriver};
 pub(crate) use ime_host::ImeUpdateSink;
+pub use node_id_allocator::NodeIdAllocator;
 pub use portal_pass::{PortalChildren, PortalRoot, PortalTree};
 pub use process_context::ProcessContext;
 pub use reconcile::{
