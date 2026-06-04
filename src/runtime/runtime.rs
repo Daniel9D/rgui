@@ -12,9 +12,9 @@ use crate::state::{ButtonState, CheckboxState, InputState, StateArena};
 use crate::text_engine::TextSystem;
 
 use super::{
-    BoolState, CommandQueue, DragState, FocusSystem, FrameInput, FrameOutput, OpenOverlay,
-    PointerCapture, Reconciler, ScrollState, UiCommand, UiNode, UiTree, paint,
-    stable_portal_child_id,
+    BoolState, CommandQueue, DragState, FocusSystem, FrameInput, FrameOutput, ImeHostDriver,
+    ImeUpdateSink, NoopDriver, OpenOverlay, PointerCapture, Reconciler, ScrollState, UiCommand,
+    UiNode, UiTree, paint, stable_portal_child_id,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -109,7 +109,6 @@ fn text_hit_geometry_for_widget(
     )
 }
 
-#[derive(Default)]
 pub struct UiRuntime {
     reconciler: Reconciler,
     text_system: TextSystem,
@@ -122,6 +121,11 @@ pub struct UiRuntime {
     active_key: Option<String>,
     focused_key: Option<String>,
     focusable_keys: Vec<String>,
+    /// Phase 3 / Plan 03-01: producer-side IME driver. Defaults to
+    /// `NoopDriver` (no events) for backward compatibility. Replace
+    /// via [`UiRuntime::with_driver`] to wire a real driver or a
+    /// `MockDriver` for tests.
+    driver: Box<dyn ImeHostDriver>,
     overlay_focusable_keys: Vec<String>,
     widget_kind_by_key: HashMap<String, WidgetKind>,
     click_action_by_key: HashMap<String, String>,
@@ -157,7 +161,69 @@ pub struct UiRuntime {
     drag: Option<DragState>,
 }
 
+impl Default for UiRuntime {
+    fn default() -> Self {
+        Self {
+            reconciler: Default::default(),
+            text_system: Default::default(),
+            tree: None,
+            key_to_node: HashMap::new(),
+            node_to_key: HashMap::new(),
+            scroll_state: Default::default(),
+            viewport: Size::default(),
+            last_hit_test: Default::default(),
+            active_key: None,
+            focused_key: None,
+            focusable_keys: Vec::new(),
+            overlay_focusable_keys: Vec::new(),
+            widget_kind_by_key: HashMap::new(),
+            click_action_by_key: HashMap::new(),
+            selected_index_by_key: HashMap::new(),
+            selected_value_by_key: HashMap::new(),
+            active_index_by_key: HashMap::new(),
+            tree_expanded_by_key: HashMap::new(),
+            table_selected_row_by_key: HashMap::new(),
+            list_selected_index_by_key: HashMap::new(),
+            widget_rect_by_key: HashMap::new(),
+            open_select_key: None,
+            disabled_select_options_by_key: HashMap::new(),
+            command_queue: Default::default(),
+            command_handlers: HashMap::new(),
+            bool_state: Default::default(),
+            focused_node: None,
+            active_node: None,
+            hovered_key: None,
+            hovered_node: None,
+            pointer_capture: Default::default(),
+            open_context_menu_key: None,
+            context_menu_anchor: None,
+            open_overlays: Vec::new(),
+            has_open_modal: false,
+            dismissed_overlay_keys: HashSet::new(),
+            opened_overlay_keys: HashSet::new(),
+            theme: Default::default(),
+            layout_backend: Default::default(),
+            focus_system: Default::default(),
+            state_arena: Default::default(),
+            a11y_backend: None,
+            a11y_update_count: 0,
+            drag: None,
+            driver: Box::new(NoopDriver),
+        }
+    }
+}
+
 impl UiRuntime {
+    /// Phase 3 / Plan 03-01: construct a `UiRuntime` with a custom
+    /// `ImeHostDriver`. Everything else is the same as `default()`.
+    /// Use this with `MockDriver` for tests; production drivers
+    /// (winit, AppKit) live in app-side adapters in v1.x.
+    pub fn with_driver(driver: Box<dyn ImeHostDriver>) -> Self {
+        let mut runtime = Self::default();
+        runtime.driver = driver;
+        runtime
+    }
+
     pub fn set_scroll_offset_for_key(&mut self, key: impl Into<String>, offset: crate::core::Vec2) {
         self.scroll_state.set_offset(key.into(), offset);
     }
@@ -896,6 +962,20 @@ impl UiRuntime {
     fn handle_misc_event(&mut self, _event: UiEvent) {}
 
     pub fn update(&mut self, input: FrameInput) -> FrameOutput {
+        // Phase 3 / Plan 03-01: poll the IME driver at the start of
+        // every frame so driver-sourced events land in the same
+        // event queue as host-sourced events. We can't call
+        // `self.driver.poll(self)` directly (mutable borrow
+        // conflict between `self.driver` and `self.dispatch`), so
+        // we use a small local sink that buffers events, then
+        // drain it. Each event routes through the existing
+        // `dispatch` (and from there into `handle_ime_preedit`
+        // with the Phase 2 `ime_enabled` gate intact).
+        let mut sink = ImeUpdateSink::default();
+        self.driver.poll(&mut sink);
+        for event in sink.events {
+            self.dispatch(event);
+        }
         self.viewport = input.viewport;
         self.theme = input.theme.clone();
         let mut root = input.root;
@@ -2446,3 +2526,12 @@ fn estimate_render_item_count(display_list: &DisplayList) -> usize {
         })
         .sum()
 }
+
+// Phase 3 / Plan 03-01: the runtime uses `ImeUpdateSink` (a small
+// `Vec<UiEvent>`-backed `ImeEventSink`) to collect events from
+// `driver.poll()`. The runtime cannot directly implement
+// `ImeEventSink` because that would require two simultaneous
+// `&mut self` borrows (one for the driver, one for the sink) —
+// the local-sink indirection keeps the borrow checker happy and
+// is also faster (one drain per frame, no extra heap traffic
+// outside the events themselves).
