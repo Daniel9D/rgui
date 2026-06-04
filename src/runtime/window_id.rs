@@ -61,7 +61,6 @@ impl fmt::Display for WindowId {
     }
 }
 
-#[cfg(feature = "winit")]
 impl From<winit::window::WindowId> for WindowId {
     /// Best-effort conversion from winit's `WindowId`.
     ///
@@ -73,8 +72,11 @@ impl From<winit::window::WindowId> for WindowId {
     /// (focus routing, snapshot identity), not platform identity.
     /// Other host libraries (SDL, native platforms) should write
     /// their own `From` impls in their own crates.
+    ///
+    /// Unconditional: `winit` is an unconditional dep of the lib
+    /// (the lib has no default features that would gate it out).
     fn from(id: winit::window::WindowId) -> Self {
-        use std::hash::{BuildHasher, Hasher};
+        use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         std::hash::Hash::hash(&id, &mut hasher);
         Self::new(hasher.finish())

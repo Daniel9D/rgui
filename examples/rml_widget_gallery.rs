@@ -4,7 +4,7 @@
 // cargo run --features rml --example rml_widget_gallery
 
 use rgui::render::wgpu::{RendererOptions, SurfaceRenderer};
-use rgui::runtime::{FrameInput, UiRuntime};
+use rgui::runtime::{FrameInput, ProcessContext, UiRuntime, WindowId};
 use rgui::{
     KeyEvent, Point, PointerButton, PointerEvent, Size, SizeU32, Theme, UiEvent, Vec2,
     WheelDeltaMode, WheelEvent,
@@ -17,7 +17,7 @@ use winit::{
     event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{Key, NamedKey},
-    window::{Window, WindowAttributes, WindowId},
+    window::{Window, WindowAttributes, WindowId as WinitWindowId},
 };
 
 const GALLERY_RML: &str = include_str!("rml_widget_gallery.rml");
@@ -25,7 +25,7 @@ const GALLERY_RML: &str = include_str!("rml_widget_gallery.rml");
 struct GalleryApp {
     window: Option<Window>,
     renderer: Option<SurfaceRenderer>,
-    runtime: UiRuntime,
+    runtime: Option<UiRuntime>,
     cursor: Option<Point>,
 }
 
@@ -44,24 +44,30 @@ impl ApplicationHandler for GalleryApp {
             pollster::block_on(SurfaceRenderer::new(&window, RendererOptions::default()))
                 .expect("surface renderer initializes");
 
+        self.runtime = Some(UiRuntime::for_window(
+            <WindowId as From<WinitWindowId>>::from(window.id()),
+            &ProcessContext::new(),
+        ));
         self.renderer = Some(renderer);
         self.window = Some(window);
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WinitWindowId, event: WindowEvent) {
+        let _ = id;
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Ime(ime_event) => {
-                match ime_event {
-                    Ime::Preedit(text, cursor_range) => {
-                        self.runtime
-                            .dispatch(UiEvent::ImePreedit(rgui::core::ImePreedit {
+                if let Some(runtime) = self.runtime.as_mut() {
+                    match ime_event {
+                        Ime::Preedit(text, cursor_range) => {
+                            runtime.dispatch(UiEvent::ImePreedit(rgui::core::ImePreedit {
                                 text,
                                 cursor_byte_range: cursor_range,
                             }));
+                        }
+                        Ime::Commit(text) => runtime.dispatch(UiEvent::ImeCommit(text)),
+                        _ => {}
                     }
-                    Ime::Commit(text) => self.runtime.dispatch(UiEvent::ImeCommit(text)),
-                    _ => {}
                 }
                 self.request_redraw();
             }
@@ -73,16 +79,20 @@ impl ApplicationHandler for GalleryApp {
             WindowEvent::CursorMoved { position, .. } => {
                 let point = Point::new(position.x as f32, position.y as f32);
                 self.cursor = Some(point);
-                self.runtime.dispatch(pointer_move(point));
+                if let Some(runtime) = self.runtime.as_mut() {
+                    runtime.dispatch(pointer_move(point));
+                }
                 self.request_redraw();
             }
             WindowEvent::MouseInput { state, button, .. } if runtime_button(button).is_some() => {
                 if let Some(point) = self.cursor {
                     let button = runtime_button(button).expect("guarded by match");
-                    match state {
-                        ElementState::Pressed => self.runtime.dispatch(pointer_down(point, button)),
-                        ElementState::Released => {
-                            self.runtime.dispatch(pointer_release(point, button))
+                    if let Some(runtime) = self.runtime.as_mut() {
+                        match state {
+                            ElementState::Pressed => runtime.dispatch(pointer_down(point, button)),
+                            ElementState::Released => {
+                                runtime.dispatch(pointer_release(point, button))
+                            }
                         }
                     }
                     self.request_redraw();
@@ -90,17 +100,21 @@ impl ApplicationHandler for GalleryApp {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let point = self.cursor.unwrap_or_else(|| Point::new(0.0, 0.0));
-                self.runtime.dispatch(wheel_event(point, delta));
+                if let Some(runtime) = self.runtime.as_mut() {
+                    runtime.dispatch(wheel_event(point, delta));
+                }
                 self.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
-                match event.logical_key {
-                    Key::Named(NamedKey::Tab) => self.runtime.dispatch(key_event("Tab")),
-                    Key::Named(NamedKey::Escape) => self.runtime.dispatch(key_event("Escape")),
-                    Key::Character(value) => {
-                        self.runtime.dispatch(UiEvent::TextInput(value.to_string()))
+                if let Some(runtime) = self.runtime.as_mut() {
+                    match event.logical_key {
+                        Key::Named(NamedKey::Tab) => runtime.dispatch(key_event("Tab")),
+                        Key::Named(NamedKey::Escape) => runtime.dispatch(key_event("Escape")),
+                        Key::Character(value) => {
+                            runtime.dispatch(UiEvent::TextInput(value.to_string()))
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
                 self.request_redraw();
             }
@@ -114,19 +128,21 @@ impl ApplicationHandler for GalleryApp {
                         }
 
                         let size = renderer.renderer().context().size();
-                        let output = self.runtime.update(FrameInput {
-                            root: parsed.element,
-                            viewport: Size::new(
-                                size.width.max(1) as f32,
-                                size.height.max(1) as f32,
-                            ),
-                            theme: Theme::light(),
-                            scale_factor: 1.0,
-                        });
+                        if let Some(runtime) = self.runtime.as_mut() {
+                            let output = runtime.update(FrameInput {
+                                root: parsed.element,
+                                viewport: Size::new(
+                                    size.width.max(1) as f32,
+                                    size.height.max(1) as f32,
+                                ),
+                                theme: Theme::light(),
+                                scale_factor: 1.0,
+                            });
 
-                        renderer
-                            .render(&output.display_list, &output.resources)
-                            .expect("RML gallery render succeeds");
+                            renderer
+                                .render(&output.display_list, &output.resources)
+                                .expect("RML gallery render succeeds");
+                        }
                     }
                     #[cfg(not(feature = "rml"))]
                     {
@@ -175,7 +191,7 @@ fn run() {
     let mut app = GalleryApp {
         window: None,
         renderer: None,
-        runtime: UiRuntime::default(),
+        runtime: None,
         cursor: None,
     };
     event_loop.run_app(&mut app).expect("app runs");

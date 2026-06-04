@@ -20,7 +20,6 @@ arboard = "3.4.0"
 
 [features]
 default = ["text", "images", "accessibility", "debug"]
-winit = []
 text = []
 images = []
 svg = []

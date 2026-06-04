@@ -1,5 +1,5 @@
 use rgui::render::wgpu::{RendererOptions, SurfaceRenderer};
-use rgui::runtime::{FrameInput, UiRuntime};
+use rgui::runtime::{FrameInput, ProcessContext, UiRuntime, WindowId};
 use rgui::widgets::{
     button, canvas, checkbox, divider, icon, input, list, menu, option, popover, radio, select,
     table, tabs, text, textarea, tooltip, tree,
@@ -9,13 +9,13 @@ use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
-    window::{Window, WindowAttributes, WindowId},
+    window::{Window, WindowAttributes, WindowId as WinitWindowId},
 };
 
 struct ShowcaseApp {
     window: Option<Window>,
     renderer: Option<SurfaceRenderer>,
-    runtime: UiRuntime,
+    runtime: Option<UiRuntime>,
 }
 
 impl ApplicationHandler for ShowcaseApp {
@@ -26,11 +26,16 @@ impl ApplicationHandler for ShowcaseApp {
         let renderer =
             pollster::block_on(SurfaceRenderer::new(&window, RendererOptions::default()))
                 .expect("surface renderer initializes");
+        self.runtime = Some(UiRuntime::for_window(
+            <WindowId as From<WinitWindowId>>::from(window.id()),
+            &ProcessContext::new(),
+        ));
         self.renderer = Some(renderer);
         self.window = Some(window);
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WinitWindowId, event: WindowEvent) {
+        let _ = id;
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
@@ -39,9 +44,11 @@ impl ApplicationHandler for ShowcaseApp {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Some(renderer) = self.renderer.as_mut() {
+                if let (Some(renderer), Some(runtime)) =
+                    (self.renderer.as_mut(), self.runtime.as_mut())
+                {
                     let size = renderer.renderer().context().size();
-                    let output = self.runtime.update(FrameInput {
+                    let output = runtime.update(FrameInput {
                         root: showcase_tree(),
                         viewport: Size::new(size.width.max(1) as f32, size.height.max(1) as f32),
                         theme: Theme::light(),
@@ -68,7 +75,7 @@ fn main() {
     let mut app = ShowcaseApp {
         window: None,
         renderer: None,
-        runtime: UiRuntime::default(),
+        runtime: None,
     };
     event_loop.run_app(&mut app).expect("app runs");
 }
