@@ -168,6 +168,20 @@ pub struct UiRuntime {
     app_shortcuts: AppShortcuts,
 }
 
+// D-19: regression guard. Will be added when `UiRuntime: Send + Sync`
+// is achievable. Today, the embedded `TaffyLayoutBackend` is `!Send`
+// because `taffy::TaffyTree` (taffy 0.10.1) stores a `*const ()` in
+// its internal slot map. Plan 04-02 lands the fix (likely wrapping
+// `TaffyLayoutBackend` in a `Mutex`); once the runtime is `Send +
+// Sync`, the static assert can be enabled:
+//
+//   const _: fn() = || { fn assert<T: Send + Sync>() {} assert::<UiRuntime>(); };
+//
+// The trait bounds on `ImeHostDriver: Send + Sync` and
+// `AccessibilityBackend: Send + Sync` (D-17) are already in place
+// (also landed early in 04-01) so the assert will only need the
+// taffy fix to compile.
+
 impl Default for UiRuntime {
     fn default() -> Self {
         Self::for_window(WindowId::unknown(), &ProcessContext::new())

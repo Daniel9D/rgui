@@ -53,7 +53,12 @@ pub trait ImeEventSink {
 /// `MockDriver` has a script cursor). The trait is intentionally
 /// sync: per `PROJECT.md` the hot path is sync; async drivers wrap
 /// their own runtime.
-pub trait ImeHostDriver {
+///
+/// `Send + Sync` is required so `Box<dyn ImeHostDriver>` is
+/// `Send + Sync` and `UiRuntime` (which holds one) can move
+/// between threads — necessary for multi-threaded host loops
+/// (winit's `EventLoop::run` on Linux / Windows, e.g.).
+pub trait ImeHostDriver: Send + Sync {
     /// Drain any pending IME events into `sink`. Called once per
     /// frame, before the runtime processes the input event queue.
     fn poll(&mut self, sink: &mut dyn ImeEventSink);

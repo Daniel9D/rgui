@@ -126,6 +126,12 @@ impl SemanticTree {
     }
 }
 
-pub trait AccessibilityBackend {
+/// Backend that receives the runtime's per-frame semantic tree.
+///
+/// `Send + Sync` is required so `Box<dyn AccessibilityBackend>` is
+/// `Send + Sync` and `UiRuntime` (which holds one) can move
+/// between threads — necessary for multi-threaded host loops
+/// (winit's `EventLoop::run` on Linux / Windows, e.g.).
+pub trait AccessibilityBackend: Send + Sync {
     fn update(&mut self, tree: &SemanticTree);
 }
