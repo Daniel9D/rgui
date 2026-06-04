@@ -145,8 +145,36 @@ impl WgpuRenderer {
     }
 
     pub fn new_headless_for_tests() -> Self {
-        pollster::block_on(Self::new_headless(RendererOptions::default()))
-            .expect("headless renderer initializes")
+        let defaults = RendererOptions::default();
+        Self::new_headless_for_tests_with_backends(
+            defaults.initial_size,
+            defaults.format,
+            defaults.backends,
+        )
+    }
+
+    /// Headless test seam that lets a test pick the GPU backend, surface
+    /// size, and texture format. Used by `tests/visual_goldens_vulkan.rs`
+    /// to render the existing visual goldens against a non-primary
+    /// backend (e.g. `wgpu::Backends::VULKAN`) and confirm that the
+    /// wgpu render path is stable across backends (REND-01).
+    ///
+    /// All other `RendererOptions` fields (e.g. `power_preference`) fall
+    /// back to `RendererOptions::default()`. Pass
+    /// `RendererOptions::default().backends` to reproduce the behavior
+    /// of [`new_headless_for_tests`].
+    pub fn new_headless_for_tests_with_backends(
+        size: SizeU32,
+        format: wgpu::TextureFormat,
+        backends: wgpu::Backends,
+    ) -> Self {
+        pollster::block_on(Self::new_headless(RendererOptions {
+            initial_size: size,
+            format,
+            backends,
+            ..RendererOptions::default()
+        }))
+        .expect("headless renderer initializes")
     }
 
     pub fn context(&self) -> &WgpuContext {
