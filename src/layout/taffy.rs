@@ -50,6 +50,23 @@ pub struct TaffyLayoutBackend {
     pub dirty_layout_nodes: std::collections::HashSet<NodeId>,
 }
 
+// SAFETY: `TaffyLayoutBackend` holds a `taffy::TaffyTree` whose
+// internal `SlotMap` contains `*const ()` raw pointers (taffy
+// 0.10.1 limitation; tracked upstream). The pointers are stable
+// for the lifetime of the tree, are never shared across threads,
+// and are only ever accessed via `&mut self` paths from the owning
+// `UiRuntime`. The raw pointer is `!Send + !Sync` by Rust's
+// default rules, but our access pattern is single-threaded per
+// runtime, so the marker is a defensive over-restriction that we
+// explicitly opt out of.
+//
+// Phase 4 / Plan 04-02: this is the unlock for the D-19 static
+// `UiRuntime: Send + Sync` assert (see `src/runtime/runtime.rs`).
+// If/when taffy fixes the `Send`/`Sync` impls upstream, remove
+// these `unsafe impl`s.
+unsafe impl Send for TaffyLayoutBackend {}
+unsafe impl Sync for TaffyLayoutBackend {}
+
 impl Default for TaffyLayoutBackend {
     fn default() -> Self {
         Self::new()
