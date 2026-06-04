@@ -14,6 +14,7 @@ pub mod runtime;
 pub mod state;
 pub mod text_metrics;
 pub mod tree;
+pub mod window_id;
 
 pub use animation::{AnimationClock, AnimationId};
 pub use app::{App, AppOptions};
@@ -36,3 +37,4 @@ pub use state::{
     ScrollState,
 };
 pub use tree::{IdAllocator, UiNode, UiTree, stable_portal_child_id};
+pub use window_id::WindowId;
