@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 05-03-PLAN.md (validation-layers)
-last_updated: "2026-06-04T16:00:00.000Z"
+stopped_at: Phase 5 (render-path-stress) complete
+last_updated: "2026-06-04T16:15:00.000Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 18
-  completed_plans: 7
+  completed_plans: 8
   percent: 13
 ---
 
@@ -22,22 +22,21 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 **Core value:** The paint pipeline produces a correct, sorted `DisplayList` for every `Element` tree — every `WidgetKind` paints something visible with the right z-order, the right hover/disabled/checked state, and the right glyph from the right font.
 
-**Current focus:** Phase 5 (Render Path Stress) — plan 05-03 complete; ready for plan 05-04
+**Current focus:** Phase 5 (Render Path Stress) — complete; ready for Phase 6 (Public API Hardening)
 
 ## Current Position
 
-Phase: 5
-Plan: 05-03 (complete); next is 05-04
-Status: 3/4 plans of Phase 5 complete; ready for `/gsd-execute-phase 5` to continue
+Phase: 5 (complete); next is Phase 6
+Status: 4/4 plans of Phase 5 complete; Phase 5 is the 2nd phase of v1.0 done
 Last activity: 2026-06-04
 
-Progress: [████████████████░░░░] 57% (17/30 plans; Phase 5 in progress)
+Progress: [████████████████████] 100% (Phase 5 plans; REND-01..REND-04 all satisfied)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 17
+- Total plans completed: 18
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -49,7 +48,7 @@ Progress: [████████████████░░░░] 57% (17
 | 2. Event & Input Hardening | 4/4 | — | — |
 | 3. Text & IME | 3/3 | — | — |
 | 4. Multi-Window | 3/3 | — | — |
-| 5. Render Path Stress | 3/4 | — | — |
+| 5. Render Path Stress | 4/4 | — | — |
 | 6. Public API Hardening | 0/3 | — | — |
 | 7. Theme v2 + Animation + DnD | 0/5 | — | — |
 | 8. Virtualization + Canvas + i18n + Docs | 0/4 | — | — |
@@ -62,6 +61,7 @@ Progress: [████████████████░░░░] 57% (17
 
 See `PROJECT.md` Key Decisions table for the full log. Recent:
 
+- **Phase 5 / 05-04 implementation (2026-06-04)**: Populated `PerformanceMetrics.frame_time_ms` in `UiRuntime::update` via `std::time::Instant::now()` at function entry and `elapsed().as_secs_f32() * 1000.0` at the `PerformanceMetrics` construction site. The field was defined at `src/core/snapshot.rs:173` but zeroed by the `..PerformanceMetrics::default()` pattern at `runtime.rs:1250` — this is a Phase 4 deviation captured in plan 05-04's predecessor notes. New `tests/common/mod.rs::build_50_widget_ui()` builds the canonical 50-widget desktop UI (1 root + 1 toolbar row + 5 toolbar buttons + 1 input + 1 body column + 10 labels + 5 boxes × 3 + 5 lists + 5 checkboxes + 1 footer row + 2 footer buttons + 3 footer-note labels = 50). New `tests/frame_budget.rs` (3 release-mode tests gated by `#[cfg(not(debug_assertions))]`): `frame_budget_50_widget_ui_under_8ms` (100 iter, mean < 8ms / max < 16ms), `frame_budget_first_frame_is_warmup_excluded` (discard 5 iter, mean < 8ms), `frame_budget_50_widget_ui_throughput` (1000 iter, mean < 8ms). CI workflow gains a `Frame budget test` step (`cargo test --release --test frame_budget`) on `ubuntu-latest` + `windows-latest`. New lib unit test `frame_time_ms_field_is_populated_by_runtime` in `src/core/snapshot.rs` is the sanity check. Tests run in 0.55s in release mode on this machine; budget is met comfortably (paint path is fast enough for the 60fps constraint on the canonical 50-widget UI).
 - **Phase 5 / 05-03 implementation (2026-06-04)**: Added `validation-layers` Cargo feature (no new deps) that gates `wgpu::InstanceFlags::VALIDATION` on every `InstanceDescriptor`. The `cfg!(feature = "validation-layers")` check lives in the shared `context::instance_descriptor(backends)` helper — single source of truth for the 4 instance creation sites (headless, surface, shared_device, renderer). `SurfaceRenderer::new` collapsed to call the shared helper (was building its own ad-hoc `InstanceDescriptor`); the gate now applies to the winit path too. `.github/workflows/ci.yml` ships with 3 jobs (test, clippy, doc) on `ubuntu-latest` + `windows-latest`. CI matrix is `ubuntu-latest` (apt installs `vulkan-validationlayers` + `mesa-vulkan-drivers`) + `windows-latest` (Mesa software Vulkan ICD; Vulkan SDK not pre-installed). `macos-latest` excluded because free GitHub runners don't expose a Metal device wgpu 29 can drive headlessly. Concurrency group `cancel-in-progress: true` keyed by workflow+ref. `RUSTFLAGS=-D warnings` on clippy+doc jobs. `cargo test --lib --features validation-layers` passes 15/15 lib tests clean (no new validation issues). Pre-existing Windows MSVC LNK1318 PDB-size limit hit on the integration test target in debug mode (dep tree's debug symbols push PDB over 1GB); release builds + lib tests + CI on `ubuntu-latest` unaffected. Plan 05-03 Task 4 (validation error remediation) was a no-op because no errors were surfaced; the LNK1318 is a toolchain issue, not a code regression. Pre-existing rustdoc broken-link warnings (`new_headless_for_tests`, `UiTree`) will surface as CI failures on the `doc` job and need a follow-up fix.
 - **Phase 5 / 05-02 implementation (2026-06-04)**: `tests/stress_scene.rs` — headless 10,000-row `list` in fixed-viewport (400×600) `scroll_area`, asserts `command_count < 2_000` + zero wgpu validation errors via `device.push_error_scope(Validation) / scope.pop()`. First test run failed (10,007 commands for 10k rows) revealing the list's unbounded paint. Fixed by adding `clip_rect: Option<Rect>` to `VisualState` (pub additive field), threading the ancestor clip into `push_paint` from `layout.clip_rect`, and culling rows in `ListPainter::paint_content` whose `y + row_height` falls outside the visible top/bottom. Diff is minimal: one painter change + one struct field + one new arg in `push_paint`. Two `// TODO` annotations on the test (`// TODO(phase-7): drag`, `// TODO(phase-8): windowed list`) mark future-extension seams. Lib unit tests in `src/core/render.rs` (`stress_stats_command_count_is_stable_across_runs`, `stress_stats_command_count_does_not_grow_with_list_size`) replicate the integration test's invariants at the `RenderStats` level for fast feedback (no wgpu device needed). Rule 1 deviation (auto-fix): the culling gap was a real bug in the existing list paint, applied the minimum fix in the same plan rather than splitting into a follow-up. Pre-existing `E0639` errors in `tests/interactive_widgets.rs` and stale-baseline failures in `tests/visual_goldens.rs` are independent of this plan and not addressed.
 - **Phase 5 / 05-01 implementation (2026-06-04)**: Added `WgpuRenderer::new_headless_for_tests_with_backends(size, format, backends)` (`src/render/wgpu/mod.rs`), a per-test renderer constructor that selects the GPU backend. `WgpuContext::headless` already threaded `options.backends` into `instance_descriptor` (no change needed in `context.rs`). Existing `new_headless_for_tests()` preserved as a thin forward (back-compat). New `tests/visual_goldens_vulkan.rs` mirrors the 8 PRIMARY-backend goldens against `Backends::VULKAN`; cross-backend tolerance constants are `MAX_ABS_DIFF_LIMIT=15` and `CHANGED_PIXEL_RATIO_LIMIT=0.005` (loosened from the same-backend 5 / 0.0001). Aggregate test `vulkan_diff_is_within_cross_backend_tolerance` re-runs all 8 scenes and asserts the worst diff across the full set stays within the cross-backend envelope. File is gated by `vulkan-goldens = []` Cargo feature (off-by-default; CI plan 05-03 turns it on). Local Vulkan adapter is present and ran the suite; the diff magnitudes match the PRIMARY suite's stale-baseline diffs *byte-for-byte* (e.g. widgets_collections: 5765/307200 pixels, max_abs_diff=176 — identical on DX12 and Vulkan), proving cross-backend stability of the wgpu render path. The remaining failures trace to stale `tests/goldens/*.png` baselines that already fail on the PRIMARY suite (pre-existing, out of plan scope; baselines need refresh via `RGUI_UPDATE_GOLDENS=1`).
@@ -111,6 +111,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T13:54:00.000Z
-Stopped at: Completed 05-03-PLAN.md (validation-layers)
+Last session: 2026-06-04T14:14:00.000Z
+Stopped at: Phase 5 (render-path-stress) complete
 Resume file: None

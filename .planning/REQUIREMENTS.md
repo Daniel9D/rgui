@@ -40,7 +40,7 @@
 - [x] **REND-01**: Visual goldens pass on at least two GPU backends (Vulkan + Metal, or Vulkan + DX12)
 - [x] **REND-02**: A real-world stress test scene (overlapping translucent layers, image-heavy tables, animated progress bars, IME, drag-and-drop) renders without errors
 - [x] **REND-03**: `wgpu` validation layers enabled in CI surface buffer alignment issues
-- [ ] **REND-04**: Frame CPU budget is < 8ms for a 50-widget desktop UI on a modern laptop
+- [x] **REND-04**: Frame CPU budget is < 8ms for a 50-widget desktop UI on a modern laptop
 
 ### Public API (API)
 
