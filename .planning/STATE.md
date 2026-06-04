@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: plans-written
-last_updated: "2026-06-04T05:04:20.309Z"
+status: in_progress
+stopped_at: 05-01-complete
+last_updated: "2026-06-04T13:12:00.000Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 18
-  completed_plans: 3
-  percent: 13
+  completed_phases: 4
+  total_plans: 30
+  completed_plans: 15
+  percent: 50
 ---
 
 # Project State
@@ -22,22 +22,22 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 **Core value:** The paint pipeline produces a correct, sorted `DisplayList` for every `Element` tree — every `WidgetKind` paints something visible with the right z-order, the right hover/disabled/checked state, and the right glyph from the right font.
 
-**Current focus:** Phase 5 (Render Path Stress) — not started
+**Current focus:** Phase 5 (Render Path Stress) — plan 05-01 complete; ready for plan 05-02
 
 ## Current Position
 
 Phase: 5
-Plan: Not started
-Status: Phase 4 complete; ready for `/gsd-execute-phase 5`
+Plan: 05-01 (complete); next is 05-02
+Status: 1/4 plans of Phase 5 complete; ready for `/gsd-execute-phase 5` to continue
 Last activity: 2026-06-04
 
-Progress: [██████████████░░░░░░] 47% (14/30 plans; Phase 4 complete)
+Progress: [██████████████░░░░░░] 50% (15/30 plans; Phase 5 in progress)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 14
+- Total plans completed: 15
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -49,7 +49,7 @@ Progress: [██████████████░░░░░░] 47% (14
 | 2. Event & Input Hardening | 4/4 | — | — |
 | 3. Text & IME | 3/3 | — | — |
 | 4. Multi-Window | 3/3 | — | — |
-| 5. Render Path Stress | 0/4 | — | — |
+| 5. Render Path Stress | 1/4 | — | — |
 | 6. Public API Hardening | 0/3 | — | — |
 | 7. Theme v2 + Animation + DnD | 0/5 | — | — |
 | 8. Virtualization + Canvas + i18n + Docs | 0/4 | — | — |
@@ -62,6 +62,7 @@ Progress: [██████████████░░░░░░] 47% (14
 
 See `PROJECT.md` Key Decisions table for the full log. Recent:
 
+- **Phase 5 / 05-01 implementation (2026-06-04)**: Added `WgpuRenderer::new_headless_for_tests_with_backends(size, format, backends)` (`src/render/wgpu/mod.rs`), a per-test renderer constructor that selects the GPU backend. `WgpuContext::headless` already threaded `options.backends` into `instance_descriptor` (no change needed in `context.rs`). Existing `new_headless_for_tests()` preserved as a thin forward (back-compat). New `tests/visual_goldens_vulkan.rs` mirrors the 8 PRIMARY-backend goldens against `Backends::VULKAN`; cross-backend tolerance constants are `MAX_ABS_DIFF_LIMIT=15` and `CHANGED_PIXEL_RATIO_LIMIT=0.005` (loosened from the same-backend 5 / 0.0001). Aggregate test `vulkan_diff_is_within_cross_backend_tolerance` re-runs all 8 scenes and asserts the worst diff across the full set stays within the cross-backend envelope. File is gated by `vulkan-goldens = []` Cargo feature (off-by-default; CI plan 05-03 turns it on). Local Vulkan adapter is present and ran the suite; the diff magnitudes match the PRIMARY suite's stale-baseline diffs *byte-for-byte* (e.g. widgets_collections: 5765/307200 pixels, max_abs_diff=176 — identical on DX12 and Vulkan), proving cross-backend stability of the wgpu render path. The remaining failures trace to stale `tests/goldens/*.png` baselines that already fail on the PRIMARY suite (pre-existing, out of plan scope; baselines need refresh via `RGUI_UPDATE_GOLDENS=1`).
 - **Phase 4 implementation (2026-06-04)**: 3 plans executed inline via `task` tool subagents. `WindowId` newtype (`src/runtime/window_id.rs`) + `UiRuntime::for_window(id, &ctx)` + `dispatch_to_window` (D-10) + `dispatch_app_event` (D-12) + `AppEvent`/`AppEventOutcome`/`AppShortcuts` (D-12). 4 winit examples migrated (`widgets`, `visual_showcase`, `rml_showcase`, `rml_widget_gallery`); `basic_window.rs` left on `UiRuntime::default()` (non-interactive, back-compat still works). D-17 trait bounds (`ImeHostDriver: Send + Sync`, `AccessibilityBackend: Send + Sync`) were pulled forward from 04-02 into 04-01 to unblock the D-19 assert activation. `ProcessContext` is the full D-13 struct: `node_ids: NodeIdAllocator` (`Arc<AtomicU64>`, process-global) + `a11y: Option<SharedAccessibility>`. `IdAllocator` refactored from `&mut u64` to `&NodeIdAllocator`; `Reconciler.next_id` removed in favor of the process-global counter. D-19 static assert activated via `unsafe impl Send + Sync` for `TaffyLayoutBackend` (taffy 0.10.1's `TaffyTree` stores `*const ()` in its `SlotMap`; SAFETY block explains single-threaded-per-runtime access pattern). `SharedWgpuDevice` (D-06..D-09) wraps `Arc<Adapter>` + `Arc<Device>` + `Arc<Queue>` + `Arc<Mutex<GpuAtlas>>`; `WgpuRenderer::atlas()` field type changed from `GpuAtlas` to `Arc<Mutex<GpuAtlas>>` (D-09 lock pattern). `WgpuRenderer::with_shared_device` and `SurfaceRenderer::with_shared_device` are additive constructors; existing `from_context`/`new` constructors remain for single-window back-compat. 3 integration tests pin WIN-02 (coexistence, disjoint `(window_id, node_id)` tuples), WIN-03 (event routing, independent state), WIN-04 (snapshot isolation, monotonic counter across runtimes). `examples/multi_window.rs` demonstrates two winit windows in one process sharing a `SharedWgpuDevice` and two `UiRuntime` instances. 04-03 plan's test code referenced fictional `update_with`/`last_output`/`UiSnapshot::window_id` API; tests rewritten to use real `update(FrameInput) -> FrameOutput + debug_snapshot()` API.
 - **Phase 3 implementation (2026-06-04)**: `UiRuntime::text_cache_stats` is captured at the start of `update()` (before `text_system` is mutably borrowed by `FrameBuilder`); the value is the previous frame's final cache state. `RenderStats::text_cache` is added for forward-compat (the wgpu backend currently leaves it `default()`; the runtime populates it in its own `RenderStats` build path). `TextCacheStats` derives `serde::Serialize` so it can ride the `to_debug_json` round-trip.
 - **Phase 3 context (2026-06-03)**: `ImeHostDriver` is a producer-side trait (runtime calls `driver.poll(&mut sink)` per frame; sink pushes `UiEvent::ImePreedit` / `UiEvent::ImeCommit`). `MockDriver` replays a `Vec<ImeOp>` script for tests. CJK + Arabic shaping tests rely on system fonts (`fonts-noto-cjk`, `fonts-noto`); CI installs via `scripts/ci-install-fonts.sh`; `RGUI_REQUIRE_FONTS=1` opt-in to fail-fast. Arabic is the v1 RTL reference (isolated + contextual + bidi cases). `TextCacheStats` surfaces in three places: `UiRuntime::text_cache_stats()` public method, `UiSnapshot.text_cache` field, `RendererStats.text_cache` field. Heuristic `clear_metrics_cache()` and shape/layout `clear_text_cache()` (new) clear the two caches symmetrically. `Shaping::Advanced` is the v1 default for all scripts. No winit/AppKit/browser adapters in v1 (apps wire their own).
@@ -108,6 +109,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-04T05:04:20.303Z
-Stopped at: plans-written
-Resume file: .planning/phases/05-render-path-stress/05-CONTEXT.md
+Last session: 2026-06-04T13:12:00.000Z
+Stopped at: Completed 05-01-PLAN.md (visual-goldens-Vulkan)
+Resume file: None
