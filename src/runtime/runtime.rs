@@ -11,11 +11,13 @@ use crate::layout::{LAYOUT_ENGINE_NAME, LayoutCx, TaffyLayoutBackend};
 use crate::state::{ButtonState, CheckboxState, InputState, StateArena};
 use crate::text_engine::TextSystem;
 
+use crate::core::SharedAccessibility;
+
 use super::{
     AppEvent, AppEventOutcome, AppShortcuts, BoolState, CommandQueue, DragState, FocusSystem,
-    FrameInput, FrameOutput, ImeHostDriver, ImeUpdateSink, NoopDriver, OpenOverlay,
-    PointerCapture, ProcessContext, Reconciler, ScrollState, UiCommand, UiNode, UiTree,
-    WindowId, paint, stable_portal_child_id,
+    FrameInput, FrameOutput, ImeHostDriver, ImeUpdateSink, NodeIdAllocator, NoopDriver,
+    OpenOverlay, PointerCapture, ProcessContext, Reconciler, ScrollState, UiCommand, UiNode,
+    UiTree, WindowId, paint, stable_portal_child_id,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -116,6 +118,15 @@ pub struct UiRuntime {
     /// Phase 4 / Plan 04-01: per-window identity invariant.
     /// Set once via [`UiRuntime::for_window`]. Never mutated.
     window_id: WindowId,
+    /// Phase 4 / Plan 04-02: process-global `NodeId` counter (D-14).
+    /// Cloned from the `ProcessContext` passed to
+    /// [`UiRuntime::for_window`]. Shared across every runtime
+    /// that was constructed from the same `&ctx`.
+    node_ids: NodeIdAllocator,
+    /// Phase 4 / Plan 04-02: optional shared `AccessibilityBackend`
+    /// (D-15). Cloned from the `ProcessContext`; `None` if the
+    /// context was built with `ProcessContext::new_without_a11y()`.
+    a11y: Option<SharedAccessibility>,
     tree: Option<UiTree>,
     key_to_node: HashMap<String, NodeId>,
     node_to_key: HashMap<NodeId, String>,
@@ -202,15 +213,19 @@ impl UiRuntime {
     /// Phase 4 / Plan 04-01: construct a `UiRuntime` bound to a
     /// specific window. The `window_id` is set once and is
     /// invariant for the runtime's lifetime. The `ProcessContext`
-    /// is the per-process shared state (Phase 4 / D-13); the 04-01
-    /// stub takes no parameters. `UiRuntime::default()` is a
+    /// is the per-process shared state (Phase 4 / D-13): a
+    /// process-global `NodeId` counter (D-14) and an optional
+    /// shared `AccessibilityBackend` (D-15). Both are `Arc`-shared
+    /// from the context. `UiRuntime::default()` is a
     /// backward-compat single-window shortcut that delegates here
-    /// with `WindowId::unknown()`.
-    pub fn for_window(id: WindowId, _ctx: &ProcessContext) -> Self {
+    /// with `WindowId::unknown()` and a fresh `ProcessContext`.
+    pub fn for_window(id: WindowId, ctx: &ProcessContext) -> Self {
         Self {
             reconciler: Default::default(),
             text_system: Default::default(),
             window_id: id,
+            node_ids: ctx.node_ids().clone(),
+            a11y: ctx.a11y().cloned(),
             tree: None,
             key_to_node: HashMap::new(),
             node_to_key: HashMap::new(),
@@ -263,6 +278,22 @@ impl UiRuntime {
     /// for the single-window back-compat `UiRuntime::default()`.
     pub fn window_id(&self) -> WindowId {
         self.window_id
+    }
+
+    /// Phase 4 / Plan 04-02: read the process-global `NodeId`
+    /// counter (D-14). The counter is shared with every other
+    /// `UiRuntime` constructed from the same `&ProcessContext`;
+    /// `UiRuntime::default()` (no `for_window` call) starts at 0.
+    pub fn node_ids(&self) -> &NodeIdAllocator {
+        &self.node_ids
+    }
+
+    /// Phase 4 / Plan 04-02: read the optional shared
+    /// `AccessibilityBackend` (D-15). `None` for runtimes built
+    /// via `ProcessContext::new_without_a11y()`; `Some` for the
+    /// default (noop) or a host-supplied backend.
+    pub fn a11y(&self) -> Option<&SharedAccessibility> {
+        self.a11y.as_ref()
     }
 
     /// Phase 3 / Plan 03-03: snapshot of the shape / layout text
