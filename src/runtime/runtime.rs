@@ -12,6 +12,7 @@ use crate::state::{ButtonState, CheckboxState, InputState, StateArena};
 use crate::text_engine::TextSystem;
 
 use crate::core::SharedAccessibility;
+use crate::core::a11y::AccessibilityBackend;
 
 use super::{
     AppEvent, AppEventOutcome, AppShortcuts, BoolState, CommandQueue, DragState, FocusSystem,
@@ -1214,6 +1215,18 @@ impl UiRuntime {
             fallback_used: false,
             text_cache: text_cache_stats,
         };
+        // Phase 4 / D-15: route accessibility updates through the
+        // `SharedAccessibility` (set in `for_window` from the
+        // `ProcessContext`). The legacy `a11y_backend: Option<Box<...>>`
+        // field is preserved as a public escape hatch for hosts that
+        // need a non-shared backend; if both are present, the shared
+        // path is the primary one (the legacy one is a no-op when
+        // `None`, which is the default for `for_window`-built
+        // runtimes).
+        if let Some(shared) = self.a11y.as_mut() {
+            shared.update(&builder.semantics);
+            self.a11y_update_count += 1;
+        }
         if let Some(backend) = self.a11y_backend.as_mut() {
             backend.update(&builder.semantics);
             self.a11y_update_count += 1;

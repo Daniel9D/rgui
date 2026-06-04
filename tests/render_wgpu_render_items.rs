@@ -310,7 +310,7 @@ fn missing_image_lowers_to_visible_fallback_rect() {
     }));
 
     let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("missing image should still lower");
 
     assert_eq!(items[0].pipeline, PipelineKind::SolidRect);
@@ -364,7 +364,7 @@ fn render_debug_formatters_report_items_and_batches() {
     }));
 
     let mut renderer = WgpuRenderer::new_headless_for_tests();
-    let items = build_render_items(&list, &ResourceStore::default(), renderer.atlas_mut())
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
         .expect("items lower");
     let batches = build_batches_from_items(&items);
 

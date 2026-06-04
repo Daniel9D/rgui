@@ -166,6 +166,19 @@ impl WgpuRenderer {
         &self.atlas
     }
 
+    /// Acquire a `MutexGuard` on the shared atlas. Callers that
+    /// need `&mut GpuAtlas` (e.g. the render-item builder in the
+    /// test suite) use this; the guard derefs to `&mut GpuAtlas`
+    /// and is held for the lifetime of the borrow. The mutex is
+    /// the same one every `WgpuRenderer` built from the same
+    /// `SharedWgpuDevice` locks; all renders serialize through it
+    /// (D-09).
+    pub fn atlas_mut(&self) -> std::sync::MutexGuard<'_, GpuAtlas> {
+        self.atlas
+            .lock()
+            .expect("WgpuRenderer atlas mutex poisoned")
+    }
+
     /// Upload an RGBA8 image to the shared atlas. The atlas mutex
     /// is locked for the duration of the upload (a single
     /// `queue.write_texture` call).
