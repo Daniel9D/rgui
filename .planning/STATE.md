@@ -26,10 +26,10 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 ## Current Position
 
-Phase: 3 of 8 (Text & IME) — context complete; planning next
+Phase: 4 of 8 (Multi-Window) — context complete; planning next
 Plan: 0 of 3 in current phase
-Status: Context complete; ready for `/gsd-plan-phase 3`
-Last activity: 2026-06-03 — Phase 3 `03-CONTEXT.md` written with 6 locked decisions (ImeHostDriver producer-side trait, system fonts / CI installs Noto, Arabic RTL, 3-surface TextCacheStats, preedit in existing InputState, Shaping::Advanced default)
+Status: Context complete; ready for `/gsd-plan-phase 4`
+Last activity: 2026-06-04 — Phase 4 context gathered: 19 locked decisions (WindowId invariant on UiRuntime; SharedWgpuDevice with shared atlas; host HashMap<WindowId, AppWindow> ownership; dispatch_to_window + AppEvent; ProcessContext bundles global NodeId + shared a11y; ImeHostDriver + AccessibilityBackend gain Send + Sync; static assert on UiRuntime: Send + Sync)
 
 Progress: [████████░░░░] 27% (8/30 plans)
 
