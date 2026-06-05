@@ -146,7 +146,6 @@ Plans:
   4. `register_widget_painter` and `unregister_widget_painter` are documented public API with a "writing a custom widget" guide
 
 **Plans**: 3 plans
-
 Plans:
 
 - [ ] 06-01: Doctests for every public type at the crate root
