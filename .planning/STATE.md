@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
+status: executing
 stopped_at: Phase 6 context gathered
-last_updated: "2026-06-05T13:30:45.207Z"
-last_activity: 2026-06-05 -- Phase 6 planning complete
+last_updated: "2026-06-05T13:35:32.538Z"
+last_activity: 2026-06-05 -- Phase 06 execution started
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 18
+  total_plans: 21
   completed_plans: 7
   percent: 25
 ---
@@ -22,13 +22,14 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 **Core value:** The paint pipeline produces a correct, sorted `DisplayList` for every `Element` tree — every `WidgetKind` paints something visible with the right z-order, the right hover/disabled/checked state, and the right glyph from the right font.
 
-**Current focus:** Phase 5 (Render Path Stress) — complete; ready for Phase 6 (Public API Hardening)
+**Current focus:** Phase 06 — public-api-hardening
 
 ## Current Position
 
-Phase: 5 (complete); next is Phase 6
-Status: 4/4 plans of Phase 5 complete; Phase 5 is the 2nd phase of v1.0 done
-Last activity: 2026-06-05 -- Phase 6 planning complete
+Phase: 06 (public-api-hardening) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 06
+Last activity: 2026-06-05 -- Phase 06 execution started
 
 Progress: [████████████████████] 100% (Phase 5 plans; REND-01..REND-04 all satisfied)
 
