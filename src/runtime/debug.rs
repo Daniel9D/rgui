@@ -1,3 +1,7 @@
+#![allow(clippy::unwrap_used)]
+// `writeln!` to a `String` can never fail, so the `.unwrap()` calls below are
+// infallible. The runtime-wide `clippy::unwrap_used` deny does not apply here.
+
 use crate::core::{
     BorderCmd, Color, DisplayList, LayerKind, LayerSpec, Paint, PaintCommand, Rect, RectCmd, Size,
 };

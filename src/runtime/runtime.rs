@@ -628,8 +628,11 @@ impl UiRuntime {
                             self.state_arena.insert(hit.node, InputState::new(None));
                         }
                         if let Some(state) = self.state_arena.get_mut::<InputState>(hit.node) {
+                            let kind_for_geometry = kind.expect(
+                                "WidgetKind is Some(WidgetKind::Input | Textarea) when matches!(kind, Some(WidgetKind::Input | Textarea)) is true",
+                            );
                             let (text_top_left, measure_width, style) =
-                                text_hit_geometry_for_widget(kind.unwrap(), hit.rect, &self.theme);
+                                text_hit_geometry_for_widget(kind_for_geometry, hit.rect, &self.theme);
                             let layout = self.text_system.measure(
                                 &state.text,
                                 style.font_size,

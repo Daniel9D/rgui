@@ -355,6 +355,7 @@ pub struct LayoutCacheStats {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod pointer_capture_release_tests {
     use super::*;
 

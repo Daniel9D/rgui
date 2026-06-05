@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 pub mod animation;
 pub mod app;
 pub mod app_event;
