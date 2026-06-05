@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 6 context gathered
-last_updated: "2026-06-05T13:35:32.538Z"
-last_activity: 2026-06-05 -- Phase 06 execution started
+last_updated: "2026-06-05T14:04:38.028Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 21
-  completed_plans: 7
-  percent: 25
+  completed_plans: 10
+  percent: 38
 ---
 
 # Project State
@@ -22,22 +22,21 @@ See: `.planning/PROJECT.md` (updated 2026-06-03)
 
 **Core value:** The paint pipeline produces a correct, sorted `DisplayList` for every `Element` tree — every `WidgetKind` paints something visible with the right z-order, the right hover/disabled/checked state, and the right glyph from the right font.
 
-**Current focus:** Phase 06 — public-api-hardening
+**Current focus:** Phase 6 (Public API Hardening) — complete; ready for Phase 7 (Theme v2 + Animation + DnD)
 
 ## Current Position
 
-Phase: 06 (public-api-hardening) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 06
-Last activity: 2026-06-05 -- Phase 06 execution started
+Phase: 6 (complete); next is Phase 7
+Status: 3/3 plans of Phase 6 complete; Phase 6 is the 3rd phase of v1.0 done
+Last activity: 2026-06-05 -- Phase 6 execution complete (API-01..04, CUST-01..03 all satisfied)
 
-Progress: [████████████████████] 100% (Phase 5 plans; REND-01..REND-04 all satisfied)
+Progress: [████████████████████] 100% (Phase 6 plans; API-01..04 + CUST-01..03 all satisfied)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 18
+- Total plans completed: 21
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -50,11 +49,23 @@ Progress: [████████████████████] 100% (P
 | 3. Text & IME | 3/3 | — | — |
 | 4. Multi-Window | 3/3 | — | — |
 | 5. Render Path Stress | 4/4 | — | — |
-| 6. Public API Hardening | 0/3 | — | — |
+| 6. Public API Hardening | 3/3 | — | — |
 | 7. Theme v2 + Animation + DnD | 0/5 | — | — |
 | 8. Virtualization + Canvas + i18n + Docs | 0/4 | — | — |
+| 06 | 3 | - | - |
 
 *Updated after each plan completion*
+| Phase 06 P02 | 8 min | 5 tasks | 5 files |
+| Phase 06 P01 | 25 min | 7 tasks | 13 files |
+| Phase 06 P03 | 10 min | 5 tasks | 4 files |
+
+## Accumulated Context
+
+### Decisions
+
+- **Phase 6 / 06-03 implementation (2026-06-05)**: `docs/writing-a-custom-widget.md` 5-step guide (define → register → use → unregister → integration-test) uses the actual `&'static dyn WidgetPainter` API (not the `Arc` form from the plan sketch — that was wrong). `examples/custom_widget.rs` demonstrates a `StatusPillPainter` for `WidgetKind::Badge`; `tests/widget_painter_registry.rs` pins the round-trip with an `AtomicUsize` counter, asserting painter IS invoked after register and is NOT invoked after unregister.
+- **Phase 6 / 06-02 implementation (2026-06-05)**: Replaced `kind.unwrap()` at `runtime.rs:632` with `kind.expect(...)` naming the matches! invariant. Added `#![deny(clippy::unwrap_used)]` to `src/runtime/mod.rs`. Added `#[allow(clippy::unwrap_used)]` to `src/runtime/debug.rs` (file-level inner attribute — `writeln!` to `String` is infallible) and to the `mod pointer_capture_release_tests` test module. New `tests/unwrap_audit.rs` regression test strips `#[cfg(test)]` blocks + respects file-level `#![allow(clippy::unwrap_used)]` opt-outs. Enforcement is now two layers: clippy deny (compile-time) + grep audit (test-time).
+- **Phase 6 / 06-01 implementation (2026-06-05)**: Added 49 doctests across 30+ public types (every `pub use widgets::spec::{...}` re-export + top-level types Color/Point/Size/SizeU32/Rect/DisplayList/RenderStats/UiSnapshot/FrameInput/FrameOutput/UiRuntime/WgpuRenderer/TextSystem). Fixed 8 rustdoc warnings (the plan mentioned 2 from Phase 5; the actual count grew as Phase 5 changes added more): 5 in `paint.rs` (UiTree/DisplayList/LayerKind::order broken links + 2 private-painter references), 2 in `reconcile.rs` (`prior[i]` and `new[i]` false-positive links), 1 in `wgpu/mod.rs` (new_headless_for_tests). Also fixed a pre-existing doctest bug in `widgets/forms.rs:155` where `select_options` was not imported. New `tests/doc_build_clean.rs` regression test spawns `cargo doc --no-deps --document-private-items` and asserts exit 0 + zero `warning:` lines. The `#[non_exhaustive]` SelectSpec doctest uses a workaround (build default + push to options) since struct-expression syntax is forbidden for non-exhaustive types.
 
 ## Accumulated Context
 
@@ -77,8 +88,8 @@ See `PROJECT.md` Key Decisions table for the full log. Recent:
 
 ### Pending Todos
 
-- Wire `Reconciler::diff` into `runtime::update` (replacing `reconcile_with_dirty` for unkeyed nodes). Tracked for Phase 6 (Public API Hardening).
-- Add `release_captures_for_unmounted` call into `update()` after the diff runs. Tracked for Phase 6.
+- Wire `Reconciler::diff` into `runtime::update` (replacing `reconcile_with_dirty` for unkeyed nodes). Tracked for Phase 6 (Public API Hardening). **Not addressed in 06-01/02/03 — out of plan scope; remains pending for a future phase.**
+- Add `release_captures_for_unmounted` call into `update()` after the diff runs. Tracked for Phase 6. **Not addressed in 06-01/02/03 — out of plan scope; remains pending.**
 - Add `LayoutCache` reads into the paint path (currently the paint path still walks taffy). Tracked for Phase 5 (Render Path Stress).
 - Wire `ModalSpec::trap_focus` into the runtime's overlay-scope routing (currently the new `FocusManager::tab_next` is the lighter-weight alternative, but the existing `FocusSystem` is what the runtime actually uses). Tracked for a future phase if/when a real-world modal needs it.
 - Write a winit `ImeHostDriver` adapter as a v1.x follow-up. Not in scope for Phase 3.
@@ -87,8 +98,8 @@ See `PROJECT.md` Key Decisions table for the full log. Recent:
 
 ### Blockers/Concerns
 
-- The runtime paint path has `unwrap()` calls in widget painters. Phase 6 (Public API Hardening) plans to audit and remove them.
-- The current `WidgetPainter` trait is `Send + Sync`; verify all custom painters written by users are also `Send + Sync`. Phase 6 plans to add a guide.
+- ~~The runtime paint path has `unwrap()` calls in widget painters.~~ **Resolved in 06-02** (1 production-code unwrap replaced; `#![deny(clippy::unwrap_used)]` + `tests/unwrap_audit.rs` enforce going forward).
+- ~~The current `WidgetPainter` trait is `Send + Sync`; verify all custom painters written by users are also `Send + Sync`.~~ **Resolved in 06-03** (`docs/writing-a-custom-widget.md` documents the contract; `tests/widget_painter_registry.rs` pins the round-trip).
 - The `runtime ↔ widgets` module boundary still has widget painters living in `runtime/paint.rs`; Phase 7 (Theme v2) is the natural place to do the architectural split (8.2 from the feedback review).
 
 ## Deferred Items
@@ -112,6 +123,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-05T13:15:46.307Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-public-api-hardening/06-CONTEXT.md
+Last session: 2026-06-05T14:10:00.000Z
+Stopped at: Phase 6 execution complete; ready for Phase 7
+Resume file: none needed — Phase 7 is the next phase; run `/gsd-execute-phase 7` to continue
