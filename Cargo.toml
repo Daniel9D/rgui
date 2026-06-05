@@ -53,3 +53,8 @@ required-features = ["rml"]
 [[example]]
 name = "rml_widget_gallery"
 required-features = ["rml"]
+
+# Plan 06-03 (API-04 + CUST-01..03): demonstrates the `WidgetPainter`
+# extension point. No special features required.
+[[example]]
+name = "custom_widget"
