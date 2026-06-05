@@ -39,6 +39,16 @@ use crate::core::{
     AtlasEntryKind, DisplayList, ImageId, RenderStats, RendererBackend, ResourceStore, SizeU32,
 };
 
+/// The `wgpu`-backed renderer. Lowers a [`DisplayList`]
+/// into GPU draw calls and submits them to a `wgpu::Surface` or an
+/// offscreen target.
+///
+/// ```rust,no_run
+/// use rgui::render::wgpu::WgpuRenderer;
+/// // WgpuRenderer requires a real GPU device to construct. The doctest
+/// // only verifies the type name + import path resolve.
+/// let _ = std::marker::PhantomData::<WgpuRenderer>;
+/// ```
 pub struct WgpuRenderer {
     context: WgpuContext,
     pipelines: PipelineCache,
@@ -162,7 +172,7 @@ impl WgpuRenderer {
     /// All other `RendererOptions` fields (e.g. `power_preference`) fall
     /// back to `RendererOptions::default()`. Pass
     /// `RendererOptions::default().backends` to reproduce the behavior
-    /// of [`new_headless_for_tests`].
+    /// of `[\`new_headless_for_tests\`]`.
     pub fn new_headless_for_tests_with_backends(
         size: SizeU32,
         format: wgpu::TextureFormat,

@@ -15,6 +15,12 @@
 
 use serde::Serialize;
 
+/// A 2D point in widget-local coordinates (floats).
+///
+/// ```rust
+/// use rgui::core::Point;
+/// let _ = Point::new(10.0, 20.0);
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Point {
     pub x: f32,
@@ -71,6 +77,12 @@ impl From<Vec2> for Point {
     }
 }
 
+/// A 2D size in layout-space (floats).
+///
+/// ```rust
+/// use rgui::core::Size;
+/// let _ = Size::new(800.0, 600.0);
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Size {
     pub width: f32,
@@ -92,6 +104,12 @@ impl Size {
     }
 }
 
+/// A 2D size in physical-pixel space (integers).
+///
+/// ```rust
+/// use rgui::core::SizeU32;
+/// let _ = SizeU32::new(1920, 1080);
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct SizeU32 {
     pub width: u32,
@@ -104,6 +122,12 @@ impl SizeU32 {
     }
 }
 
+/// An axis-aligned rectangle defined by an origin `Point` and a `Size`.
+///
+/// ```rust
+/// use rgui::core::{Point, Rect, Size};
+/// let _ = Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 50.0));
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Rect {
     pub origin: Point,

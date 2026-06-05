@@ -131,7 +131,7 @@ impl Reconciler {
     /// in place but possibly dirty), plus per-node `DirtyFlags` for
     /// downstream passes.
     ///
-    /// For v1 the diff is *positional*: prior[i] is paired with new[i].
+    /// For v1 the diff is *positional*: `prior[i]` is paired with `new[i]`.
     /// If the pair's `WidgetKind` is the same, it's a PATCH and state
     /// is preserved. If the kinds differ, the old is unmounted and the
     /// new is mounted (state reset). If the lists are different

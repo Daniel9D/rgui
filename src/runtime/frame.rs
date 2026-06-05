@@ -4,6 +4,12 @@ use crate::core::{
     SemanticTree, Size, Theme, UiSnapshot,
 };
 
+/// The input the runtime needs to produce one frame.
+///
+/// ```rust
+/// use rgui::runtime::FrameInput;
+/// let _ = FrameInput::default();
+/// ```
 #[derive(Clone, Debug)]
 pub struct FrameInput {
     pub root: Element,
@@ -28,6 +34,14 @@ impl Default for FrameInput {
     }
 }
 
+/// The output the runtime produces for one frame.
+///
+/// ```rust
+/// use rgui::runtime::FrameOutput;
+/// // `FrameOutput` is not `Default`; the value is constructed by the runtime.
+/// // This doctest only verifies the type resolves by referencing it.
+/// fn _frame_output_resolves(_: &FrameOutput) {}
+/// ```
 #[derive(Clone, Debug)]
 pub struct FrameOutput {
     pub display_list: DisplayList,

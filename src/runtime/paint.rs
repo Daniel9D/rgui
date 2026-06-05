@@ -1,9 +1,10 @@
 //! Paint pipeline for the rgui runtime.
 //!
-//! The pipeline walks the [`UiTree`] in document order and emits a
-//! [`DisplayList`] of [`PaintCommand`]s. Widget painting is delegated
-//! to per-`WidgetKind` [`WidgetPainter`] impls; primitives (Row, Column,
-//! Grid, Stack, Absolute, ScrollArea) are painted inline.
+//! The pipeline walks the [`UiTree`](crate::runtime::tree::UiTree) in document
+//! order and emits a [`DisplayList`](crate::core::DisplayList) of
+//! [`PaintCommand`]s. Widget painting is delegated to per-`WidgetKind`
+//! [`WidgetPainter`] impls; primitives (Row, Column, Grid, Stack, Absolute,
+//! ScrollArea) are painted inline.
 //!
 //! # Z-layer contract
 //!
@@ -11,8 +12,9 @@
 //! `z_index` ascending before submission. Stack-management commands
 //! ([`PaintCommand::PushLayer`], [`PaintCommand::PopLayer`],
 //! [`PaintCommand::PushClip`], [`PaintCommand::PopClip`]) sort first
-//! (i32::MIN) so they bracket their content. See [`LayerKind::order`]
-//! for the overlay ordering source of truth.
+//! (i32::MIN) so they bracket their content. See
+//! [`LayerKind::order`](crate::core::LayerKind::order) for the overlay
+//! ordering source of truth.
 //!
 //! # WidgetPainter contract
 //!
@@ -393,8 +395,9 @@ impl<'a> PaintCtx<'a> {
 ///
 /// `paint_content` must therefore start all commands at **z + 2** or higher.
 ///
-/// Widgets that have a fundamentally different background geometry (e.g. [`CheckboxPainter`],
-/// [`RadioPainter`]) may override `paint` entirely and manage their own z-layers.
+/// Widgets that have a fundamentally different background geometry (e.g. the
+/// built-in `CheckboxPainter` and `RadioPainter`) may override `paint` entirely
+/// and manage their own z-layers.
 pub trait WidgetPainter: Send + Sync {
     // ── Override hooks ────────────────────────────────────────────────────────
 

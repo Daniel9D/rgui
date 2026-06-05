@@ -55,6 +55,13 @@ pub struct TextCacheStats {
     pub layout_entries: usize,
 }
 
+/// The text engine: shapes text via `cosmic-text`, caches the results,
+/// and uploads glyph atlases to the GPU.
+///
+/// ```rust
+/// use rgui::text_engine::TextSystem;
+/// let _ = TextSystem::default();
+/// ```
 pub struct TextSystem {
     engine: CosmicTextEngine,
     font_system: glyphon::cosmic_text::FontSystem,

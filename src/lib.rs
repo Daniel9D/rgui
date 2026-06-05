@@ -32,6 +32,16 @@ pub mod widgets;
 // them to be discoverable at the crate root.
 #[doc(hidden)]
 pub use core::*;
+// DOCTEST AUDIT (Phase 6 06-01):
+//   The 30+ explicit `pub use widgets::spec::{...}` re-exports below are the
+//   documented crate-root public surface (per bug-fix 8.5 + API-01). Every
+//   type gets a runnable doctest. Format per Task 1 mapping:
+//     smoke   = `let _ = Type::default();`        (opaque / simple enums)
+//     usage   = full `Element::foo(...)` example   (builder types)
+//     variant = `let _ = Variant::Default;`       (tagged enums)
+//   Mapping table — kept in sync with the doctests in `src/widgets/spec.rs`:
+//   - AlertSpec, AlertVariant, AvatarSize, AvatarSpec, BadgeSpec, BadgeVariant, ButtonSpec, CardSpec, CheckboxSpec, IconSpec, ImageFit, ImageSpec, InputSpec, LinkSpec, ListSpec, MenuItemSpec, MenuSpec, ModalSpec, PopoverSpec, ProgressBarSpec, RadioSpec, SelectOption, SelectPartStyles, SelectSpec, SliderSpec, SpinnerSpec, SwitchSpec, TableSpec, TabsSpec, TextareaSpec, TooltipSpec, TreeItemSpec, TreeSpec, WidgetSpec
+//   - Special: SelectOption::new("v", "l") example (not a default ctor), WidgetSpec::Button(ButtonSpec::default()) umbrella-enum example, ImageFit / AlertVariant / BadgeVariant / AvatarSize show 2-3 variants.
 pub use widgets::spec::{
     AlertSpec, AlertVariant, AvatarSize, AvatarSpec, BadgeSpec, BadgeVariant, ButtonSpec,
     CardSpec, CheckboxSpec, IconSpec, ImageFit, ImageSpec, InputSpec, LinkSpec, ListSpec,

@@ -33,6 +33,12 @@ pub struct GlyphKey {
 /// is [`Color::DEFAULT`]. Use [`Color::is_default`] to detect it. The render
 /// path is responsible for replacing `DEFAULT` with the appropriate token
 /// (e.g. `theme.colors.text`) before lowering to the GPU.
+///
+/// ```rust
+/// use rgui::core::Color;
+/// let _ = Color::rgb(0, 128, 255);
+/// let _ = Color::DEFAULT;
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Color {
     pub r: u8,
@@ -251,6 +257,14 @@ impl PaintCommand {
     }
 }
 
+/// A sorted list of paint commands produced by the runtime. The runtime
+/// produces a `DisplayList` for each frame; the renderer lowers the list
+/// to GPU draw calls.
+///
+/// ```rust
+/// use rgui::core::DisplayList;
+/// let _ = DisplayList::default();
+/// ```
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DisplayList {
     commands: Vec<PaintCommand>,
@@ -472,6 +486,13 @@ pub struct ResourceStore {
     pub atlas_entries: Vec<AtlasEntry>,
 }
 
+/// Per-frame rendering statistics. The runtime populates this on every
+/// `update()`; the renderer can also fill in the backend-side fields.
+///
+/// ```rust
+/// use rgui::core::RenderStats;
+/// let _ = RenderStats::default();
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderStats {
     pub command_count: usize,

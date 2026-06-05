@@ -1,5 +1,12 @@
 use crate::core::WidgetKind;
 
+/// The umbrella enum that wraps every concrete spec type. The runtime
+/// converts an `Element` tree into a `WidgetSpec` during reconciliation.
+///
+/// ```rust
+/// use rgui::widgets::spec::{ButtonSpec, WidgetSpec};
+/// let _ = WidgetSpec::Button(ButtonSpec::default());
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum WidgetSpec {
     Button(ButtonSpec),
@@ -67,6 +74,12 @@ impl WidgetSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Button` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::ButtonSpec;
+/// let _ = ButtonSpec::default();
+/// ```
 pub struct ButtonSpec {
     pub label: Option<String>,
     pub disabled: bool,
@@ -75,6 +88,12 @@ pub struct ButtonSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for an `Input` text-entry widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::InputSpec;
+/// let _ = InputSpec::default();
+/// ```
 pub struct InputSpec {
     pub placeholder: Option<String>,
     pub default_value: Option<String>,
@@ -94,6 +113,12 @@ pub struct InputSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Checkbox` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::CheckboxSpec;
+/// let _ = CheckboxSpec::default();
+/// ```
 pub struct CheckboxSpec {
     pub label: Option<String>,
     pub disabled: bool,
@@ -102,6 +127,12 @@ pub struct CheckboxSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Radio` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::RadioSpec;
+/// let _ = RadioSpec::default();
+/// ```
 pub struct RadioSpec {
     pub label: Option<String>,
     pub disabled: bool,
@@ -110,6 +141,14 @@ pub struct RadioSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// A single `<option>` inside a `Select` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::SelectOption;
+/// let opt = SelectOption::new("value", "Label");
+/// assert_eq!(opt.value, "value");
+/// assert_eq!(opt.label, "Label");
+/// ```
 pub struct SelectOption {
     pub value: String,
     pub label: String,
@@ -133,6 +172,13 @@ impl SelectOption {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Per-part style overrides for a `Select` widget. Each field is
+/// `Some(Style)` to apply, `None` to inherit from the theme.
+///
+/// ```rust
+/// use rgui::widgets::spec::SelectPartStyles;
+/// let _ = SelectPartStyles::default();
+/// ```
 pub struct SelectPartStyles {
     pub trigger: Option<crate::Style>,
     pub popover: Option<crate::Style>,
@@ -145,6 +191,14 @@ pub struct SelectPartStyles {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Select` dropdown widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::{SelectOption, SelectSpec};
+/// let mut spec = SelectSpec::default();
+/// spec.options.push(SelectOption::new("v", "L"));
+/// let _ = spec;
+/// ```
 pub struct SelectSpec {
     pub placeholder: Option<String>,
     pub disabled: bool,
@@ -156,6 +210,12 @@ pub struct SelectSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a multi-line `Textarea` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::TextareaSpec;
+/// let _ = TextareaSpec::default();
+/// ```
 pub struct TextareaSpec {
     pub placeholder: Option<String>,
     pub default_value: Option<String>,
@@ -166,6 +226,12 @@ pub struct TextareaSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Tabs` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::TabsSpec;
+/// let _ = TabsSpec::default();
+/// ```
 pub struct TabsSpec {
     pub tabs: Vec<String>,
     pub active_index: Option<usize>,
@@ -173,12 +239,24 @@ pub struct TabsSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a hierarchical `Tree` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::TreeSpec;
+/// let _ = TreeSpec::default();
+/// ```
 pub struct TreeSpec {
     pub items: Vec<TreeItemSpec>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// A single node inside a `Tree` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::TreeItemSpec;
+/// let _ = TreeItemSpec::default();
+/// ```
 pub struct TreeItemSpec {
     pub label: String,
     pub expanded: bool,
@@ -187,6 +265,12 @@ pub struct TreeItemSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Table` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::TableSpec;
+/// let _ = TableSpec::default();
+/// ```
 pub struct TableSpec {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<String>>,
@@ -203,6 +287,12 @@ impl TableSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `List` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::ListSpec;
+/// let _ = ListSpec::default();
+/// ```
 pub struct ListSpec {
     pub items: Vec<String>,
     pub selected_index: Option<usize>,
@@ -210,10 +300,22 @@ pub struct ListSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Menu` widget (top-level menu container).
+///
+/// ```rust
+/// use rgui::widgets::spec::MenuSpec;
+/// let _ = MenuSpec::default();
+/// ```
 pub struct MenuSpec {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a single item inside a `Menu` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::MenuItemSpec;
+/// let _ = MenuItemSpec::default();
+/// ```
 pub struct MenuItemSpec {
     pub label: String,
     pub action: Option<String>,
@@ -223,6 +325,12 @@ pub struct MenuItemSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Modal` overlay widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::ModalSpec;
+/// let _ = ModalSpec::default();
+/// ```
 pub struct ModalSpec {
     pub title: Option<String>,
     pub close_on_escape: bool,
@@ -236,18 +344,36 @@ pub struct ModalSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Popover` floating widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::PopoverSpec;
+/// let _ = PopoverSpec::default();
+/// ```
 pub struct PopoverSpec {
     pub content_label: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Tooltip` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::TooltipSpec;
+/// let _ = TooltipSpec::default();
+/// ```
 pub struct TooltipSpec {
     pub text: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for an `Icon` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::IconSpec;
+/// let _ = IconSpec::default();
+/// ```
 pub struct IconSpec {
     pub name: String,
 }
@@ -260,6 +386,12 @@ impl IconSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for an `Image` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::ImageSpec;
+/// let _ = ImageSpec::default();
+/// ```
 pub struct ImageSpec {
     pub src: Option<String>,
     pub alt: Option<String>,
@@ -267,6 +399,12 @@ pub struct ImageSpec {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// How an `Image` widget scales its source to fit the layout box.
+///
+/// ```rust
+/// use rgui::widgets::spec::ImageFit;
+/// let _ = (ImageFit::Cover, ImageFit::Contain, ImageFit::Fill);
+/// ```
 pub enum ImageFit {
     #[default]
     Cover,
@@ -277,6 +415,12 @@ pub enum ImageFit {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Switch` toggle widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::SwitchSpec;
+/// let _ = SwitchSpec::default();
+/// ```
 pub struct SwitchSpec {
     pub label: Option<String>,
     pub disabled: bool,
@@ -285,6 +429,12 @@ pub struct SwitchSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Slider` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::SliderSpec;
+/// let _ = SliderSpec::default();
+/// ```
 pub struct SliderSpec {
     pub min: f32,
     pub max: f32,
@@ -295,6 +445,12 @@ pub struct SliderSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `ProgressBar` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::ProgressBarSpec;
+/// let _ = ProgressBarSpec::default();
+/// ```
 pub struct ProgressBarSpec {
     pub value: f32,
     pub max: f32,
@@ -303,18 +459,36 @@ pub struct ProgressBarSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Spinner` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::SpinnerSpec;
+/// let _ = SpinnerSpec::default();
+/// ```
 pub struct SpinnerSpec {
     pub label: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Badge` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::BadgeSpec;
+/// let _ = BadgeSpec::default();
+/// ```
 pub struct BadgeSpec {
     pub text: String,
     pub variant: BadgeVariant,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Color/intent variant for a `Badge` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::BadgeVariant;
+/// let _ = (BadgeVariant::Default, BadgeVariant::Primary, BadgeVariant::Success);
+/// ```
 pub enum BadgeVariant {
     #[default]
     Default,
@@ -326,6 +500,12 @@ pub enum BadgeVariant {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for an `Avatar` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::AvatarSpec;
+/// let _ = AvatarSpec::default();
+/// ```
 pub struct AvatarSpec {
     pub src: Option<String>,
     pub initials: Option<String>,
@@ -333,6 +513,12 @@ pub struct AvatarSpec {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Size preset for an `Avatar` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::AvatarSize;
+/// let _ = (AvatarSize::Sm, AvatarSize::Md, AvatarSize::Lg);
+/// ```
 pub enum AvatarSize {
     #[default]
     Md,
@@ -343,6 +529,12 @@ pub enum AvatarSize {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Link` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::LinkSpec;
+/// let _ = LinkSpec::default();
+/// ```
 pub struct LinkSpec {
     pub href: Option<String>,
     pub label: Option<String>,
@@ -351,12 +543,24 @@ pub struct LinkSpec {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for an `Alert` banner widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::AlertSpec;
+/// let _ = AlertSpec::default();
+/// ```
 pub struct AlertSpec {
     pub title: Option<String>,
     pub variant: AlertVariant,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Severity/intent variant for an `Alert` widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::AlertVariant;
+/// let _ = (AlertVariant::Info, AlertVariant::Success, AlertVariant::Error);
+/// ```
 pub enum AlertVariant {
     #[default]
     Info,
@@ -367,6 +571,12 @@ pub enum AlertVariant {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+/// Configuration for a `Card` container widget.
+///
+/// ```rust
+/// use rgui::widgets::spec::CardSpec;
+/// let _ = CardSpec::default();
+/// ```
 pub struct CardSpec {
     pub title: Option<String>,
 }

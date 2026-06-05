@@ -113,6 +113,22 @@ fn text_hit_geometry_for_widget(
     )
 }
 
+/// The top-level retained-mode UI runtime. Holds the reconciler, text
+/// system, state arena, and per-window identity. Each frame, an app
+/// pushes events in and calls [`UiRuntime::update`] to produce a
+/// [`FrameOutput`].
+///
+/// ```rust
+/// use rgui::runtime::{UiRuntime, FrameInput};
+/// use rgui::core::Element;
+///
+/// let mut runtime = UiRuntime::default();
+/// let _ = runtime.update(FrameInput {
+///     root: Element::column(),
+///     viewport: Default::default(),
+///     ..Default::default()
+/// });
+/// ```
 pub struct UiRuntime {
     reconciler: Reconciler,
     text_system: TextSystem,

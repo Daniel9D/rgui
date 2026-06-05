@@ -153,11 +153,13 @@ where
 ///
 /// Accepts any iterable whose items implement [`IntoSelectOption`]:
 /// ```
+/// use rgui::widgets::select_options;
+///
 /// // Same value and label:
-/// select_options(["Alpha", "Beta", "Gamma"])
+/// let _ = select_options(["Alpha", "Beta", "Gamma"]);
 ///
 /// // Different value and label (e.g. enum keys vs. display strings):
-/// select_options([("en", "English"), ("fr", "French")])
+/// let _ = select_options([("en", "English"), ("fr", "French")]);
 /// ```
 pub fn select_options(options: impl IntoIterator<Item = impl IntoSelectOption>) -> Element {
     let options: Vec<SelectOption> = options

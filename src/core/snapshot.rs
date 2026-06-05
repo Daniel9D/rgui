@@ -3,6 +3,14 @@ use serde::Serialize;
 use crate::{LayoutDebugSnapshot, NodeId};
 use crate::text_engine::TextCacheStats;
 
+/// A read-only snapshot of the runtime's internal state at the end of a
+/// frame. The runtime returns one of these on every `update()`.
+///
+/// ```rust
+/// use rgui::core::UiSnapshot;
+/// fn takes_snapshot(_: &UiSnapshot) {}
+/// let _ = std::marker::PhantomData::<UiSnapshot>;
+/// ```
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct UiSnapshot {
     pub tree_nodes: Vec<String>,
