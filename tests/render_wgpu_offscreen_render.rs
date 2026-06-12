@@ -45,6 +45,129 @@ fn renders_solid_rect_into_offscreen_texture() {
 }
 
 #[test]
+fn renders_linear_gradient_into_offscreen_texture() {
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(64, 16),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+
+    let mut display_list = DisplayList::default();
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(64.0, 16.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(64.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(255, 0, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(64, 16));
+    let stats = renderer
+        .render_to_target(&display_list, &ResourceStore::default(), target.view())
+        .expect("offscreen render succeeds");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    let left = sample_pixel(&pixels, 64, 2, 8);
+    let middle = sample_pixel(&pixels, 64, 32, 8);
+    let right = sample_pixel(&pixels, 64, 62, 8);
+
+    assert_eq!(stats.command_count, 1);
+    assert_eq!(stats.batch_count, 1);
+    assert!(left[0] > left[2], "left side should be red-dominant: {left:?}");
+    assert!(
+        (middle[0] as i16 - middle[2] as i16).abs() <= 20,
+        "middle should blend red and blue: {middle:?}"
+    );
+    assert!(right[2] > right[0], "right side should be blue-dominant: {right:?}");
+}
+
+#[test]
+fn clipped_linear_gradient_does_not_render_outside_clip() {
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(32, 16),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+
+    let mut display_list = DisplayList::default();
+    display_list.push(PaintCommand::PushClip(ClipSpec::rect(Rect::new(
+        Point::new(0.0, 0.0),
+        Size::new(16.0, 16.0),
+    ))));
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(32.0, 16.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(32.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(255, 0, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+    display_list.push(PaintCommand::PopClip);
+
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(32, 16));
+    renderer
+        .render_to_target(&display_list, &ResourceStore::default(), target.view())
+        .expect("offscreen render succeeds");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    assert!(sample_pixel(&pixels, 32, 8, 8)[3] > 0);
+    assert_eq!(sample_pixel(&pixels, 32, 24, 8), [0, 0, 0, 0]);
+}
+
+#[test]
+fn linear_gradient_respects_z_order() {
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(32, 16),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+
+    let mut display_list = DisplayList::default();
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(32.0, 16.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(32.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(255, 0, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(8.0, 4.0), Size::new(16.0, 8.0)),
+        paint: Paint::Solid(Color::rgb(0, 255, 0)),
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 1,
+    }));
+
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(32, 16));
+    renderer
+        .render_to_target(&display_list, &ResourceStore::default(), target.view())
+        .expect("offscreen render succeeds");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    assert_eq!(sample_pixel(&pixels, 32, 16, 8), [0, 255, 0, 255]);
+}
+
+#[test]
 fn renders_border_as_four_rect_edges() {
     let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
         initial_size: SizeU32::new(32, 32),
