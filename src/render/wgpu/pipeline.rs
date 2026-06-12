@@ -117,12 +117,13 @@ impl PipelineCache {
 /// Single source of truth mapping each `PipelineKind` to the fragment entry
 /// point in `SHADER_SOURCE` that should be used for it. Keeping this in one
 /// place makes it easy to audit which shader entry every pipeline runs.
-fn pipeline_table() -> [(PipelineKind, &'static str); 7] {
+fn pipeline_table() -> [(PipelineKind, &'static str); 8] {
     [
         (PipelineKind::SolidRect, "fs_main"),
         (PipelineKind::Border, "fs_main"),
         (PipelineKind::Path, "fs_main"),
         (PipelineKind::RoundedRect, "fs_rounded"),
+        (PipelineKind::LinearGradient, "fs_main"),
         (PipelineKind::TextGlyph, "fs_main"),
         (PipelineKind::Image, "fs_textured"),
         (PipelineKind::Svg, "fs_textured"),
