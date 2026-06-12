@@ -6,12 +6,13 @@
 //! add, remove, or rename a fragment entry.
 //!
 //! Entry summary:
-//! - `vs_main` — shared vertex shader for every pipeline.
-//! - `fs_main` — solid color output (SolidRect, Border, Path, TextGlyph).
-//! - `fs_rounded` — rounded-rect SDF output (RoundedRect). The `0.5` cutoff
+//! - `vs_main` - shared vertex shader for every pipeline.
+//! - `fs_main` - solid color output (SolidRect, Border, Path, TextGlyph).
+//! - `fs_rounded` - rounded-rect SDF output (RoundedRect). The `0.5` cutoff
 //!   here is mirrored in `render::wgpu::constants::ROUNDED_RECT_RADIUS_THRESHOLD`
 //!   on the CPU side; the CPU uses it to decide which pipeline a rect goes to.
-//! - `fs_textured` — atlas-textured color output (Image, Svg).
+//! - `fs_linear_gradient` - two-stop linear gradient output (LinearGradient).
+//! - `fs_textured` - atlas-textured color output (Image, Svg).
 //!
 //! All three fragment entries share `VertexOut`; the `radius` and `uv` fields
 //! are only meaningful for the entries that read them.
@@ -23,6 +24,9 @@ struct VertexOut {
     @location(1) uv: vec2<f32>,
     @location(2) size: vec2<f32>,
     @location(3) radius: f32,
+    @location(4) world_pos: vec2<f32>,
+    @location(5) gradient: vec4<f32>,
+    @location(6) gradient_end_color: vec4<f32>,
 };
 
 @group(0) @binding(0) var atlas_texture: texture_2d<f32>;
@@ -35,7 +39,9 @@ fn vs_main(
     @location(1) color: vec4<f32>,
     @location(2) uv_rect: vec4<f32>,
     @location(3) viewport: vec4<f32>,
-    @location(4) flags: vec4<f32>
+    @location(4) flags: vec4<f32>,
+    @location(5) gradient: vec4<f32>,
+    @location(6) gradient_end_color: vec4<f32>
 ) -> VertexOut {
     let corners = array<vec2<f32>, 6>(
         vec2<f32>(0.0, 0.0),
@@ -60,6 +66,9 @@ fn vs_main(
     );
     out.size = vec2<f32>(rect.z, rect.w);
     out.radius = flags.x;
+    out.world_pos = px;
+    out.gradient = gradient;
+    out.gradient_end_color = gradient_end_color;
     return out;
 }
 
@@ -83,6 +92,19 @@ fn fs_rounded(in: VertexOut) -> @location(0) vec4<f32> {
     let aa = 1.0;
     let alpha = 1.0 - smoothstep(-aa, aa, d);
     return vec4<f32>(in.color.rgb, in.color.a * alpha);
+}
+
+@fragment
+fn fs_linear_gradient(in: VertexOut) -> @location(0) vec4<f32> {
+    let start = in.gradient.xy;
+    let end = in.gradient.zw;
+    let axis = end - start;
+    let denom = dot(axis, axis);
+    if denom <= 0.0001 {
+        return in.color;
+    }
+    let t = clamp(dot(in.world_pos - start, axis) / denom, 0.0, 1.0);
+    return mix(in.color, in.gradient_end_color, t);
 }
 
 @fragment

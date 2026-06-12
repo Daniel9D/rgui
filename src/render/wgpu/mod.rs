@@ -378,6 +378,8 @@ impl WgpuRenderer {
                 uv_rect: item.uv_rect,
                 viewport,
                 flags: [item.radius, 0.0, 0.0, 0.0],
+                gradient: item.gradient,
+                gradient_end_color: item.gradient_end_color,
             })
             .collect()
     }

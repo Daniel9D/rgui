@@ -24,16 +24,20 @@ pub struct InstanceRaw {
     pub uv_rect: [f32; 4],
     pub viewport: [f32; 4],
     pub flags: [f32; 4],
+    pub gradient: [f32; 4],
+    pub gradient_end_color: [f32; 4],
 }
 
 impl InstanceRaw {
     pub fn vertex_buffer_layout<'a>() -> wgpu::VertexBufferLayout<'a> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+        const ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
             0 => Float32x4,
             1 => Float32x4,
             2 => Float32x4,
             3 => Float32x4,
-            4 => Float32x4
+            4 => Float32x4,
+            5 => Float32x4,
+            6 => Float32x4
         ];
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
@@ -123,7 +127,7 @@ fn pipeline_table() -> [(PipelineKind, &'static str); 8] {
         (PipelineKind::Border, "fs_main"),
         (PipelineKind::Path, "fs_main"),
         (PipelineKind::RoundedRect, "fs_rounded"),
-        (PipelineKind::LinearGradient, "fs_main"),
+        (PipelineKind::LinearGradient, "fs_linear_gradient"),
         (PipelineKind::TextGlyph, "fs_main"),
         (PipelineKind::Image, "fs_textured"),
         (PipelineKind::Svg, "fs_textured"),
