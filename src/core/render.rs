@@ -304,6 +304,7 @@ impl DisplayList {
                 }
                 PaintCommand::DrawRect(cmd) => {
                     validate_rect(cmd.rect)?;
+                    validate_paint(&cmd.paint)?;
                     validate_non_negative(cmd.radius, "rect radius")?;
                     validate_non_negative(cmd.opacity, "rect opacity")?;
                 }
@@ -374,6 +375,13 @@ pub enum DisplayListError {
     ClipStackUnbalanced(usize),
     /// A `DrawPath` had fewer than 2 points.
     PathTooShort,
+    /// A linear gradient had fewer than two color stops.
+    GradientTooFewStops,
+    /// A linear gradient stop position was not finite.
+    NonFiniteGradientStop {
+        /// Index of the invalid stop.
+        index: usize,
+    },
     /// A `Point` had non-finite coordinates.
     NonFinitePoint {
         /// Where the bad point was used.
@@ -411,6 +419,12 @@ impl std::fmt::Display for DisplayListError {
                 write!(f, "clip stack has {n} unclosed entries")
             }
             Self::PathTooShort => write!(f, "path must contain at least two points"),
+            Self::GradientTooFewStops => {
+                write!(f, "linear gradient must contain at least two stops")
+            }
+            Self::NonFiniteGradientStop { index } => {
+                write!(f, "linear gradient stop {index} position must be finite")
+            }
             Self::NonFinitePoint { field } => {
                 write!(f, "{field} coordinates must be finite")
             }
@@ -464,6 +478,25 @@ fn validate_rect(rect: Rect) -> Result<(), DisplayListError> {
         return Err(DisplayListError::InvalidRect { field: "height" });
     }
     Ok(())
+}
+
+fn validate_paint(paint: &Paint) -> Result<(), DisplayListError> {
+    match paint {
+        Paint::Solid(_) | Paint::Image(_) => Ok(()),
+        Paint::LinearGradient { start, end, stops } => {
+            validate_point(*start, "gradient start")?;
+            validate_point(*end, "gradient end")?;
+            if stops.len() < 2 {
+                return Err(DisplayListError::GradientTooFewStops);
+            }
+            for (index, (position, _color)) in stops.iter().enumerate() {
+                if !position.is_finite() {
+                    return Err(DisplayListError::NonFiniteGradientStop { index });
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -774,6 +807,14 @@ mod tests {
             (
                 DisplayListError::PathTooShort,
                 "path must contain at least two points",
+            ),
+            (
+                DisplayListError::GradientTooFewStops,
+                "linear gradient must contain at least two stops",
+            ),
+            (
+                DisplayListError::NonFiniteGradientStop { index: 2 },
+                "linear gradient stop 2 position must be finite",
             ),
             (
                 DisplayListError::NonFinitePoint { field: "text origin" },
