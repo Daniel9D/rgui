@@ -616,6 +616,69 @@ mod tests {
         assert!(list.validate().is_ok());
     }
 
+    #[test]
+    fn validate_accepts_linear_gradient_with_two_finite_stops() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(Point::new(0.0, 0.0), crate::core::Size::new(10.0, 10.0)),
+            paint: Paint::LinearGradient {
+                start: Point::new(0.0, 0.0),
+                end: Point::new(10.0, 0.0),
+                stops: vec![
+                    (0.0, Color::rgb(255, 0, 0)),
+                    (1.0, Color::rgb(0, 0, 255)),
+                ],
+            },
+            radius: 0.0,
+            opacity: 1.0,
+            z_index: 0,
+        }));
+
+        assert_eq!(list.validate(), Ok(()));
+    }
+
+    #[test]
+    fn validate_rejects_linear_gradient_with_too_few_stops() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(Point::new(0.0, 0.0), crate::core::Size::new(10.0, 10.0)),
+            paint: Paint::LinearGradient {
+                start: Point::new(0.0, 0.0),
+                end: Point::new(10.0, 0.0),
+                stops: vec![(0.0, Color::rgb(255, 0, 0))],
+            },
+            radius: 0.0,
+            opacity: 1.0,
+            z_index: 0,
+        }));
+
+        assert_eq!(list.validate().unwrap_err(), DisplayListError::GradientTooFewStops);
+    }
+
+    #[test]
+    fn validate_rejects_linear_gradient_with_non_finite_stop_position() {
+        let mut list = DisplayList::default();
+        list.push(PaintCommand::DrawRect(RectCmd {
+            rect: Rect::new(Point::new(0.0, 0.0), crate::core::Size::new(10.0, 10.0)),
+            paint: Paint::LinearGradient {
+                start: Point::new(0.0, 0.0),
+                end: Point::new(10.0, 0.0),
+                stops: vec![
+                    (0.0, Color::rgb(255, 0, 0)),
+                    (f32::NAN, Color::rgb(0, 0, 255)),
+                ],
+            },
+            radius: 0.0,
+            opacity: 1.0,
+            z_index: 0,
+        }));
+
+        assert_eq!(
+            list.validate().unwrap_err(),
+            DisplayListError::NonFiniteGradientStop { index: 1 }
+        );
+    }
+
     // Bug fix 5.7: `DisplayList::validate` now returns
     // `Result<(), DisplayListError>` so callers can match on
     // specific failure modes. The Display impl renders the
