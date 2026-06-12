@@ -379,9 +379,9 @@ fn missing_image_lowers_to_visible_fallback_rect() {
 
 #[test]
 fn instance_raw_has_stable_gpu_layout() {
-    assert_eq!(std::mem::size_of::<InstanceRaw>(), 80);
+    assert_eq!(std::mem::size_of::<InstanceRaw>(), 112);
     assert_eq!(std::mem::align_of::<InstanceRaw>(), 4);
-    assert!(InstanceRaw::vertex_buffer_layout().array_stride >= 80);
+    assert!(InstanceRaw::vertex_buffer_layout().array_stride >= 112);
 }
 
 #[test]
@@ -389,6 +389,9 @@ fn shader_source_contains_expected_entry_points() {
     let _ = std::any::type_name::<PipelineCache>();
     assert!(SHADER_SOURCE.contains("fn vs_main"));
     assert!(SHADER_SOURCE.contains("fn fs_main"));
+    assert!(SHADER_SOURCE.contains("fn fs_rounded"));
+    assert!(SHADER_SOURCE.contains("fn fs_textured"));
+    assert!(SHADER_SOURCE.contains("fn fs_linear_gradient"));
 }
 
 #[test]
