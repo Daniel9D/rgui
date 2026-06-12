@@ -14,8 +14,9 @@
 //! - `fs_linear_gradient` - two-stop linear gradient output (LinearGradient).
 //! - `fs_textured` - atlas-textured color output (Image, Svg).
 //!
-//! All three fragment entries share `VertexOut`; the `radius` and `uv` fields
-//! are only meaningful for the entries that read them.
+//! All fragment entries share `VertexOut`; `radius`, `uv`, `world_pos`,
+//! `gradient`, and `gradient_end_color` are only meaningful for the entries
+//! that read them.
 
 pub const SHADER_SOURCE: &str = r#"
 struct VertexOut {
