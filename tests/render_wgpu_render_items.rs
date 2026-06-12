@@ -40,6 +40,66 @@ fn lowers_rect_commands_to_solid_items_with_order_and_z_index() {
 }
 
 #[test]
+fn lowers_linear_gradient_rect_to_gradient_render_item() {
+    let mut list = DisplayList::default();
+    list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(4.0, 8.0), Size::new(20.0, 10.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(4.0, 8.0),
+            end: Point::new(24.0, 8.0),
+            stops: vec![
+                (0.0, Color::rgba(255, 0, 0, 200)),
+                (1.0, Color::rgba(0, 0, 255, 128)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 0.5,
+        z_index: 7,
+    }));
+
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
+        .expect("valid gradient display list lowers");
+
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].pipeline, PipelineKind::LinearGradient);
+    assert_eq!(items[0].gradient, [4.0, 8.0, 24.0, 8.0]);
+    assert_eq!(items[0].color, [1.0, 0.0, 0.0, 200.0 / 255.0 * 0.5]);
+    assert_eq!(
+        items[0].gradient_end_color,
+        [0.0, 0.0, 1.0, 128.0 / 255.0 * 0.5]
+    );
+    assert_eq!(items[0].z_index, 7);
+}
+
+#[test]
+fn linear_gradient_lowering_uses_first_and_last_stop() {
+    let mut list = DisplayList::default();
+    list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(30.0, 10.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(30.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(255, 0, 0)),
+                (0.5, Color::rgb(0, 255, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
+        .expect("valid gradient display list lowers");
+
+    assert_eq!(items[0].color, [1.0, 0.0, 0.0, 1.0]);
+    assert_eq!(items[0].gradient_end_color, [0.0, 0.0, 1.0, 1.0]);
+}
+
+#[test]
 fn render_items_preserve_layer_clip_z_and_order() {
     let clip = Rect::new(Point::new(2.0, 3.0), Size::new(12.0, 14.0));
     let mut list = DisplayList::default();
