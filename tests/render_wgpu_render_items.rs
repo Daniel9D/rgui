@@ -1,6 +1,6 @@
 use rgui::render::wgpu::{
-    InstanceRaw, MAX_RENDER_ITEMS_PER_FRAME, PipelineCache, PipelineKind, SHADER_SOURCE,
-    WgpuRenderer, build_batches_from_items, build_render_items,
+    build_batches_from_items, build_render_items, InstanceRaw, PipelineCache, PipelineKind,
+    WgpuRenderer, MAX_RENDER_ITEMS_PER_FRAME, SHADER_SOURCE,
 };
 use rgui::{
     ClipSpec, Color, DisplayList, ImageCmd, ImageId, LayerKind, LayerSpec, Paint, PaintCommand,

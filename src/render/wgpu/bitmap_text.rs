@@ -1,8 +1,8 @@
 use crate::core::{Color, LayerKind, Point, Rect, Size};
 
 use super::{
-    PipelineKind, RenderItem, color::color_to_linear, constants,
-    item::MAX_RENDER_ITEMS_PER_FRAME, item::paint_order,
+    color::color_to_linear, constants, item::paint_order, item::MAX_RENDER_ITEMS_PER_FRAME,
+    PipelineKind, RenderItem,
 };
 
 const GLYPH_WIDTH: usize = 5;
@@ -92,6 +92,8 @@ pub(crate) fn push_bitmap_text_runs_with_pipeline(
                                 + row * constants::GLYPH_ROW_STRIDE
                                 + run_start,
                         ),
+                        gradient: [0.0, 0.0, 0.0, 0.0],
+                        gradient_end_color: linear_color,
                     },
                 )?;
             }
@@ -275,5 +277,3 @@ fn bitmap_glyph(ch: char) -> [u8; GLYPH_HEIGHT] {
         ],
     }
 }
-
-

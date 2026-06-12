@@ -8,6 +8,7 @@ use super::SHADER_SOURCE;
 pub enum PipelineKind {
     SolidRect,
     RoundedRect,
+    LinearGradient,
     Border,
     TextGlyph,
     Image,

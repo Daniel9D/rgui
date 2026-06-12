@@ -1,11 +1,11 @@
-use super::{GpuAtlas, RenderItem, RendererResult};
 #[cfg(feature = "bitmap-text-fallback")]
 use super::{color::color_to_linear, constants};
 #[cfg(feature = "bitmap-text-fallback")]
 use super::{
+    item::{paint_order, MAX_RENDER_ITEMS_PER_FRAME},
     PipelineKind, RendererError,
-    item::{MAX_RENDER_ITEMS_PER_FRAME, paint_order},
 };
+use super::{GpuAtlas, RenderItem, RendererResult};
 #[cfg(feature = "bitmap-text-fallback")]
 use crate::core::{GlyphKey, Point, SizeU32};
 use crate::core::{LayerKind, Rect, TextCmd};
@@ -145,7 +145,12 @@ pub(crate) fn lower_text_glyph_atlas(
                             uv_rect: atlas_entry.uv_rect,
                             radius: 0.0,
                             z_index: cmd.z_index,
-                            order: paint_order(command_order, i * constants::GLYPH_SUB_ORDER_STRIDE),
+                            order: paint_order(
+                                command_order,
+                                i * constants::GLYPH_SUB_ORDER_STRIDE,
+                            ),
+                            gradient: [0.0, 0.0, 0.0, 0.0],
+                            gradient_end_color: color,
                         },
                     )?;
                 }
@@ -174,7 +179,11 @@ fn shape_text_for_atlas(text: &str, font_size: f32) -> Option<Vec<GlyphPosition>
     let mut buffer = Buffer::new(&mut font_system, metrics);
 
     let attrs = Attrs::new().family(Family::SansSerif);
-    buffer.set_size(&mut font_system, Some(f32::MAX), Some(line_height * constants::SHAPING_BUFFER_LINE_MULTIPLIER));
+    buffer.set_size(
+        &mut font_system,
+        Some(f32::MAX),
+        Some(line_height * constants::SHAPING_BUFFER_LINE_MULTIPLIER),
+    );
     buffer.set_text(&mut font_system, text, &attrs, Shaping::Advanced, None);
     buffer.set_wrap(&mut font_system, Wrap::Word);
     buffer.shape_until_scroll(&mut font_system, false);
@@ -212,4 +221,3 @@ struct GlyphPosition {
     width: f32,
     height: f32,
 }
-

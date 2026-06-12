@@ -1,10 +1,10 @@
 use crate::core::{
-    AtlasEntryKind, BorderCmd, ClipSpec, DisplayList, LayerKind, Paint, PaintCommand, PathCmd,
-    Point, Rect, ResourceStore, ShadowCmd, Size, effective_clip,
+    effective_clip, AtlasEntryKind, BorderCmd, ClipSpec, DisplayList, LayerKind, Paint,
+    PaintCommand, PathCmd, Point, Rect, ResourceStore, ShadowCmd, Size,
 };
 
 use super::{
-    GpuAtlas, PipelineKind, RendererError, RendererResult, color::color_to_linear, constants,
+    color::color_to_linear, constants, GpuAtlas, PipelineKind, RendererError, RendererResult,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -18,6 +18,8 @@ pub struct RenderItem {
     pub radius: f32,
     pub z_index: i32,
     pub order: u64,
+    pub gradient: [f32; 4],
+    pub gradient_end_color: [f32; 4],
 }
 
 pub const MAX_RENDER_ITEMS_PER_FRAME: usize = constants::MAX_RENDER_ITEMS_PER_FRAME;
@@ -52,16 +54,20 @@ pub fn build_render_items(
             PaintCommand::DrawImage(cmd) => {
                 let kind = AtlasEntryKind::Image(cmd.id);
                 let item = if let Some(uv_rect) = atlas.uv_for(&kind) {
+                    let color = [1.0, 1.0, 1.0, cmd.opacity];
+                    let (gradient, gradient_end_color) = no_gradient(color);
                     RenderItem {
                         layer,
                         clip_rect,
                         pipeline: PipelineKind::Image,
                         rect: cmd.rect,
-                        color: [1.0, 1.0, 1.0, cmd.opacity],
+                        color,
                         uv_rect,
                         radius: 0.0,
                         z_index: cmd.z_index,
                         order: paint_order(order, 0),
+                        gradient,
+                        gradient_end_color,
                     }
                 } else {
                     missing_resource_item(
@@ -77,16 +83,20 @@ pub fn build_render_items(
             PaintCommand::DrawSvg(cmd) => {
                 let kind = AtlasEntryKind::Svg(cmd.id);
                 let item = if let Some(uv_rect) = atlas.uv_for(&kind) {
+                    let color = [1.0, 1.0, 1.0, cmd.opacity];
+                    let (gradient, gradient_end_color) = no_gradient(color);
                     RenderItem {
                         layer,
                         clip_rect,
                         pipeline: PipelineKind::Svg,
                         rect: cmd.rect,
-                        color: [1.0, 1.0, 1.0, cmd.opacity],
+                        color,
                         uv_rect,
                         radius: 0.0,
                         z_index: cmd.z_index,
                         order: paint_order(order, 0),
+                        gradient,
+                        gradient_end_color,
                     }
                 } else {
                     missing_resource_item(
@@ -125,10 +135,27 @@ fn push_rect(
     } else {
         PipelineKind::SolidRect
     };
-    let (pipeline, color) = match cmd.paint {
-        Paint::Solid(color) => (base_pipeline, color_to_linear(color, cmd.opacity)),
-        Paint::LinearGradient { .. } => (base_pipeline, [1.0, 1.0, 1.0, cmd.opacity]),
-        Paint::Image(_) => (PipelineKind::Image, [1.0, 1.0, 1.0, cmd.opacity]),
+    let (pipeline, color, gradient, gradient_end_color) = match &cmd.paint {
+        Paint::Solid(color) => {
+            let color = color_to_linear(*color, cmd.opacity);
+            let (gradient, gradient_end_color) = no_gradient(color);
+            (base_pipeline, color, gradient, gradient_end_color)
+        }
+        Paint::LinearGradient { start, end, stops } => {
+            let (color, gradient_end_color, gradient) =
+                linear_gradient_parts(*start, *end, stops, cmd.opacity);
+            (
+                PipelineKind::LinearGradient,
+                color,
+                gradient,
+                gradient_end_color,
+            )
+        }
+        Paint::Image(_) => {
+            let color = [1.0, 1.0, 1.0, cmd.opacity];
+            let (gradient, gradient_end_color) = no_gradient(color);
+            (PipelineKind::Image, color, gradient, gradient_end_color)
+        }
     };
     push_item(
         items,
@@ -142,8 +169,29 @@ fn push_rect(
             radius: cmd.radius,
             z_index: cmd.z_index,
             order: paint_order(order, 0),
+            gradient,
+            gradient_end_color,
         },
     )
+}
+
+fn linear_gradient_parts(
+    start: Point,
+    end: Point,
+    stops: &[(f32, crate::core::Color)],
+    opacity: f32,
+) -> ([f32; 4], [f32; 4], [f32; 4]) {
+    let first = stops[0].1;
+    let last = stops[stops.len() - 1].1;
+    (
+        color_to_linear(first, opacity),
+        color_to_linear(last, opacity),
+        [start.x, start.y, end.x, end.y],
+    )
+}
+
+fn no_gradient(color: [f32; 4]) -> ([f32; 4], [f32; 4]) {
+    ([0.0, 0.0, 0.0, 0.0], color)
 }
 
 fn missing_resource_item(
@@ -153,16 +201,20 @@ fn missing_resource_item(
     z_index: i32,
     order: u64,
 ) -> RenderItem {
+    let color = [1.0, 0.0, 1.0, 1.0];
+    let (gradient, gradient_end_color) = no_gradient(color);
     RenderItem {
         layer,
         clip_rect,
         pipeline: PipelineKind::SolidRect,
         rect,
-        color: [1.0, 0.0, 1.0, 1.0],
+        color,
         uv_rect: [0.0, 0.0, 1.0, 1.0],
         radius: 0.0,
         z_index,
         order,
+        gradient,
+        gradient_end_color,
     }
 }
 
@@ -198,6 +250,8 @@ fn push_border(
                 radius: cmd.radius,
                 z_index: cmd.z_index,
                 order: paint_order(order, offset),
+                gradient: [0.0, 0.0, 0.0, 0.0],
+                gradient_end_color: color,
             },
         )?;
     }
@@ -214,6 +268,7 @@ fn push_path(
     for (offset, pair) in cmd.points.windows(2).enumerate() {
         let a = pair[0];
         let b = pair[1];
+        let color = color_to_linear(cmd.color, 1.0);
         let min_x = a.x.min(b.x);
         let min_y = a.y.min(b.y);
         let width = (a.x - b.x).abs().max(cmd.width);
@@ -225,11 +280,13 @@ fn push_path(
                 clip_rect,
                 pipeline: PipelineKind::Path,
                 rect: Rect::new(Point::new(min_x, min_y), Size::new(width, height)),
-                color: color_to_linear(cmd.color, 1.0),
+                color,
                 uv_rect: [0.0, 0.0, 1.0, 1.0],
                 radius: 0.0,
                 z_index: cmd.z_index,
                 order: paint_order(order, offset),
+                gradient: [0.0, 0.0, 0.0, 0.0],
+                gradient_end_color: color,
             },
         )?;
     }
@@ -243,7 +300,9 @@ fn push_shadow(
     layer: LayerKind,
     clip_rect: Option<Rect>,
 ) -> RendererResult<()> {
-    let expand = cmd.blur_radius + (cmd.offset.x * cmd.offset.x + cmd.offset.y * cmd.offset.y).sqrt();
+    let expand =
+        cmd.blur_radius + (cmd.offset.x * cmd.offset.x + cmd.offset.y * cmd.offset.y).sqrt();
+    let color = color_to_linear(cmd.color, constants::SHADOW_OPACITY);
     push_item(
         items,
         RenderItem {
@@ -257,11 +316,13 @@ fn push_shadow(
                     cmd.rect.size.height + expand * 2.0,
                 ),
             ),
-            color: color_to_linear(cmd.color, constants::SHADOW_OPACITY),
+            color,
             uv_rect: [0.0, 0.0, 1.0, 1.0],
             radius: 0.0,
             z_index: cmd.z_index,
             order: paint_order(order, 0),
+            gradient: [0.0, 0.0, 0.0, 0.0],
+            gradient_end_color: color,
         },
     )
 }
