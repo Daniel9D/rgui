@@ -157,6 +157,34 @@ fn clipped_scrolled_child_does_not_receive_pointer_outside_viewport() {
 }
 
 #[test]
+fn overflow_visible_child_receives_pointer_outside_parent_bounds() {
+    let mut runtime = UiRuntime::default();
+    runtime.update(FrameInput {
+        root: Element::column()
+            .key("viewport")
+            .width(40.0)
+            .height(40.0)
+            .overflow(Overflow::Visible)
+            .child(button("Wide").width(120.0).height(40.0).key("wide")),
+        viewport: Size::new(200.0, 120.0),
+        ..Default::default()
+    });
+
+    runtime.dispatch(UiEvent::PointerDown(PointerEvent {
+        position: Point::new(90.0, 20.0),
+        button: Some(PointerButton::Primary),
+        modifiers: 0,
+    }));
+    runtime.dispatch(UiEvent::PointerUp(PointerEvent {
+        position: Point::new(90.0, 20.0),
+        button: Some(PointerButton::Primary),
+        modifiers: 0,
+    }));
+
+    assert!(runtime.command_count() > 0);
+}
+
+#[test]
 fn pointer_move_updates_hovered_key() {
     let mut runtime = UiRuntime::default();
     runtime.update(FrameInput {

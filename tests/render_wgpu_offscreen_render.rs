@@ -403,6 +403,76 @@ fn push_clip_prevents_pixels_outside_clip_rect() {
 }
 
 #[test]
+fn overflow_hidden_clips_descendant_paint() {
+    let mut runtime = rgui::runtime::UiRuntime::default();
+    let root = rgui::Element::column()
+        .width(20.0)
+        .height(20.0)
+        .overflow(rgui::Overflow::Hidden)
+        .child(
+            rgui::widgets::canvas("")
+                .primary()
+                .width(40.0)
+                .height(20.0),
+        );
+
+    let output = runtime.update(rgui::runtime::FrameInput {
+        root,
+        viewport: rgui::Size::new(64.0, 32.0),
+        ..Default::default()
+    });
+
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(64, 32),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(64, 32));
+    renderer
+        .render_to_target(&output.display_list, &output.resources, target.view())
+        .expect("runtime frame renders");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    assert_eq!(sample_pixel(&pixels, 64, 10, 10), [252, 252, 253, 255]);
+    assert_eq!(sample_pixel(&pixels, 64, 30, 10), [0, 0, 0, 0]);
+}
+
+#[test]
+fn overflow_visible_allows_descendant_paint_outside_parent() {
+    let mut runtime = rgui::runtime::UiRuntime::default();
+    let root = rgui::Element::column()
+        .width(20.0)
+        .height(20.0)
+        .overflow(rgui::Overflow::Visible)
+        .child(
+            rgui::widgets::canvas("")
+                .primary()
+                .width(40.0)
+                .height(20.0),
+        );
+
+    let output = runtime.update(rgui::runtime::FrameInput {
+        root,
+        viewport: rgui::Size::new(64.0, 32.0),
+        ..Default::default()
+    });
+
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(64, 32),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(64, 32));
+    renderer
+        .render_to_target(&output.display_list, &output.resources, target.view())
+        .expect("runtime frame renders");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    assert_eq!(sample_pixel(&pixels, 64, 10, 10), [252, 252, 253, 255]);
+    assert_eq!(sample_pixel(&pixels, 64, 30, 10), [252, 252, 253, 255]);
+}
+
+#[test]
 fn renders_text_as_glyph_shape_with_transparent_holes() {
     let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
         initial_size: SizeU32::new(32, 32),
