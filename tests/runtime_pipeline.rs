@@ -1,8 +1,30 @@
 use rgui::runtime::{FrameInput, UiRuntime};
-use rgui::widgets::{button, input, modal, popover, text, tooltip};
-use rgui::{
-    Element, KeyEvent, PaintCommand, Point, PointerButton, PointerEvent, Size, Theme, UiEvent,
+use rgui::runtime::paint::{
+    PaintCtx, PaintedCommand, WidgetPainter, register_widget_painter, unregister_widget_painter,
 };
+use rgui::widgets::{badge, button, input, modal, popover, text, tooltip};
+use rgui::{
+    Color, Element, KeyEvent, PaintCommand, Point, PointerButton, PointerEvent, Rect, RectCmd, Size,
+    Theme, UiEvent, WidgetKind,
+};
+
+struct OversizedBadgePainter;
+
+impl WidgetPainter for OversizedBadgePainter {
+    fn background_color(&self, _ctx: &PaintCtx<'_>) -> Color {
+        Color::rgba(0, 0, 0, 0)
+    }
+
+    fn paint_content(&self, ctx: &mut PaintCtx<'_>, cmds: &mut Vec<PaintedCommand>) {
+        let oversized = Rect::new(
+            ctx.rect.origin,
+            rgui::Size::new(ctx.rect.size.width * 2.0, ctx.rect.size.height),
+        );
+        cmds.push(ctx.draw_rect(oversized, Color::rgb(255, 0, 0), 0.0, 0));
+    }
+}
+
+static OVERSIZED_BADGE_PAINTER: OversizedBadgePainter = OversizedBadgePainter;
 
 #[test]
 fn runtime_update_returns_all_frame_artifacts() {
@@ -180,6 +202,52 @@ fn runtime_paints_document_background_for_window_examples() {
         output.display_list.commands().first(),
         Some(PaintCommand::DrawRect(_))
     ));
+}
+
+#[test]
+fn overflow_hidden_clips_node_own_paint_commands() {
+    let old = unregister_widget_painter(WidgetKind::Badge);
+    register_widget_painter(WidgetKind::Badge, &OVERSIZED_BADGE_PAINTER);
+
+    let mut runtime = UiRuntime::default();
+    let output = runtime.update(FrameInput {
+        root: badge("wide")
+            .width(20.0)
+            .height(20.0)
+            .overflow(rgui::Overflow::Hidden),
+        viewport: Size::new(64.0, 32.0),
+        ..Default::default()
+    });
+
+    let commands = output.display_list.commands();
+    let push_index = commands
+        .iter()
+        .position(|cmd| matches!(cmd, PaintCommand::PushClip(_)))
+        .expect("overflow-hidden should push a clip");
+    let oversized_rect_index = commands
+        .iter()
+        .position(|cmd| {
+            matches!(
+                cmd,
+                PaintCommand::DrawRect(RectCmd { rect, .. })
+                    if rect.size.width > 20.0
+            )
+        })
+        .expect("custom oversized painter should emit a wide rect");
+    let pop_index = commands
+        .iter()
+        .position(|cmd| matches!(cmd, PaintCommand::PopClip))
+        .expect("overflow-hidden should pop the clip");
+
+    unregister_widget_painter(WidgetKind::Badge);
+    if let Some(old) = old {
+        register_widget_painter(WidgetKind::Badge, old);
+    }
+
+    assert!(
+        push_index < oversized_rect_index && oversized_rect_index < pop_index,
+        "own paint must be bracketed by overflow clip"
+    );
 }
 
 #[test]
