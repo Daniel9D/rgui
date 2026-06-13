@@ -101,11 +101,18 @@ fn fs_linear_gradient(in: VertexOut) -> @location(0) vec4<f32> {
     let end = in.gradient.zw;
     let axis = end - start;
     let denom = dot(axis, axis);
-    if denom <= 0.0001 {
-        return in.color;
+    var color = in.color;
+    if denom > 0.0001 {
+        let t = clamp(dot(in.world_pos - start, axis) / denom, 0.0, 1.0);
+        color = mix(in.color, in.gradient_end_color, t);
     }
-    let t = clamp(dot(in.world_pos - start, axis) / denom, 0.0, 1.0);
-    return mix(in.color, in.gradient_end_color, t);
+    if in.radius <= 0.5 {
+        return color;
+    }
+    let d = rounded_rect_sdf(in.uv * in.size, in.size, in.radius);
+    let aa = 1.0;
+    let alpha = 1.0 - smoothstep(-aa, aa, d);
+    return vec4<f32>(color.rgb, color.a * alpha);
 }
 
 @fragment

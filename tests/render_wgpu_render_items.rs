@@ -191,6 +191,41 @@ fn popover_layer_sorts_above_document_even_with_lower_z_index() {
 }
 
 #[test]
+fn gradient_in_popover_layer_sorts_above_document_even_with_lower_z_index() {
+    let mut list = DisplayList::default();
+    list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(10.0, 10.0)),
+        paint: Paint::Solid(Color::rgb(255, 0, 0)),
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 10,
+    }));
+    list.push(PaintCommand::PushLayer(LayerSpec::new(LayerKind::Popover)));
+    list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(10.0, 10.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(10.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(0, 255, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+    list.push(PaintCommand::PopLayer);
+
+    let renderer = WgpuRenderer::new_headless_for_tests();
+    let items = build_render_items(&list, &ResourceStore::default(), &mut *renderer.atlas_mut())
+        .expect("valid display list lowers");
+
+    assert_eq!(items.last().unwrap().pipeline, PipelineKind::LinearGradient);
+    assert_eq!(items.last().unwrap().layer, LayerKind::Popover);
+}
+
+#[test]
 fn composite_text_subitems_keep_command_order_relative_to_later_rects() {
     let mut list = DisplayList::default();
     list.push(PaintCommand::DrawText(TextCmd {

@@ -1,8 +1,9 @@
 use rgui::SizeU32;
 use rgui::render::wgpu::{OffscreenTarget, RendererOptions, WgpuContext, WgpuRenderer};
 use rgui::{
-    AtlasEntry, AtlasEntryKind, BorderCmd, ClipSpec, Color, DisplayList, ImageCmd, ImageId, Paint,
-    PaintCommand, PathCmd, Point, Rect, RectCmd, RendererBackend, ResourceStore, Size, TextCmd,
+    AtlasEntry, AtlasEntryKind, BorderCmd, ClipSpec, Color, DisplayList, ImageCmd, ImageId,
+    LayerKind, LayerSpec, Paint, PaintCommand, PathCmd, Point, Rect, RectCmd, RendererBackend,
+    ResourceStore, Size, TextCmd,
 };
 
 #[test]
@@ -89,6 +90,50 @@ fn renders_linear_gradient_into_offscreen_texture() {
 }
 
 #[test]
+fn rounded_linear_gradient_clips_corners() {
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(32, 32),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+
+    let mut display_list = DisplayList::default();
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(32.0, 32.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(32.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(255, 0, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 12.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(32, 32));
+    renderer
+        .render_to_target(&display_list, &ResourceStore::default(), target.view())
+        .expect("offscreen render succeeds");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    let left = sample_pixel(&pixels, 32, 4, 16);
+    let middle = sample_pixel(&pixels, 32, 16, 16);
+    let right = sample_pixel(&pixels, 32, 28, 16);
+
+    assert_eq!(sample_pixel(&pixels, 32, 1, 1), [0, 0, 0, 0]);
+    assert!(middle[3] > 240);
+    assert!(left[0] > left[2], "left side should remain red-dominant: {left:?}");
+    assert!(
+        (middle[0] as i16 - middle[2] as i16).abs() <= 24,
+        "middle should remain blended: {middle:?}"
+    );
+    assert!(right[2] > right[0], "right side should remain blue-dominant: {right:?}");
+}
+
+#[test]
 fn clipped_linear_gradient_does_not_render_outside_clip() {
     let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
         initial_size: SizeU32::new(32, 16),
@@ -165,6 +210,52 @@ fn linear_gradient_respects_z_order() {
     let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
 
     assert_eq!(sample_pixel(&pixels, 32, 16, 8), [0, 255, 0, 255]);
+}
+
+#[test]
+fn linear_gradient_respects_layer_order() {
+    let mut renderer = pollster::block_on(WgpuRenderer::new_headless(RendererOptions {
+        initial_size: SizeU32::new(32, 16),
+        ..RendererOptions::default()
+    }))
+    .expect("renderer initializes");
+
+    let mut display_list = DisplayList::default();
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(32.0, 16.0)),
+        paint: Paint::Solid(Color::rgb(255, 0, 0)),
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 10,
+    }));
+    display_list.push(PaintCommand::PushLayer(LayerSpec::new(LayerKind::Popover)));
+    display_list.push(PaintCommand::DrawRect(RectCmd {
+        rect: Rect::new(Point::new(0.0, 0.0), Size::new(32.0, 16.0)),
+        paint: Paint::LinearGradient {
+            start: Point::new(0.0, 0.0),
+            end: Point::new(32.0, 0.0),
+            stops: vec![
+                (0.0, Color::rgb(0, 255, 0)),
+                (1.0, Color::rgb(0, 0, 255)),
+            ],
+        },
+        radius: 0.0,
+        opacity: 1.0,
+        z_index: 0,
+    }));
+    display_list.push(PaintCommand::PopLayer);
+
+    let target = OffscreenTarget::new(renderer.context(), SizeU32::new(32, 16));
+    renderer
+        .render_to_target(&display_list, &ResourceStore::default(), target.view())
+        .expect("offscreen render succeeds");
+    let pixels = pollster::block_on(target.read_rgba8(renderer.context())).expect("readback works");
+
+    let left = sample_pixel(&pixels, 32, 2, 8);
+    let right = sample_pixel(&pixels, 32, 30, 8);
+
+    assert!(left[1] > left[0], "popover gradient should cover document red: {left:?}");
+    assert!(right[2] > right[0], "popover gradient should cover document red: {right:?}");
 }
 
 #[test]

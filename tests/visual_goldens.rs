@@ -233,7 +233,7 @@ fn pixel_diff_stats_counts_tolerated_drift_as_unflagged() {
 #[test]
 fn pixel_diff_stats_flags_regression_above_tolerance() {
     // One pixel of 8 channels drifts by 50 in red; the rest match.
-    let mut expected = vec![0u8; 32];
+    let expected = vec![0u8; 32];
     let mut actual = vec![0u8; 32];
     actual[0] = 50; // first pixel red channel: drift = 50
     let stats = pixel_diff_stats(&expected, &actual);
