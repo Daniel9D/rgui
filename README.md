@@ -1,179 +1,215 @@
 # rgui
 
-> ⚗️ **Vibe Coded · Experimental · Don't @ me**
+`rgui` is an experimental retained-mode GUI library for Rust, built on top of
+`wgpu`, `taffy`, and `glyphon`.
 
-A GPU-accelerated, retained-mode GUI library for Rust — built by vibes, shipped by chaos, and not ready for production (but maybe someday?).
+It is a playground for a Rust-native, GPU-first UI toolkit: an `Element` tree
+goes in, a sorted `DisplayList` comes out, and the runtime keeps layout, paint,
+event dispatch, text, and widget state moving together.
 
----
+## Project Status
 
-## ⚠️ Disclaimer
+This project is intentionally experimental and AI-assisted.
 
-This is a **vibe-coded experimental project**. That means:
+Most of the implementation has been explored and iterated with AI coding
+assistance, then tested, reviewed, and shaped into a working Rust codebase. That
+makes `rgui` useful as a research project, learning tool, and prototype surface,
+but it is not production-ready and should not be treated as a stable GUI
+framework yet.
 
-- It was built by following intuition more than specification.
-- The API **will** break. Probably often.
-- There are dragons 🐉 lurking in the corners of the codebase.
-- No stability guarantees. No semver promises. No warranties expressed or implied.
-- Issues and PRs are welcome, but expect replies written at 2 AM fueled by curiosity.
+Expect:
 
-Use it to learn, tinker, or get inspired — but **don't ship it to production** unless you're the kind of person who enjoys living dangerously.
+- API changes while the design settles.
+- incomplete or evolving widgets.
+- occasional sharp edges in rendering, layout, and platform integration.
+- tests and examples to carry more authority than long-term compatibility
+  promises.
 
----
+In other words: curious, capable, and still wearing a lab coat.
 
-## What Is This?
+## What It Does
 
-`rgui` is an experimental Rust GUI toolkit that renders everything through **wgpu** (a modern, cross-platform GPU API). It aims to be a batteries-included widget library with its own layout engine, text rendering, and even a declarative markup language.
+`rgui` provides a retained-mode UI model for desktop and embedded `wgpu`
+applications. It focuses on producing a correct GPU-ready display list from a
+declarative Rust widget tree, while keeping the public API approachable for
+application code and examples.
 
-Think of it as a playground for exploring what a Rust-native, GPU-first UI framework could look like.
+Core ideas:
 
----
+- retained `Element` trees instead of immediate-mode drawing calls.
+- GPU rendering through `wgpu`.
+- flex and grid layout through `taffy`.
+- text shaping and rendering through `glyphon`.
+- themed widgets with hover, disabled, checked, selected, focused, and active
+  states.
+- optional RML, an XML-style declarative markup format for UI experiments.
 
-## ✨ Features (so far)
+## Features
 
-- 🎨 **GPU-accelerated rendering** via [`wgpu`](https://github.com/gfx-rs/wgpu)
-- 🪟 **Windowing** via [`winit`](https://github.com/rust-windowing/winit)
-- 📐 **Flex/grid layout** powered by [`taffy`](https://github.com/DioxusLabs/taffy)
-- ✍️ **Text rendering** with [`glyphon`](https://github.com/grovesNL/glyphon)
-- 🧩 **Rich widget set** — buttons, inputs, sliders, checkboxes, modals, popovers, tooltips, tabs, tables, trees, cards, badges, avatars, alerts, spinners, progress bars, selects, and more
-- 🖼️ **Image support** via the `images` feature
-- 🔣 **SVG support** (experimental, `svg` feature)
-- ♿ **Accessibility scaffolding** (`a11y` + `accesskit` features)
-- 📝 **RML** — a custom XML-based markup language for declaring UIs declaratively (think JSX but make it Rust)
-- 🐛 **Debug tooling** built-in (`debug` feature)
-- 📋 **Clipboard** support via [`arboard`](https://github.com/1Password/arboard)
-- 🎭 **Vector path rendering** via [`kurbo`](https://github.com/linebender/kurbo)
+- GPU-accelerated rendering with `wgpu`.
+- Windowing integration with `winit`.
+- Flexbox and grid layout through `taffy`.
+- Text shaping and rendering with `glyphon`.
+- Widget coverage for buttons, inputs, textareas, sliders, checkboxes, radios,
+  selects, tabs, menus, tables, lists, trees, cards, badges, avatars, alerts,
+  spinners, progress bars, modals, popovers, tooltips, canvas primitives, and
+  images.
+- Optional RML parser for XML-style declarative UI.
+- Accessibility scaffolding through the `accessibility` and `accesskit`
+  features.
+- Debug snapshots and render validation tests for inspecting runtime output.
+- Clipboard support through `arboard`.
+- Vector path support through `kurbo`.
 
----
+## Quick Start
 
-## 🗂️ Project Structure
-
-```
-rgui/
-├── src/
-│   ├── core/          # Core abstractions and types
-│   ├── render/        # wgpu rendering pipeline
-│   ├── widgets/       # Widget specs and implementations
-│   │   ├── spec.rs        # All widget specs (the declarative API)
-│   │   ├── primitives.rs  # Box, text, image primitives
-│   │   ├── forms.rs       # Input, select, checkbox, radio, slider…
-│   │   ├── feedback.rs    # Alert, spinner, progress bar, badge…
-│   │   ├── overlays.rs    # Modal, popover, tooltip
-│   │   ├── navigation.rs  # Tabs, menu
-│   │   ├── collections.rs # Table, list, tree
-│   │   └── canvas.rs      # Canvas widget
-│   ├── layout/        # Layout engine integration (taffy)
-│   ├── text_engine/   # Text shaping & rendering (glyphon)
-│   ├── rml/           # RML markup language parser & evaluator
-│   ├── runtime/       # Event loop & application runtime
-│   ├── state/         # Application state management
-│   ├── adapters/      # Platform adapters
-│   ├── a11y.rs        # Accessibility support
-│   ├── debug.rs       # Debug utilities
-│   ├── images.rs      # Image loading
-│   └── svg.rs         # SVG rendering (stub)
-├── examples/
-│   ├── basic_window.rs        # Hello world window
-│   ├── widgets.rs             # Widget showcase
-│   ├── visual_showcase.rs     # Visual demo
-│   ├── rml_showcase.rs        # RML markup demo
-│   ├── rml_widget_gallery.rs  # Full widget gallery via RML
-│   └── debug_snapshot.rs      # Debug rendering snapshot
-└── docs/
-```
-
----
-
-## 🚀 Getting Started
+Use the crate locally while it is still experimental:
 
 ```toml
-# Cargo.toml
 [dependencies]
 rgui = { path = "path/to/rgui" }
 ```
 
-Run one of the examples to see it in action:
+Run a small window:
 
 ```bash
-# Basic window
 cargo run --example basic_window
+```
 
-# Widget showcase
+Explore the widget showcase:
+
+```bash
 cargo run --example widgets
+```
 
-# RML markup showcase (requires rml feature)
+Try the RML examples:
+
+```bash
 cargo run --example rml_showcase --features rml
-
-# Full widget gallery via RML
 cargo run --example rml_widget_gallery --features rml
 ```
 
----
+## Rust Widget Example
 
-## 🧱 The Widget System
-
-Widgets are described declaratively using **specs** — plain Rust structs that describe what should be rendered. No macros required (though RML gives you a markup option).
+Widgets are described declaratively using Rust data structures and builders.
+Application code creates an element tree; the runtime handles layout, paint, and
+events.
 
 ```rust
-use rgui::{ButtonSpec, WidgetSpec};
+use rgui::{Element, Size};
+use rgui::runtime::{FrameInput, UiRuntime};
 
-let my_button = WidgetSpec::Button(ButtonSpec {
-    label: "Click me".into(),
+let root = Element::column()
+    .child(Element::text("Hello from rgui"))
+    .child(rgui::widgets::button("Click me"));
+
+let mut runtime = UiRuntime::default();
+let frame = runtime.update(FrameInput {
+    root,
+    viewport: Size::new(800.0, 600.0),
     ..Default::default()
 });
+
+assert!(frame.display_list.commands().len() > 0);
 ```
 
----
+## RML Example
 
-## 📝 RML — Rust Markup Language
-
-`rgui` ships with an optional XML-based declarative UI format called **RML**, enabled via the `rml` feature. It lets you describe your UI in a familiar tag-based syntax:
+RML is optional and enabled with the `rml` feature. It is useful for demos,
+fixtures, and exploring declarative UI syntax without writing Rust widget code
+for every screen.
 
 ```xml
-<Button label="Click me" />
-<Card>
-  <Text>Hello from RML!</Text>
+<Card width="320" padding="16">
+  <Text>Hello from RML</Text>
   <Input placeholder="Type here..." />
+  <Button label="Submit" />
 </Card>
 ```
 
----
+## Feature Flags
 
-## 🛠️ Feature Flags
+| Feature | Description |
+| --- | --- |
+| `text` | Text rendering support. Enabled by default. |
+| `images` | Image loading and display. Enabled by default. |
+| `svg` | Experimental SVG support. |
+| `accessibility` | Accessibility scaffolding. Enabled by default. |
+| `accesskit` | AccessKit integration. |
+| `serde` | Serialization support for selected data structures. |
+| `debug` | Debug utilities and overlays. Enabled by default. |
+| `html` | Experimental HTML-oriented adapter surface. |
+| `rml` | XML-style RML parser, backed by `quick-xml`. |
+| `tailwind` | Tailwind-like adapter surface. |
+| `css` | CSS adapter surface. |
+| `canvas` | Canvas widget support. |
+| `bitmap-text-fallback` | Bitmap text fallback path. |
+| `vulkan-goldens` | Vulkan visual-golden test gate. |
+| `validation-layers` | Enables expensive `wgpu` validation layers for testing. |
 
-| Feature              | Description                              |
-|----------------------|------------------------------------------|
-| `text`               | Text rendering support (default on)      |
-| `images`             | Image loading & display (default on)     |
-| `svg`                | SVG rendering (experimental)             |
-| `accessibility`      | Accessibility scaffolding (default on)   |
-| `accesskit`          | AccessKit integration                    |
-| `rml`                | RML markup language parser               |
-| `serde`              | Serialization support for widget specs   |
-| `debug`              | Debug utilities & overlays (default on)  |
-| `html`               | HTML rendering (planned)                 |
-| `tailwind`           | Tailwind-like styling (planned)          |
-| `css`                | CSS support (planned)                    |
-| `canvas`             | Canvas widget (planned)                  |
-| `bitmap-text-fallback` | Bitmap font fallback                   |
+## Repository Layout
 
----
+```text
+rgui/
+  src/
+    core/          Core geometry, style, render, event, and snapshot types
+    render/        wgpu renderer and render-item lowering
+    runtime/       Frame runtime, reconciliation, state, paint, and events
+    layout/        taffy layout integration
+    text_engine/   glyphon-backed text measurement and shaping
+    widgets/       Widget specs, builders, and painters
+    rml/           RML parser and lowering
+    adapters/      Minimal CSS, Tailwind, and HTML-style adapters
+  examples/        Runnable examples and showcase apps
+  tests/           Contract, integration, renderer, and visual-golden tests
+  docs/            Public API notes, plans, and design documentation
+```
 
-## 🤷 Why?
+## Development
 
-Because why not? Sometimes the best way to learn how GUI frameworks work is to build one from scratch, let the vibes guide the architecture, and see what emerges.
+Run the default test suite:
 
-This project is less about shipping a polished product and more about exploring the design space of Rust GUI. Every file in here is a question asked through code.
+```bash
+cargo test
+```
 
----
+Run RML-specific tests:
 
-## 📜 License
+```bash
+cargo test --features rml --test rml
+cargo test --features rml --test widgets_example_showcase
+```
 
-TBD — for now, treat it like it's MIT. Or Apache-2.0. Honestly, just don't be weird about it.
+Run visual goldens:
 
----
+```bash
+cargo test --test visual_goldens -j1
+```
 
-<div align="center">
+The project leans heavily on tests because the implementation is still moving.
+When behavior changes intentionally, update tests and examples with the same
+care as source code.
 
-*Built with ✨ vibes ✨, Rust, and a healthy disregard for sleep.*
+## Production Readiness
 
-</div>
+`rgui` is not ready for production use.
+
+It may be useful if you want to study retained-mode UI architecture, experiment
+with `wgpu` rendering, prototype Rust-native widgets, or inspect how a GUI
+toolkit can turn a declarative tree into layout, paint, accessibility, and
+event-dispatch data.
+
+It is a bad fit today if you need semver stability, platform polish, a complete
+accessibility story, mature text editing behavior, or long-term API guarantees.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+## A Small Note From The Lab
+
+This codebase started as an AI-assisted experiment and still carries that
+spirit: fast iteration, lots of tests, a little weirdness, and a genuine attempt
+to learn by building the thing directly.
+
+Use it with curiosity. Trust it only after verification.
