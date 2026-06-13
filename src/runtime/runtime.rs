@@ -1986,7 +1986,15 @@ impl<'a> FrameBuilder<'a> {
         }
 
         self.push_semantics(tree, node, rect);
-        // Paint node background/content
+
+        let pushes_new_clip = clip_rect.is_some() && clip_rect != inherited_clip;
+        if let Some(clip) = clip_rect.filter(|_| pushes_new_clip) {
+            self.display_list
+                .push(PaintCommand::PushClip(ClipSpec::rect(clip)));
+        }
+
+        // Paint node background/content inside its own overflow clip so custom
+        // painters and canvas-like content follow CSS overflow-hidden semantics.
         self.push_paint(
             tree,
             node,
@@ -1996,14 +2004,8 @@ impl<'a> FrameBuilder<'a> {
             layout.scroll_offset,
             layout.clip_rect,
         );
-        // Collect overlay for deferred painting outside document clip stack
+        // Collect overlay for deferred painting outside document clip stack.
         self.collect_overlay(tree, node, rect);
-
-        let pushes_new_clip = clip_rect.is_some() && clip_rect != inherited_clip;
-        if let Some(clip) = clip_rect.filter(|_| pushes_new_clip) {
-            self.display_list
-                .push(PaintCommand::PushClip(ClipSpec::rect(clip)));
-        }
 
         if should_layout_children(node) {
             let active_idx = if matches!(node.kind, ElementKind::Widget(WidgetKind::Tabs)) {
