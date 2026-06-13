@@ -30,7 +30,7 @@ fn display_list_rejects_invalid_rect_geometry() {
     }));
 
     let error = list.validate().expect_err("negative width rect is invalid");
-    assert!(error.contains("width"));
+    assert!(error.to_string().contains("width"));
 }
 
 #[test]
@@ -64,7 +64,8 @@ fn display_list_rejects_invalid_text_geometry() {
     assert!(
         list.validate()
             .expect_err("invalid text origin")
-            .contains("point")
+            .to_string()
+            .contains("text origin")
     );
 }
 
@@ -78,7 +79,12 @@ fn display_list_rejects_invalid_path_geometry() {
         z_index: 0,
     }));
 
-    assert!(list.validate().expect_err("invalid path").contains("path"));
+    assert!(
+        list.validate()
+            .expect_err("invalid path")
+            .to_string()
+            .contains("path")
+    );
 }
 
 #[test]

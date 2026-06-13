@@ -502,10 +502,11 @@ fn performance_metrics_track_required_mvp_numbers() {
 
 #[test]
 fn accessibility_backend_sync_with_ui_runtime() {
-    use rgui::runtime::{FrameInput, UiRuntime};
+    use rgui::runtime::{FrameInput, ProcessContext, UiRuntime, WindowId};
     use rgui::widgets::button;
 
-    let mut runtime = UiRuntime::default();
+    let context = ProcessContext::new_without_a11y();
+    let mut runtime = UiRuntime::for_window(WindowId::unknown(), &context);
     let backend = rgui::a11y::RealAccessibilityBackend::new();
     runtime.a11y_backend = Some(Box::new(backend));
 

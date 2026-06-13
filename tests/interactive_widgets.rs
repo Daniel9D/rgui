@@ -1,9 +1,6 @@
 use rgui::runtime::{FrameInput, UiCommand, UiRuntime};
-use rgui::widgets::{button, list, menu, option, select, table, tabs, text, tree};
-use rgui::{
-    Element, LayerKind, ListSpec, Point, PointerButton, PointerEvent, SelectSpec, Size, TableSpec,
-    TabsSpec, TreeItemSpec, TreeSpec, UiEvent, WidgetSpec,
-};
+use rgui::widgets::{button, list, menu, option, select, table, tabs, text, tree, tree_item};
+use rgui::{Element, LayerKind, Point, PointerButton, PointerEvent, Size, UiEvent};
 
 fn update(runtime: &mut UiRuntime, root: Element) -> rgui::runtime::FrameOutput {
     runtime.update(FrameInput {
@@ -30,18 +27,11 @@ fn click(runtime: &mut UiRuntime, point: Point) {
 fn select_click_opens_options_without_changing_selection() {
     let app = select()
         .key("choice")
-        .widget_spec(WidgetSpec::Select(SelectSpec {
-            placeholder: None,
-            disabled: false,
-            options: vec![
-                option("One", "One"),
-                option("Two", "Two"),
-                option("Three", "Three"),
-            ],
-            selected_index: None,
-            default_value: None,
-            styles: Default::default(),
-        }));
+        .options([
+            option("One", "One"),
+            option("Two", "Two"),
+            option("Three", "Three"),
+        ]);
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let hit = output.hit_test.entries()[0].rect;
@@ -69,18 +59,11 @@ fn select_click_opens_options_without_changing_selection() {
 fn select_option_click_updates_selected_index_and_closes_options() {
     let app = select()
         .key("choice")
-        .widget_spec(WidgetSpec::Select(SelectSpec {
-            placeholder: None,
-            disabled: false,
-            options: vec![
-                option("One", "One"),
-                option("Two", "Two"),
-                option("Three", "Three"),
-            ],
-            selected_index: None,
-            default_value: None,
-            styles: Default::default(),
-        }));
+        .options([
+            option("One", "One"),
+            option("Two", "Two"),
+            option("Three", "Three"),
+        ]);
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let trigger = output.hit_test.entries()[0].rect;
@@ -125,10 +108,7 @@ fn select_option_click_updates_selected_index_and_closes_options() {
 fn tabs_update_active_tab() {
     let app = tabs()
         .key("tabs")
-        .widget_spec(WidgetSpec::Tabs(TabsSpec {
-            tabs: vec!["A".into(), "B".into()],
-            active_index: None,
-        }))
+        .tabs(["A", "B"])
         .child(text("A"))
         .child(text("B"));
     let mut runtime = UiRuntime::default();
@@ -177,17 +157,9 @@ fn menu_item_emits_click_command() {
 
 #[test]
 fn tree_click_toggles_expanded_item_state() {
-    let app = tree().key("tree").widget_spec(WidgetSpec::Tree(TreeSpec {
-        items: vec![TreeItemSpec {
-            label: "Root".into(),
-            expanded: false,
-            children: vec![TreeItemSpec {
-                label: "Child".into(),
-                expanded: false,
-                children: vec![],
-            }],
-        }],
-    }));
+    let app = tree()
+        .key("tree")
+        .items([tree_item("Root").child(tree_item("Child"))]);
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let hit = output.hit_test.entries()[0].rect;
@@ -205,11 +177,8 @@ fn tree_click_toggles_expanded_item_state() {
 fn table_click_updates_selected_row() {
     let app = table()
         .key("table")
-        .widget_spec(WidgetSpec::Table(TableSpec {
-            columns: vec!["Name".into()],
-            rows: vec![vec!["One".into()], vec!["Two".into()]],
-            selected_row: None,
-        }));
+        .columns(["Name"])
+        .rows([["One"], ["Two"]]);
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let hit = output.hit_test.entries()[0].rect;
@@ -229,10 +198,7 @@ fn table_click_updates_selected_row() {
 
 #[test]
 fn list_click_updates_selected_index() {
-    let app = list().key("list").widget_spec(WidgetSpec::List(ListSpec {
-        items: vec!["One".into(), "Two".into(), "Three".into()],
-        selected_index: None,
-    }));
+    let app = list().key("list").items(["One", "Two", "Three"]);
     let mut runtime = UiRuntime::default();
     let output = update(&mut runtime, app.clone());
     let hit = output.hit_test.entries()[0].rect;

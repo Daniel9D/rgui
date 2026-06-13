@@ -1,3 +1,5 @@
+#![cfg(feature = "rml")]
+
 use rgui::rml::{RmlAttributeStatus, parse, rml_attribute_status};
 
 #[test]
