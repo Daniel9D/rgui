@@ -226,6 +226,17 @@ geometry produced by Taffy-backed layout.
 Compatibility behavior from older manual layout paths is not preserved when it
 conflicts with Taffy semantics.
 
+Overflow is available through the Rust style API, RML attributes, CSS adapter
+properties, and Tailwind-style utility classes. `Overflow::Hidden`,
+`Overflow::Clip`, `Overflow::Scroll`, and `Overflow::Auto` clip both an
+element's own paint and descendant paint. `Overflow::Visible` leaves paint and
+hit testing unclipped unless an ancestor applies a clip.
+
+Unconstrained in-flow children contribute to parent size through Taffy layout.
+Once a parent has an explicit size, max size, root viewport constraint, or
+scroll/clip overflow, overflow no longer resizes that parent after layout;
+scroll containers instead report content size for scrolling and scrollbars.
+
 ## Overlay Taffy Layout
 
 Taffy owns overlay content size and child positions for popovers, context menus,
@@ -1466,6 +1477,7 @@ full browser DOM, CSS cascade, or Tailwind implementations.
 use rgui::adapters::minimal_css::css_to_style;
 use rgui::adapters::minimal_html::parse_element;
 use rgui::adapters::minimal_tailwind::classes_to_style;
+use rgui::Overflow;
 
 let html_element = parse_element("<button>Save</button>")?;
 let input_element = parse_element("<input />")?;
@@ -1473,6 +1485,9 @@ let div_element = parse_element("<div>Hello</div>")?;
 
 let css_style = css_to_style("padding: 12px; gap: 8px; width: 240px; height: 48px;")?;
 let tailwind_style = classes_to_style("flex gap-2 p-4")?;
+let overflow_style = classes_to_style("overflow-hidden overflow-y-auto")?;
+assert_eq!(overflow_style.overflow_x, Some(Overflow::Hidden));
+assert_eq!(overflow_style.overflow_y, Some(Overflow::Auto));
 
 # Ok::<(), String>(())
 ```
