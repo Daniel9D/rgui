@@ -1,4 +1,4 @@
-use crate::core::{Edge, Length, Style};
+use crate::core::{Edge, Length, Overflow, Style};
 
 pub fn css_to_style(input: &str) -> Result<Style, String> {
     if input.trim().is_empty() {
@@ -32,6 +32,22 @@ pub fn css_to_style(input: &str) -> Result<Style, String> {
                     style.height = Some(Length::Px(px));
                 }
             }
+            "overflow" => {
+                if let Some(overflow) = parse_overflow(value) {
+                    style.overflow_x = Some(overflow);
+                    style.overflow_y = Some(overflow);
+                }
+            }
+            "overflow-x" => {
+                if let Some(overflow) = parse_overflow(value) {
+                    style.overflow_x = Some(overflow);
+                }
+            }
+            "overflow-y" => {
+                if let Some(overflow) = parse_overflow(value) {
+                    style.overflow_y = Some(overflow);
+                }
+            }
             _ => {}
         }
     }
@@ -40,4 +56,15 @@ pub fn css_to_style(input: &str) -> Result<Style, String> {
 
 fn parse_px(value: &str) -> Option<f32> {
     value.strip_suffix("px")?.trim().parse().ok()
+}
+
+fn parse_overflow(value: &str) -> Option<Overflow> {
+    match value.trim() {
+        "visible" => Some(Overflow::Visible),
+        "hidden" => Some(Overflow::Hidden),
+        "clip" => Some(Overflow::Clip),
+        "scroll" => Some(Overflow::Scroll),
+        "auto" => Some(Overflow::Auto),
+        _ => None,
+    }
 }
