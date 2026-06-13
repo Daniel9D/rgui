@@ -103,6 +103,83 @@ fn rml_showcase_is_a_markup_gallery_for_all_supported_tags() {
     }
 }
 
+#[cfg(feature = "rml")]
+fn rml_gallery_output() -> rgui::runtime::FrameOutput {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let parsed = rgui::rml::parse(include_str!("../examples/rml_widget_gallery.rml"))
+                .expect("gallery rml parses");
+            let mut runtime = UiRuntime::default();
+            runtime.update(FrameInput {
+                root: parsed.element,
+                viewport: Size::new(880.0, 746.0),
+                ..Default::default()
+            })
+        })
+        .expect("thread spawn succeeds")
+        .join()
+        .expect("gallery render thread succeeds")
+}
+
+#[cfg(feature = "rml")]
+fn layout_rect(snapshot: &rgui::UiSnapshot, key: &str) -> rgui::Rect {
+    let layout = snapshot
+        .layout_box(key)
+        .unwrap_or_else(|| panic!("missing layout box for {key}"));
+    rgui::Rect::new(
+        rgui::Point::new(layout.x, layout.y),
+        Size::new(layout.width, layout.height),
+    )
+}
+
+#[cfg(feature = "rml")]
+fn contains_rect(outer: rgui::Rect, inner: rgui::Rect) -> bool {
+    const EPS: f32 = 0.5;
+    inner.origin.x + EPS >= outer.origin.x
+        && inner.origin.y + EPS >= outer.origin.y
+        && inner.max_x() <= outer.max_x() + EPS
+        && inner.max_y() <= outer.max_y() + EPS
+}
+
+#[cfg(feature = "rml")]
+#[test]
+fn rml_widget_gallery_collection_text_stays_inside_fixed_widgets() {
+    let output = rml_gallery_output();
+    let snapshot = output.snapshot.as_ref().expect("snapshot exists");
+
+    let cases = [
+        (
+            "This is a multi-line textarea",
+            "ref-notes",
+            "textarea default text",
+        ),
+        ("forms.rs", "ref-tree", "tree row"),
+        ("MIT/Apache-2.0", "ref-table-detailed", "table cell"),
+    ];
+
+    for (needle, owner_key, label) in cases {
+        let owner = layout_rect(snapshot, owner_key);
+        let rects: Vec<_> = output
+            .display_list
+            .commands()
+            .iter()
+            .filter_map(|command| match command {
+                PaintCommand::DrawText(cmd) if cmd.text.contains(needle) => Some(cmd.rect),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !rects.is_empty(),
+            "expected {label} text containing {needle:?}"
+        );
+        assert!(
+            rects.iter().any(|rect| contains_rect(owner, *rect)),
+            "{label} text should stay inside {owner_key}; owner={owner:?} rects={rects:?}"
+        );
+    }
+}
+
 #[test]
 fn widgets_example_forwards_scroll_and_secondary_pointer_input() {
     let source = include_str!("../examples/widgets.rs");

@@ -1110,7 +1110,7 @@ fn grid_scroll_area_renders_text_that_starts_below_initial_viewport() {
 #[test]
 fn actual_rml_gallery_renders_text_that_starts_below_initial_viewport() {
     std::thread::Builder::new()
-        .stack_size(8 * 1024 * 1024)
+        .stack_size(64 * 1024 * 1024)
         .spawn(|| {
             let parsed = rgui::rml::parse(include_str!("../examples/rml_widget_gallery.rml"))
                 .expect("gallery rml parses");
@@ -1129,10 +1129,9 @@ fn actual_rml_gallery_renders_text_that_starts_below_initial_viewport() {
                 .iter()
                 .filter_map(|command| match command {
                     PaintCommand::DrawText(cmd)
-                        if cmd.text.contains("Collection")
-                            || cmd.text.contains("Overlay")
-                            || cmd.text.contains("Primitive")
-                            || cmd.text.contains("Style") =>
+                        if cmd.text.contains("COLLECTIONS")
+                            || cmd.text.contains("OVERLAYS")
+                            || cmd.text.contains("PRIMITIVES") =>
                     {
                         Some((cmd.text.as_str(), cmd.rect))
                     }

@@ -701,7 +701,7 @@ pub(super) fn selection_color(theme: &Theme) -> Color {
 /// Callers must pass the correct origin/top-left/width from their metrics.
 pub(super) fn paint_text_field(
     ctx: &mut PaintCtx<'_>,
-    text_origin: Point,
+    _text_origin: Point,
     text_top_left: Point,
     measure_width: f32,
     cmds: &mut Vec<PaintedCommand>,
@@ -751,9 +751,38 @@ pub(super) fn paint_text_field(
             }
         }
 
-        cmds.push(text_at(display_text, text_origin, ctx.style.text_color, z + 2));
+        let visible_height = (ctx.rect.max_y() - text_top_left.y).max(1.0);
+        cmds.push(text_in_rect(
+            display_text,
+            Rect::new(
+                text_top_left,
+                Size::new(measure_width, layout.height.min(visible_height).max(1.0)),
+            ),
+            ctx.style.text_color,
+            z + 2,
+            ctx.style.font_size,
+            ctx.style.font_weight,
+        ));
     } else if let Some(placeholder) = ctx.state.label.as_ref().filter(|l| !l.is_empty()) {
-        cmds.push(text_at(placeholder.clone(), text_origin, ctx.style.text_muted_color, z + 2));
+        let layout = ctx.text.measure(
+            placeholder,
+            ctx.style.font_size,
+            ctx.style.font_weight,
+            FontStyle::Normal,
+            measure_width,
+        );
+        let visible_height = (ctx.rect.max_y() - text_top_left.y).max(1.0);
+        cmds.push(text_in_rect(
+            placeholder.clone(),
+            Rect::new(
+                text_top_left,
+                Size::new(measure_width, layout.height.min(visible_height).max(1.0)),
+            ),
+            ctx.style.text_muted_color,
+            z + 2,
+            ctx.style.font_size,
+            ctx.style.font_weight,
+        ));
         if ctx.state.focused {
             let layout = ctx.text.measure(
                 "",
@@ -787,6 +816,7 @@ pub(super) fn paint_tree_items(
     rect: Rect,
     z_index: i32,
     cmds: &mut Vec<PaintedCommand>,
+    text_system: &mut TextSystem,
     expanded_state: &std::collections::HashMap<usize, bool>,
     metrics: crate::TreeMetrics,
     text_color: Color,
@@ -806,16 +836,30 @@ pub(super) fn paint_tree_items(
         } else {
             "> "
         };
-        let display_text = format!("{}{}{}", indent, marker, item.label);
-        cmds.push(text_at(
-            display_text,
-            Point::new(
-                rect.origin.x + metrics.indent * 0.5,
-                y + metrics.row_height * 0.7,
-            ),
-            text_color,
-            z_index + 2,
-        ));
+        if y >= rect.origin.y && y + metrics.row_height <= rect.max_y() {
+            let display_text = format!("{}{}{}", indent, marker, item.label);
+            let text_x = rect.origin.x + metrics.indent * 0.5;
+            let available_width = (rect.max_x() - text_x - metrics.indent * 0.5).max(0.0);
+            let text_width = text_system
+                .measure(
+                    &display_text,
+                    DEFAULT_TEXT_SIZE,
+                    FontWeight::Normal,
+                    FontStyle::Normal,
+                    available_width,
+                )
+                .width
+                .min(available_width);
+            cmds.push(text_at_with_size_and_weight(
+                display_text,
+                Point::new(text_x, y + metrics.row_height * 0.7),
+                text_color,
+                z_index + 2,
+                DEFAULT_TEXT_SIZE,
+                FontWeight::Normal,
+                text_width,
+            ));
+        }
         *index += 1;
         if expanded && !item.children.is_empty() {
             paint_tree_items(
@@ -825,6 +869,7 @@ pub(super) fn paint_tree_items(
                 rect,
                 z_index,
                 cmds,
+                text_system,
                 expanded_state,
                 metrics,
                 text_color,
@@ -1244,6 +1289,7 @@ impl WidgetPainter for TreePainter {
             ctx.rect,
             ctx.z_index,
             cmds,
+            ctx.text,
             &ctx.state.tree_expanded,
             ctx.metrics.metrics.tree,
             ctx.style.text_color,
@@ -1279,6 +1325,9 @@ impl WidgetPainter for TablePainter {
             let y = ctx.rect.origin.y
                 + ctx.metrics.metrics.table.cell_padding
                 + r as f32 * row_height;
+            if y < ctx.rect.origin.y || y + row_height > ctx.rect.max_y() {
+                continue;
+            }
             if r == 0 {
                 cmds.push(rect_command(
                     Rect::new(
@@ -1315,11 +1364,28 @@ impl WidgetPainter for TablePainter {
                         .unwrap_or_else(|| format!("R{}C{}", r, c + 1))
                 };
                 let text_y = y + row_height * 0.5 + ctx.style.font_size * 0.3;
-                cmds.push(text_at(
+                let text_x = x + ctx.metrics.metrics.table.cell_padding;
+                let available_width =
+                    (col_width - ctx.metrics.metrics.table.cell_padding * 2.0).max(0.0);
+                let text_width = ctx
+                    .text
+                    .measure(
+                        &text_val,
+                        ctx.style.font_size,
+                        ctx.style.font_weight,
+                        FontStyle::Normal,
+                        available_width,
+                    )
+                    .width
+                    .min(available_width);
+                cmds.push(text_at_with_size_and_weight(
                     text_val,
-                    Point::new(x + ctx.metrics.metrics.table.cell_padding, text_y),
+                    Point::new(text_x, text_y),
                     ctx.style.text_color,
                     ctx.z_index + 3,
+                    ctx.style.font_size,
+                    ctx.style.font_weight,
+                    text_width,
                 ));
                 if c > 0 {
                     cmds.push(rect_command(
@@ -1419,11 +1485,27 @@ impl WidgetPainter for ListPainter {
             }
             let text_y =
                 y + row_height * 0.5 + ctx.style.font_size * 0.3;
-            cmds.push(text_at(
-                format!("  {}", label),
+            let text = format!("  {}", label);
+            let available_width = (ctx.rect.size.width - item_padding * 2.0).max(0.0);
+            let text_width = ctx
+                .text
+                .measure(
+                    &text,
+                    ctx.style.font_size,
+                    ctx.style.font_weight,
+                    FontStyle::Normal,
+                    available_width,
+                )
+                .width
+                .min(available_width);
+            cmds.push(text_at_with_size_and_weight(
+                text,
                 Point::new(ctx.rect.origin.x + item_padding, text_y),
                 if i % 2 == 0 { ctx.style.text_color } else { ctx.style.text_muted_color },
                 ctx.z_index + 3,
+                ctx.style.font_size,
+                ctx.style.font_weight,
+                text_width,
             ));
         }
     }
@@ -2263,6 +2345,36 @@ pub(super) fn text_at_with_size_and_weight(
                 // to a sensible default for the unit-tests that
                 // call this helper directly.
                 Size::new(max_width.max(1.0), line_height),
+            ),
+            color,
+            size,
+            font_weight: weight,
+            font_style: FontStyle::Normal,
+            line_height: Some(line_height),
+            z_index,
+        }),
+        snapshot: PaintCommandSnapshot {
+            kind: "DrawText".to_string(),
+            z_index,
+        },
+    }
+}
+
+pub(super) fn text_in_rect(
+    text: String,
+    rect: Rect,
+    color: Color,
+    z_index: i32,
+    size: f32,
+    weight: FontWeight,
+) -> PaintedCommand {
+    let line_height = (size * 1.2).ceil();
+    PaintedCommand {
+        command: PaintCommand::DrawText(TextCmd {
+            text,
+            rect: Rect::new(
+                rect.origin,
+                Size::new(rect.size.width.max(1.0), rect.size.height.max(line_height)),
             ),
             color,
             size,
