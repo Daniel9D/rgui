@@ -1010,6 +1010,12 @@ impl RendererBackend for NullRenderer {
 
 The WGPU API lives under `rgui::render::wgpu`.
 
+Linear gradient fidelity adds two public fields to `RenderItem` and
+`InstanceRaw`: `gradient` and `gradient_end_color`. Existing custom
+low-level integrations that construct render items should set `gradient`
+to `[0.0, 0.0, 0.0, 0.0]` and `gradient_end_color` to the same value as
+`color` for non-gradient items.
+
 ```rust
 use rgui::render::wgpu::{
     build_batches_from_items, build_render_items, OffscreenTarget, PipelineKind,
@@ -1033,7 +1039,7 @@ let allocation = atlas.allocate(
 );
 let occupancy = atlas.occupancy_count();
 
-let pipeline_kind = PipelineKind::SolidRect;
+let pipeline_kind = PipelineKind::LinearGradient;
 let shader_source = SHADER_SOURCE;
 ```
 
@@ -1074,14 +1080,19 @@ let pipeline = pipeline_cache.pipeline(PipelineKind::SolidRect);
 let bind_group_layout = pipeline_cache.bind_group_layout();
 let vertex_layout = InstanceRaw::vertex_buffer_layout();
 
+let color = [1.0, 0.0, 0.0, 1.0];
 let item = RenderItem {
+    layer: LayerKind::Document,
+    clip_rect: None,
     pipeline: PipelineKind::SolidRect,
     rect: rgui::Rect::new(rgui::Point::new(0.0, 0.0), rgui::Size::new(10.0, 10.0)),
-    color: [1.0, 0.0, 0.0, 1.0],
+    color,
     uv_rect: [0.0, 0.0, 1.0, 1.0],
     radius: 0.0,
     z_index: 0,
     order: 0,
+    gradient: [0.0, 0.0, 0.0, 0.0],
+    gradient_end_color: color,
 };
 let batches: Vec<RenderBatch> = build_batches_from_items(&[item]);
 let key = BatchKey {
