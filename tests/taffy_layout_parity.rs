@@ -144,6 +144,64 @@ fn taffy_overflow_hidden_sets_clip_rect() {
 }
 
 #[test]
+fn unconstrained_overflow_visible_parent_expands_to_fit_in_flow_child() {
+    let root = Element::column().child(
+        Element::column()
+            .overflow(rgui::Overflow::Visible)
+            .key("parent")
+            .child(Element::text("Tall").height(120.0).key("child")),
+    );
+
+    let mut reconciler = Reconciler::default();
+    let tree = reconciler.reconcile(root);
+
+    let mut backend = TaffyLayoutBackend::new();
+    let mut text = TextSystem::default();
+    let result = backend.build_from_tree(
+        &tree,
+        &mut text,
+        rgui::core::Size::new(400.0, 600.0),
+        &rgui::Theme::light(),
+    );
+
+    let parent = box_for(&result, node_for_key(&tree, "parent"));
+    let child = box_for(&result, node_for_key(&tree, "child"));
+
+    assert!(parent.local_rect.size.height >= child.local_rect.size.height);
+    assert_eq!(parent.clip_rect, None);
+}
+
+#[test]
+fn constrained_overflow_hidden_keeps_parent_size_and_reports_content_size() {
+    let mut child = Element::text("Tall").height(120.0).key("child");
+    child.style.flex_shrink = Some(0.0);
+
+    let root = Element::column()
+        .height(40.0)
+        .overflow(rgui::Overflow::Hidden)
+        .key("parent")
+        .child(child);
+
+    let mut reconciler = Reconciler::default();
+    let tree = reconciler.reconcile(root);
+
+    let mut backend = TaffyLayoutBackend::new();
+    let mut text = TextSystem::default();
+    let result = backend.build_from_tree(
+        &tree,
+        &mut text,
+        rgui::core::Size::new(400.0, 600.0),
+        &rgui::Theme::light(),
+    );
+
+    let parent = box_for(&result, node_for_key(&tree, "parent"));
+
+    assert_eq!(parent.local_rect.size.height, 40.0);
+    assert_eq!(parent.clip_rect, Some(parent.local_rect));
+    assert!(parent.content_size.height >= 120.0);
+}
+
+#[test]
 fn taffy_grid_tracks_and_placement_affect_layout() {
     let mut root_style = Style::default().display(rgui::core::Display::Grid);
     root_style.grid_template_columns =
