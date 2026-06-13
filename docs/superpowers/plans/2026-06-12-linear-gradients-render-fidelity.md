@@ -1,6 +1,6 @@
 # Linear Gradients Render Fidelity Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Render `Paint::LinearGradient` as a real WGPU linear gradient instead of a white rectangle.
 
@@ -13,6 +13,35 @@
 ## Scope Check
 
 The approved spec is a five-phase render-fidelity roadmap. This plan implements only Phase 1: Linear Gradients, because it is the first independently testable slice and produces working software on its own. Rounded borders, soft shadows, real path strokes, and resource fidelity should each receive their own implementation plan after this phase lands.
+
+## Current Status
+
+Status: **complete as of 2026-06-13**.
+
+Implementation commits on the current branch:
+
+- `80fd0e4` - `test(render): cover linear gradient validation`
+- `bd219da` - `feat(render): validate linear gradient paint`
+- `d7a24ab` - `test(render): cover linear gradient lowering`
+- `3af1ebd` - `feat(render): lower linear gradients to render items`
+- `903d752` - `fix(render): register linear gradient pipeline kind`
+- `78d9cbf` - `test(render): cover gradient shader instance layout`
+- `2901ddb` - `feat(render): add linear gradient shader`
+- `81e002b` - `docs(render): refresh gradient shader comments`
+- `65c6204` - `test(render): verify linear gradient pixels`
+- `4da7dae` - `docs(render): document linear gradient instance fields`
+- `b50ffa1` - `fix(render): close linear gradient fidelity gaps`
+
+Verification evidence from the completed phase:
+
+- `cargo test --test render_wgpu_render_items` - passed, 20 tests.
+- `cargo test --test render_wgpu_offscreen_render` - passed, 26 tests.
+- `cargo test --doc` - passed, 49 doctests.
+- `cargo test --test visual_goldens -j1` - passed, 11 tests.
+- `cargo test --features vulkan-goldens --test visual_goldens_vulkan -j1` - passed, 9 tests.
+- `git diff --check` - clean before the final implementation commit.
+
+Task 9 is **not** the next implementation step anymore. It was completed after the rounded-gradient and gradient-layer-order follow-up concerns were addressed. The default visual golden baselines were added in `b50ffa1` so the visual-golden gate is reproducible from the branch.
 
 ## File Structure
 
@@ -95,7 +124,7 @@ This changes a public type. Because the crate is pre-1.0 and no `CHANGELOG.md` e
 **Files:**
 - Modify: `src/core/render.rs`
 
-- [ ] **Step 1: Write failing tests for gradient validation**
+- [x] **Step 1: Write failing tests for gradient validation**
 
 Add these tests inside the existing `#[cfg(test)] mod tests` in `src/core/render.rs`:
 
@@ -164,7 +193,7 @@ fn validate_rejects_linear_gradient_with_non_finite_stop_position() {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -174,7 +203,7 @@ cargo test validate_
 
 Expected: compile failure mentioning missing `DisplayListError::GradientTooFewStops` and `DisplayListError::NonFiniteGradientStop`.
 
-- [ ] **Step 3: Commit the failing tests**
+- [x] **Step 3: Commit the failing tests**
 
 ```powershell
 git add src/core/render.rs
@@ -188,7 +217,7 @@ git commit -m "test(render): cover linear gradient validation"
 **Files:**
 - Modify: `src/core/render.rs`
 
-- [ ] **Step 1: Add new error variants**
+- [x] **Step 1: Add new error variants**
 
 Add these variants to `DisplayListError` after `PathTooShort`:
 
@@ -202,7 +231,7 @@ NonFiniteGradientStop {
 },
 ```
 
-- [ ] **Step 2: Add display messages**
+- [x] **Step 2: Add display messages**
 
 Add these match arms in `impl std::fmt::Display for DisplayListError`:
 
@@ -215,7 +244,7 @@ Self::NonFiniteGradientStop { index } => {
 }
 ```
 
-- [ ] **Step 3: Add gradient paint validation helper**
+- [x] **Step 3: Add gradient paint validation helper**
 
 Add this helper near the existing validation helpers:
 
@@ -240,7 +269,7 @@ fn validate_paint(paint: &Paint) -> Result<(), DisplayListError> {
 }
 ```
 
-- [ ] **Step 4: Call the helper from rect validation**
+- [x] **Step 4: Call the helper from rect validation**
 
 In the `PaintCommand::DrawRect(cmd)` branch of `DisplayList::validate`, change it to:
 
@@ -253,7 +282,7 @@ PaintCommand::DrawRect(cmd) => {
 }
 ```
 
-- [ ] **Step 5: Update the display-message unit test**
+- [x] **Step 5: Update the display-message unit test**
 
 In `display_list_error_display_renders_readable_message`, add these cases:
 
@@ -268,7 +297,7 @@ In `display_list_error_display_renders_readable_message`, add these cases:
 ),
 ```
 
-- [ ] **Step 6: Run validation tests**
+- [x] **Step 6: Run validation tests**
 
 Run:
 
@@ -279,7 +308,7 @@ cargo test display_list_error_display_renders_readable_message
 
 Expected: all four tests pass.
 
-- [ ] **Step 7: Commit validation implementation**
+- [x] **Step 7: Commit validation implementation**
 
 ```powershell
 git add src/core/render.rs
@@ -293,7 +322,7 @@ git commit -m "feat(render): validate linear gradient paint"
 **Files:**
 - Modify: `tests/render_wgpu_render_items.rs`
 
-- [ ] **Step 1: Write failing lowering tests**
+- [x] **Step 1: Write failing lowering tests**
 
 Add these tests after `lowers_rect_commands_to_solid_items_with_order_and_z_index`:
 
@@ -359,7 +388,7 @@ fn linear_gradient_lowering_uses_first_and_last_stop() {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify they fail**
+- [x] **Step 2: Run tests and verify they fail**
 
 Run:
 
@@ -369,7 +398,7 @@ cargo test --test render_wgpu_render_items linear_gradient
 
 Expected: compile failure because `PipelineKind::LinearGradient`, `RenderItem::gradient`, and `RenderItem::gradient_end_color` do not exist.
 
-- [ ] **Step 3: Commit failing lowering tests**
+- [x] **Step 3: Commit failing lowering tests**
 
 ```powershell
 git add tests/render_wgpu_render_items.rs
@@ -385,7 +414,7 @@ git commit -m "test(render): cover linear gradient lowering"
 - Modify: `src/render/wgpu/item.rs`
 - Modify: `tests/render_wgpu_render_items.rs`
 
-- [ ] **Step 1: Add the pipeline variant**
+- [x] **Step 1: Add the pipeline variant**
 
 In `PipelineKind`, add `LinearGradient` after `RoundedRect`:
 
@@ -402,7 +431,7 @@ pub enum PipelineKind {
 }
 ```
 
-- [ ] **Step 2: Add gradient fields to `RenderItem`**
+- [x] **Step 2: Add gradient fields to `RenderItem`**
 
 In `src/render/wgpu/item.rs`, change `RenderItem` to:
 
@@ -423,7 +452,7 @@ pub struct RenderItem {
 }
 ```
 
-- [ ] **Step 3: Add a default helper for non-gradient items**
+- [x] **Step 3: Add a default helper for non-gradient items**
 
 Add this helper near `missing_resource_item`:
 
@@ -433,7 +462,7 @@ fn no_gradient(color: [f32; 4]) -> ([f32; 4], [f32; 4]) {
 }
 ```
 
-- [ ] **Step 4: Add a gradient normalizer**
+- [x] **Step 4: Add a gradient normalizer**
 
 Add this helper near `push_rect`:
 
@@ -454,7 +483,7 @@ fn linear_gradient_parts(
 }
 ```
 
-- [ ] **Step 5: Update `push_rect` to lower gradients**
+- [x] **Step 5: Update `push_rect` to lower gradients**
 
 Replace the current `(pipeline, color)` match in `push_rect` with:
 
@@ -490,7 +519,7 @@ gradient,
 gradient_end_color,
 ```
 
-- [ ] **Step 6: Add default gradient fields to every other `RenderItem` literal**
+- [x] **Step 6: Add default gradient fields to every other `RenderItem` literal**
 
 For every non-gradient `RenderItem` literal in `src/render/wgpu/item.rs`, add:
 
@@ -526,7 +555,7 @@ fn missing_resource_item(
 }
 ```
 
-- [ ] **Step 7: Add default gradient fields outside `item.rs`**
+- [x] **Step 7: Add default gradient fields outside `item.rs`**
 
 Update every `RenderItem` literal in:
 
@@ -559,7 +588,7 @@ let item = RenderItem {
 };
 ```
 
-- [ ] **Step 8: Run lowering tests**
+- [x] **Step 8: Run lowering tests**
 
 Run:
 
@@ -569,7 +598,7 @@ cargo test --test render_wgpu_render_items linear_gradient
 
 Expected: tests compile and pass.
 
-- [ ] **Step 9: Commit lowering implementation**
+- [x] **Step 9: Commit lowering implementation**
 
 ```powershell
 git add src/render/wgpu/pipeline.rs src/render/wgpu/item.rs src/render/wgpu/text.rs src/render/wgpu/bitmap_text.rs tests/render_wgpu_render_items.rs
@@ -583,7 +612,7 @@ git commit -m "feat(render): lower linear gradients to render items"
 **Files:**
 - Modify: `tests/render_wgpu_render_items.rs`
 
-- [ ] **Step 1: Update the GPU layout test**
+- [x] **Step 1: Update the GPU layout test**
 
 Replace `instance_raw_has_stable_gpu_layout` with:
 
@@ -596,7 +625,7 @@ fn instance_raw_has_stable_gpu_layout() {
 }
 ```
 
-- [ ] **Step 2: Expand shader entry-point coverage**
+- [x] **Step 2: Expand shader entry-point coverage**
 
 Replace `shader_source_contains_expected_entry_points` with:
 
@@ -612,7 +641,7 @@ fn shader_source_contains_expected_entry_points() {
 }
 ```
 
-- [ ] **Step 3: Run tests and verify they fail**
+- [x] **Step 3: Run tests and verify they fail**
 
 Run:
 
@@ -623,7 +652,7 @@ cargo test --test render_wgpu_render_items shader_source_contains_expected_entry
 
 Expected: layout test fails with current size `80`; shader test fails because `fs_linear_gradient` is missing.
 
-- [ ] **Step 4: Commit failing shader/layout tests**
+- [x] **Step 4: Commit failing shader/layout tests**
 
 ```powershell
 git add tests/render_wgpu_render_items.rs
@@ -639,7 +668,7 @@ git commit -m "test(render): cover gradient shader instance layout"
 - Modify: `src/render/wgpu/shaders.rs`
 - Modify: `src/render/wgpu/mod.rs`
 
-- [ ] **Step 1: Extend `InstanceRaw`**
+- [x] **Step 1: Extend `InstanceRaw`**
 
 In `src/render/wgpu/pipeline.rs`, replace `InstanceRaw` with:
 
@@ -657,7 +686,7 @@ pub struct InstanceRaw {
 }
 ```
 
-- [ ] **Step 2: Extend vertex attributes**
+- [x] **Step 2: Extend vertex attributes**
 
 In `InstanceRaw::vertex_buffer_layout`, replace the attributes with:
 
@@ -673,7 +702,7 @@ const ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
 ];
 ```
 
-- [ ] **Step 3: Wire the gradient pipeline**
+- [x] **Step 3: Wire the gradient pipeline**
 
 Change `pipeline_table` to return eight entries:
 
@@ -692,7 +721,7 @@ fn pipeline_table() -> [(PipelineKind, &'static str); 8] {
 }
 ```
 
-- [ ] **Step 4: Populate instance data**
+- [x] **Step 4: Populate instance data**
 
 In `src/render/wgpu/mod.rs`, update the `InstanceRaw` literal in `instances_for_items`:
 
@@ -713,7 +742,7 @@ InstanceRaw {
 }
 ```
 
-- [ ] **Step 5: Extend WGSL vertex output**
+- [x] **Step 5: Extend WGSL vertex output**
 
 In `src/render/wgpu/shaders.rs`, replace the `VertexOut` struct in `SHADER_SOURCE` with:
 
@@ -730,7 +759,7 @@ struct VertexOut {
 };
 ```
 
-- [ ] **Step 6: Extend WGSL vertex inputs and assignments**
+- [x] **Step 6: Extend WGSL vertex inputs and assignments**
 
 Change `vs_main` signature to include the new attributes:
 
@@ -755,7 +784,7 @@ out.gradient = gradient;
 out.gradient_end_color = gradient_end_color;
 ```
 
-- [ ] **Step 7: Add gradient fragment shader**
+- [x] **Step 7: Add gradient fragment shader**
 
 Add this WGSL function after `fs_rounded` and before `fs_textured`:
 
@@ -774,7 +803,7 @@ fn fs_linear_gradient(in: VertexOut) -> @location(0) vec4<f32> {
 }
 ```
 
-- [ ] **Step 8: Update shader docs at the top of `shaders.rs`**
+- [x] **Step 8: Update shader docs at the top of `shaders.rs`**
 
 Add this bullet to the entry summary:
 
@@ -782,7 +811,7 @@ Add this bullet to the entry summary:
 //! - `fs_linear_gradient` - two-stop linear gradient output (LinearGradient).
 ```
 
-- [ ] **Step 9: Run shader/layout tests**
+- [x] **Step 9: Run shader/layout tests**
 
 Run:
 
@@ -793,7 +822,7 @@ cargo test --test render_wgpu_render_items shader_source_contains_expected_entry
 
 Expected: both tests pass.
 
-- [ ] **Step 10: Commit shader implementation**
+- [x] **Step 10: Commit shader implementation**
 
 ```powershell
 git add src/render/wgpu/pipeline.rs src/render/wgpu/shaders.rs src/render/wgpu/mod.rs tests/render_wgpu_render_items.rs
@@ -807,7 +836,7 @@ git commit -m "feat(render): add linear gradient shader"
 **Files:**
 - Modify: `tests/render_wgpu_offscreen_render.rs`
 
-- [ ] **Step 1: Add direct gradient pixel test**
+- [x] **Step 1: Add direct gradient pixel test**
 
 Add this test after `renders_solid_rect_into_offscreen_texture`:
 
@@ -857,7 +886,7 @@ fn renders_linear_gradient_into_offscreen_texture() {
 }
 ```
 
-- [ ] **Step 2: Add clipping test**
+- [x] **Step 2: Add clipping test**
 
 Add this test after the direct gradient test:
 
@@ -902,7 +931,7 @@ fn clipped_linear_gradient_does_not_render_outside_clip() {
 }
 ```
 
-- [ ] **Step 3: Add z-order test**
+- [x] **Step 3: Add z-order test**
 
 Add this test after the clipping test:
 
@@ -948,7 +977,7 @@ fn linear_gradient_respects_z_order() {
 }
 ```
 
-- [ ] **Step 4: Run offscreen tests**
+- [x] **Step 4: Run offscreen tests**
 
 Run:
 
@@ -958,7 +987,7 @@ cargo test --test render_wgpu_offscreen_render linear_gradient
 
 Expected: all three tests pass.
 
-- [ ] **Step 5: Commit offscreen tests**
+- [x] **Step 5: Commit offscreen tests**
 
 ```powershell
 git add tests/render_wgpu_offscreen_render.rs
@@ -972,7 +1001,7 @@ git commit -m "test(render): verify linear gradient pixels"
 **Files:**
 - Modify: `docs/public-api.md`
 
-- [ ] **Step 1: Update the `PipelineKind` example**
+- [x] **Step 1: Update the `PipelineKind` example**
 
 In the WGPU renderer API section, change:
 
@@ -986,7 +1015,7 @@ to:
 let pipeline_kind = PipelineKind::LinearGradient;
 ```
 
-- [ ] **Step 2: Update `RenderItem` examples**
+- [x] **Step 2: Update `RenderItem` examples**
 
 Every `RenderItem` literal in `docs/public-api.md` must include:
 
@@ -1014,7 +1043,7 @@ let item = RenderItem {
 };
 ```
 
-- [ ] **Step 3: Add a migration note**
+- [x] **Step 3: Add a migration note**
 
 Add this paragraph near the WGPU renderer API section:
 
@@ -1026,7 +1055,7 @@ low-level integrations that construct render items should set
 same value as `color` for non-gradient items.
 ```
 
-- [ ] **Step 4: Run docs check**
+- [x] **Step 4: Run docs check**
 
 Run:
 
@@ -1036,7 +1065,7 @@ cargo test --doc
 
 Expected: doctests pass. If pre-existing unrelated doctest failures appear, capture the failing names and continue with the targeted compile/test commands in Task 9.
 
-- [ ] **Step 5: Commit docs**
+- [x] **Step 5: Commit docs**
 
 ```powershell
 git add docs/public-api.md
@@ -1050,7 +1079,7 @@ git commit -m "docs(render): document linear gradient instance fields"
 **Files:**
 - No source edits expected.
 
-- [ ] **Step 1: Run render-item tests**
+- [x] **Step 1: Run render-item tests**
 
 Run:
 
@@ -1060,7 +1089,7 @@ cargo test --test render_wgpu_render_items
 
 Expected: test binary passes.
 
-- [ ] **Step 2: Run offscreen render tests**
+- [x] **Step 2: Run offscreen render tests**
 
 Run:
 
@@ -1070,7 +1099,7 @@ cargo test --test render_wgpu_offscreen_render
 
 Expected: test binary passes.
 
-- [ ] **Step 3: Run visual goldens**
+- [x] **Step 3: Run visual goldens**
 
 Run:
 
@@ -1080,7 +1109,7 @@ cargo test --test visual_goldens -j1
 
 Expected: test binary passes. If a golden changes only because a test scene starts using gradients in a later change, update goldens with `RGUI_UPDATE_GOLDENS=1` in a separate intentional commit. This Phase 1 plan does not add gradient widgets to visual goldens, so no golden image change is expected.
 
-- [ ] **Step 4: Run optional Vulkan golden mirror when the backend is available**
+- [x] **Step 4: Run optional Vulkan golden mirror when the backend is available**
 
 Run:
 
@@ -1090,7 +1119,7 @@ cargo test --features vulkan-goldens --test visual_goldens_vulkan -j1
 
 Expected: pass on machines with a working Vulkan backend. If the machine lacks Vulkan support, record the backend error in the final implementation notes.
 
-- [ ] **Step 5: Inspect final diff**
+- [x] **Step 5: Inspect final diff**
 
 Run:
 
@@ -1101,7 +1130,7 @@ git diff --check
 
 Expected: `git diff --check` prints no output.
 
-- [ ] **Step 6: Commit verification note if docs changed during fixes**
+- [x] **Step 6: Commit verification note if docs changed during fixes**
 
 If Task 9 required small docs-only corrections, commit them:
 
