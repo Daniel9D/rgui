@@ -114,9 +114,7 @@ impl SurfaceRenderer {
             std::mem::transmute::<wgpu::Surface<'_>, wgpu::Surface<'static>>(
                 instance
                     .create_surface(window)
-                    .map_err(|_| {
-                        RendererError::Surface("surface creation failed".to_string())
-                    })?,
+                    .map_err(|_| RendererError::Surface("surface creation failed".to_string()))?,
             )
         };
         let size = SizeU32::new(

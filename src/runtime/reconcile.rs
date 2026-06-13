@@ -149,7 +149,14 @@ impl Reconciler {
     pub fn diff(&mut self, prior: Element, new: Element) -> DiffOutput {
         // Build the prior tree with a *fresh* allocator (so we can
         // compare ids back without polluting `self.keyed_ids`).
-        let mut prior_allocator = IdAllocator::fresh();
+        // Bug fix RT-10: use `fresh_with` to avoid the `Box::leak`
+        // that the old `fresh()` did on every call.
+        let prior_node_ids = NodeIdAllocator::new();
+        let mut prior_keyed_ids = std::collections::HashMap::new();
+        let mut prior_allocator = IdAllocator::fresh_with(
+            &prior_node_ids,
+            &mut prior_keyed_ids,
+        );
         let prior_tree = UiTree::from_element_with_ids(prior, &mut prior_allocator);
         // Build the new tree with the *live* allocator — keyed nodes
         // will get the same `NodeId` as on the previous frame.

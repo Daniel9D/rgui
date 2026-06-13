@@ -227,6 +227,20 @@ impl Element {
                 WidgetSpec::Link(l) => {
                     l.label = label_for_spec.take().or_else(|| self.semantic.label.clone());
                 }
+                // Bug fix C-1: `Element::label` should also update
+                // `ImageSpec::alt` and `TooltipSpec::text`. Without
+                // these arms, calling `.label("hello")` on an
+                // `image()` or `tooltip()` was silently ignored.
+                WidgetSpec::Image(img) => {
+                    img.alt = label_for_spec
+                        .take()
+                        .or_else(|| self.semantic.label.clone());
+                }
+                WidgetSpec::Tooltip(tt) => {
+                    tt.text = label_for_spec
+                        .take()
+                        .or_else(|| self.semantic.label.clone());
+                }
                 WidgetSpec::MenuItem(mi) => {
                     // MenuItemSpec.label is a `String`, not `Option<String>`.
                     // Take ownership of the buffer; fall back to the

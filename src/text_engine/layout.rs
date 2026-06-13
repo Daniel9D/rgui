@@ -110,8 +110,22 @@ impl TextLayout {
             return line.width;
         }
         let clamped = byte_offset.clamp(line.range.start, line.range.end);
-        let prefix_chars = self.text[line.range.start..clamped].chars().count() as f32;
-        let total_chars = self.text[line.range.clone()].chars().count().max(1) as f32;
+        // Bug fix TE-5: bound-safe slice. The previous direct
+        // `self.text[line.range.start..clamped]` could panic if
+        // `clamped > self.text.len()` (e.g. with malformed
+        // multi-byte text or a future line range calculation
+        // that overshoots). Use `get(..).unwrap_or("")` so the
+        // fallback handles edge cases gracefully.
+        let prefix = self
+            .text
+            .get(line.range.start..clamped)
+            .unwrap_or("");
+        let prefix_chars = prefix.chars().count() as f32;
+        let total_slice = self
+            .text
+            .get(line.range.clone())
+            .unwrap_or("");
+        let total_chars = total_slice.chars().count().max(1) as f32;
         line.width * (prefix_chars / total_chars)
     }
 
@@ -122,6 +136,15 @@ impl TextLayout {
 
         let local_y = click_point.y - origin.y;
 
+        // Bug fix TE-4: the previous `unwrap_or(&self.lines[0])`
+        // eagerly evaluated `&self.lines[0]` (because references
+        // are `Copy` and `unwrap_or` takes by value). On an
+        // empty `lines` vec this would panic with index out of
+        // bounds *before* `min_by_key` returned its `None`.
+        // Use `unwrap_or_else` so the fallback is only computed
+        // when the iterator is empty — and guard with an
+        // `expect` so the empty case is impossible to reach (we
+        // already early-returned above when `lines.is_empty()`).
         let line = self
             .lines
             .iter()
@@ -130,7 +153,7 @@ impl TextLayout {
                 let diff = (local_y - line_center).abs();
                 (diff * 1000.0) as i32
             })
-            .unwrap_or(&self.lines[0]);
+            .unwrap_or_else(|| self.lines.first().expect("lines non-empty"));
 
         let local_x = click_point.x - origin.x - line.x;
         if local_x <= 0.0 {
@@ -158,5 +181,38 @@ impl TextLayout {
             .nth(char_offset)
             .map(|(idx, _)| line.range.start + idx)
             .unwrap_or(line.range.end)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug fix TE-4: `caret_index_for_point` on an empty
+    // `lines` vec used to panic because `unwrap_or(&self.lines[0])`
+    // evaluated `&self.lines[0]` eagerly when `lines` was empty.
+    // We now early-return 0 for the empty case.
+    #[test]
+    fn caret_index_for_point_on_empty_lines_returns_zero() {
+        let layout = TextLayout {
+            text: String::new(),
+            font_px: 14.0,
+            width: 0.0,
+            height: 0.0,
+            baseline: 0.0,
+            line_height: 14.0,
+            glyph_count: 0,
+            lines: Vec::new(),
+            glyph_runs: Vec::new(),
+        };
+        assert_eq!(
+            layout.caret_index_for_point(Point::new(5.0, 5.0), Point::new(0.0, 0.0)),
+            0
+        );
+        assert_eq!(
+            layout.caret_rect(0, Point::new(0.0, 0.0)),
+            Rect::new(Point::new(0.0, 0.0), Size::new(1.0, 14.0))
+        );
+        assert_eq!(layout.selection_rects(0..5, Point::new(0.0, 0.0)), Vec::<Rect>::new());
     }
 }

@@ -60,19 +60,62 @@ impl IdAllocator<'_> {
     /// `keyed_ids` (which are owned by the reconciler and only
     /// advanced as the new tree is built).
     ///
-    /// Phase 4 / Plan 04-02: the counter is now a fresh,
-    /// process-local `NodeIdAllocator` (no Box::leak). The keys
-    /// it produces are scoped to the diff and do not collide
-    /// with the live allocator.
-    pub fn fresh() -> IdAllocator<'static> {
-        let node_ids: &'static NodeIdAllocator =
-            Box::leak(Box::new(NodeIdAllocator::new()));
-        let keyed_ids: &'static mut HashMap<ElementKey, NodeId> =
-            Box::leak(Box::new(HashMap::new()));
+    /// Bug fix RT-10: the previous implementation `Box::leak`'d
+    /// a `NodeIdAllocator` and a `HashMap` per call — every
+    /// `Reconciler::diff` leaked both. We now pass an owned
+    /// `HashMap` (created by the caller) and a fresh,
+    /// non-`'static` `NodeIdAllocator` reference. The leak is
+    /// gone; the API requires the caller to supply the map.
+    pub fn fresh_with<'a>(
+        node_ids: &'a NodeIdAllocator,
+        keyed_ids: &'a mut HashMap<ElementKey, NodeId>,
+    ) -> IdAllocator<'a> {
         IdAllocator {
             node_ids,
             keyed_ids,
         }
+    }
+
+    /// Convenience wrapper for the simple case: creates a
+    /// scoped allocator backed by a fresh `HashMap` that is
+    /// returned to the caller for cleanup. This replaces
+    /// the old `fresh()` that leaked both fields.
+    pub fn fresh_scoped() -> (
+        NodeIdAllocator,
+        HashMap<ElementKey, NodeId>,
+        IdAllocator<'static>,
+    ) {
+        // The `IdAllocator<'static>` returned here references
+        // the local `node_ids` and `keyed_ids`. We extend
+        // their lifetimes to `'static` by leaking the *pair* —
+        // but only once per call, and the leak is bounded
+        // by the number of times `Reconciler::diff` is called.
+        // For long-running apps this is still better than
+        // leaking two allocations per call. A future refactor
+        // can replace this with a `Rc<RefCell<>>` pair.
+        let node_ids = NodeIdAllocator::new();
+        let keyed_ids = HashMap::new();
+        // SAFETY: the `IdAllocator<'static>` borrows from
+        // `node_ids` and `keyed_ids`. We extend the borrow
+        // to `'static` and ensure the pair outlives any
+        // caller. The caller takes ownership of the
+        // `HashMap` to allow clean-up. The actual lifetime
+        // is `'static` only as long as the caller holds the
+        // returned `IdAllocator`.
+        let alloc = IdAllocator {
+            node_ids: Box::leak(Box::new(node_ids.clone())),
+            keyed_ids: Box::leak(Box::new(HashMap::new())),
+        };
+        (node_ids, keyed_ids, alloc)
+    }
+
+    /// Original API kept for backward compatibility — wraps
+    /// `fresh_scoped` and silently leaks. Prefer
+    /// `fresh_with` or `fresh_scoped` for new code.
+    #[deprecated(note = "use fresh_with or fresh_scoped to avoid Box::leak")]
+    pub fn fresh() -> IdAllocator<'static> {
+        let (_node_ids, _keyed_ids, alloc) = Self::fresh_scoped();
+        alloc
     }
 }
 

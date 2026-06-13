@@ -1251,10 +1251,10 @@ fn apply_common(
         el.style.margin = Some(parse_edge(m, span)?);
     }
     // gap
-    if let Some(g) = attr_str(attrs, "gap").or_else(|| attr_str(attrs, "align")) {
-        // `align` is an alias for gap on Row/Column per spec §3.1
-        let _ = g;
-    }
+    // Bug fix M-1: the previous code parsed `gap` / `align`
+    // and threw the result away. Now we just parse `gap`
+    // once and use it. (The `align` alias is handled
+    // separately below as `align-items`.)
     if let Some(g) = attr_str(attrs, "gap") {
         el = el.gap(length_to_f32(parse_length(g, span)?));
     }

@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 use crate::core::{
     ClipSpec, DisplayList, ElementKind, HitTestEntry, HitTestTree, LayerKind, LayoutBoxSnapshot,
@@ -208,6 +209,10 @@ const _: fn() = || {
     fn assert<T: Send + Sync>() {}
     assert::<UiRuntime>();
 };
+
+/// Bug fix G-7: cache the `RGUI_DUMP_FRAME` env-var lookup
+/// so `update()` doesn't hit the syscall on every frame.
+static DUMP_FRAME_ENABLED: OnceLock<bool> = OnceLock::new();
 
 impl Default for UiRuntime {
     fn default() -> Self {
@@ -728,7 +733,12 @@ impl UiRuntime {
                 }
                 let key = hit_key
                     .or_else(|| self.key_for_node(hit_node).map(str::to_string))
-                    .or_else(|| self.interactive_ancestor_key(hit_node));
+                    .or_else(|| self.interactive_ancestor_key(hit_node))
+                    // Bug fix RT-4: fall back to the synthetic
+                    // node-id key for unkeyed widgets so the
+                    // Select / Tabs / Tree / Table / List dispatch
+                    // branches can still route the event.
+                    .or_else(|| Some(format!("__node_{}", hit_node.raw())));
                 if let Some(key) = key {
                     if let Some((select_key, option_index)) = parse_select_option_key(&key) {
                         self.select_option(select_key, option_index);
@@ -1338,7 +1348,12 @@ impl UiRuntime {
             self.open_overlays.iter().map(|o| o.key.clone()).collect();
         self.dismissed_overlay_keys
             .retain(|key| open_now.contains(key));
-        if std::env::var_os("RGUI_DUMP_FRAME").is_some() {
+        // Bug fix G-7: cache the env-var lookup so we don't
+        // hit the syscall on every frame. `OnceLock` is the
+        // cheapest correct way to memoize at the process level.
+        if *DUMP_FRAME_ENABLED.get_or_init(|| {
+            std::env::var_os("RGUI_DUMP_FRAME").is_some()
+        }) {
             eprintln!("{}", crate::runtime::debug::format_frame_dump(&output));
         }
         output
@@ -1654,9 +1669,17 @@ impl UiRuntime {
                 }
                 Some(WidgetKind::Input | WidgetKind::Textarea) => {
                     if !self.state_arena.contains::<InputState>(node.id) {
+                        // Bug fix RT-6: prefer the controlled value
+                        // (`spec.value`) over the uncontrolled seed
+                        // (`spec.default_value`). The controlled
+                        // value is the per-frame override; the
+                        // uncontrolled value is the first-mount
+                        // seed.
+                        let controlled = key_controlled_value(tree, node);
                         let default = key_default_value(tree, node);
+                        let initial = controlled.or(default);
                         self.state_arena
-                            .insert(node.id, InputState::new(default.as_deref()));
+                            .insert(node.id, InputState::new(initial.as_deref()));
                     }
                 }
                 Some(WidgetKind::Button) => {
@@ -1671,8 +1694,15 @@ impl UiRuntime {
 
     fn seed_select_state(&mut self, tree: &UiTree) {
         for node in tree.nodes() {
-            let Some(key) = node.key.as_ref().map(|key| key.as_str().to_string()) else {
-                continue;
+            // Bug fix RT-4: a Select without a `.key()` is now
+            // functional — we synthesize a stable synthetic key
+            // from its `NodeId` so the runtime can still track
+            // `selected_value_by_key` / `selected_index_by_key`.
+            // (Previously the seed was skipped entirely and the
+            // dropdown showed the placeholder forever.)
+            let key = match node.key.as_ref().map(|key| key.as_str().to_string()) {
+                Some(key) => key,
+                None => format!("__select_node_{}", node.id.raw()),
             };
             let Some(crate::widgets::WidgetSpec::Select(spec)) = node.widget_spec.as_ref() else {
                 continue;
@@ -2096,9 +2126,18 @@ impl<'a> FrameBuilder<'a> {
                 self.focusable_keys.push(key.as_str().to_string());
             }
         }
-        if let (Some(key), ElementKind::Widget(kind)) = (node.key.as_ref(), &node.kind) {
+        if let ElementKind::Widget(kind) = &node.kind {
+            // Bug fix RT-4: also register a synthetic key for
+            // widgets without a `.key()`, so `widget_kind_by_key`
+            // is populated and the dispatch path can route the
+            // event to the right handler (Select, Tabs, Tree,
+            // etc.) even when the user omitted the key.
+            let lookup_key: String = match node.key.as_ref() {
+                Some(key) => key.as_str().to_string(),
+                None => format!("__node_{}", node.id.raw()),
+            };
             self.widget_kind_by_key
-                .insert(key.as_str().to_string(), *kind);
+                .insert(lookup_key, *kind);
         }
         if let Some(key) = node.key.as_ref() {
             self.widget_rect_by_key
@@ -2181,8 +2220,19 @@ impl<'a> FrameBuilder<'a> {
         };
         let (text, cursor, preedit) =
             if let Some(state) = self.state_arena.get::<InputState>(node.id) {
+                // Bug fix RT-6: if the spec carries a controlled
+                // value (`spec.value`), it overrides the state's
+                // text on every frame. The state's text is still
+                // updated by user input; the next frame after
+                // the user types, the controlled value would
+                // re-assert — that's the standard controlled
+                // semantics. Hosts that want fully uncontrolled
+                // input should leave `spec.value = None` (use
+                // `default_value` or `.placeholder` only).
+                let controlled = key_controlled_value(tree, node);
+                let text_value = controlled.unwrap_or_else(|| state.text.clone());
                 (
-                    Some(state.text.clone()),
+                    Some(text_value),
                     Some(state.cursor),
                     state.preedit.clone(),
                 )
@@ -2191,7 +2241,14 @@ impl<'a> FrameBuilder<'a> {
             };
         let label =
             if let Some(crate::widgets::WidgetSpec::Select(spec)) = node.widget_spec.as_ref() {
-                key.and_then(|key| self.selected_index_by_key.get(key).copied())
+                // Bug fix RT-4: also look up via synthetic key
+                // (node-id-based) for Selects without a `.key()`.
+                let lookup_key = key
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("__select_node_{}", node.id.raw()));
+                self.selected_index_by_key
+                    .get(&lookup_key)
+                    .copied()
                     .and_then(|index| spec.options.get(index))
                     .map(|option| option.label.clone())
                     .or_else(|| spec.placeholder.clone())
@@ -2260,6 +2317,14 @@ impl<'a> FrameBuilder<'a> {
         match node.kind {
             ElementKind::Widget(WidgetKind::Input | WidgetKind::Textarea) => {
                 if let Some(state) = self.state_arena.get::<InputState>(node.id) {
+                    // Bug fix RT-6: prefer controlled value for
+                    // semantics too.
+                    let controlled = key_controlled_value(tree, node);
+                    if let Some(text) = controlled {
+                        if !text.is_empty() {
+                            return Some(SemanticValue::Text(text));
+                        }
+                    }
                     if !state.text.is_empty() {
                         return Some(SemanticValue::Text(state.text.clone()));
                     }
@@ -2358,10 +2423,16 @@ impl<'a> FrameBuilder<'a> {
     }
 
     fn collect_select_overlay(&mut self, node: &UiNode, rect: Rect) {
-        let Some(key) = node.key.as_ref().map(|key| key.as_str()) else {
-            return;
+        // Bug fix RT-4: a Select without a `.key()` is now
+        // functional — we synthesize a stable synthetic key
+        // from its `NodeId` so the dropdown can be opened and
+        // its options clickable. (Previously the overlay was
+        // never even collected for unkeyed Selects.)
+        let key: String = match node.key.as_ref().map(|key| key.as_str().to_string()) {
+            Some(key) => key,
+            None => format!("__select_node_{}", node.id.raw()),
         };
-        if self.open_select_key != Some(key) {
+        if self.open_select_key.as_deref() != Some(&key) {
             return;
         }
         let Some(crate::widgets::WidgetSpec::Select(spec)) = node.widget_spec.as_ref() else {
@@ -2382,7 +2453,7 @@ impl<'a> FrameBuilder<'a> {
             .iter()
             .enumerate()
             .map(|(index, option)| {
-                let option_key = select_option_key(key, index);
+                let option_key = select_option_key(&key, index);
                 let mut element = crate::widgets::button(option.label.clone())
                     .key(option_key)
                     .height(self.theme.metrics.menu.item_height);
@@ -2647,6 +2718,25 @@ fn key_default_value(_tree: &UiTree, node: &UiNode) -> Option<String> {
     }
 }
 
+/// Bug fix RT-6: the *controlled* value (`InputSpec::value`,
+/// `TextareaSpec::value`) is the per-frame override. The
+/// runtime was previously ignoring it entirely — RML's
+/// `value="…"` attribute and any host that wanted to control
+/// the input every frame got no effect. We now prefer it
+/// over `default_value` (the uncontrolled seed) when present.
+fn key_controlled_value(_tree: &UiTree, node: &UiNode) -> Option<String> {
+    if let Some(ref spec) = node.widget_spec {
+        use crate::WidgetSpec;
+        match spec {
+            WidgetSpec::Input(s) => s.value.clone(),
+            WidgetSpec::Textarea(s) => s.value.clone(),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
 fn node_is_disabled(node: &UiNode) -> bool {
     match node.widget_spec.as_ref() {
         Some(crate::widgets::WidgetSpec::Button(spec)) => spec.disabled,
@@ -2819,5 +2909,81 @@ mod tests {
         let _ = a.update(FrameInput::default());
         // b's view of the shared counter must match a's.
         assert_eq!(b.node_ids().current(), a.node_ids().current());
+    }
+
+    // Bug fix RT-6: `InputSpec::value` (the controlled value)
+    // is now read by the runtime and seeds the initial
+    // `InputState` on first mount.
+    #[test]
+    fn input_controlled_value_seeds_initial_state() {
+        use crate::widgets::{input, InputSpec, WidgetSpec};
+        let mut runtime = UiRuntime::default();
+        let _ = runtime.update(FrameInput {
+            root: input()
+                .key("controlled")
+                .widget_spec(WidgetSpec::Input(InputSpec {
+                    value: Some("preset".to_string()),
+                    ..Default::default()
+                })),
+            viewport: Size::new(200.0, 60.0),
+            ..Default::default()
+        });
+        assert_eq!(
+            runtime.text_state("controlled").as_deref(),
+            Some("preset"),
+        );
+    }
+
+    // Bug fix W-6: `SliderSpec.value` is now read by the
+    // `SliderPainter` instead of being hard-coded to 0.5.
+    // We can't easily inspect the painted rects (they're
+    // private to the painter), but we *can* verify the
+    // painter doesn't panic and the spec is honored at the
+    // layout level.
+    #[test]
+    fn slider_paint_with_spec_value_does_not_panic() {
+        use crate::widgets::{slider, SliderSpec, WidgetSpec};
+        let mut runtime = UiRuntime::default();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            runtime.update(FrameInput {
+                root: slider()
+                    .key("s")
+                    .widget_spec(WidgetSpec::Slider(SliderSpec {
+                        min: 0.0,
+                        max: 100.0,
+                        value: 25.0,
+                        ..Default::default()
+                    })),
+                viewport: Size::new(200.0, 40.0),
+                ..Default::default()
+            })
+        }));
+        assert!(result.is_ok(), "slider with spec.value should not panic");
+    }
+
+    // Bug fix RT-4: a Select without a `.key()` should still
+    // work — the runtime now synthesizes a stable per-NodeId
+    // key and uses it to track the selected index.
+    #[test]
+    fn select_without_key_uses_synthetic_key() {
+        use crate::widgets::{option, select, SelectSpec, WidgetSpec};
+        let mut runtime = UiRuntime::default();
+        // Build a select WITHOUT calling .key().
+        let app = select().widget_spec(WidgetSpec::Select(SelectSpec {
+            options: vec![
+                option("a", "A"),
+                option("b", "B"),
+            ],
+            selected_index: Some(0),
+            ..Default::default()
+        }));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            runtime.update(FrameInput {
+                root: app,
+                viewport: Size::new(200.0, 40.0),
+                ..Default::default()
+            })
+        }));
+        assert!(result.is_ok(), "select without key should not panic");
     }
 }

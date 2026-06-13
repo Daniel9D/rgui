@@ -1,8 +1,37 @@
-# Stack Research
+<!-- GSD:project-start source:PROJECT.md -->
 
-**Domain:** Rust wgpu GUI library (retained-mode, GPU-accelerated)
-**Researched:** 2026-06-03
-**Confidence:** HIGH (based on the actual committed stack in `Cargo.toml`)
+## Project
+
+**rsgui**
+
+A Rust GUI library for `wgpu` that gives desktop and embedded-wgpu
+applications a retained-mode, GPU-accelerated, themeable, accessible
+UI surface — `Element` tree in, `DisplayList` out, with a clean
+separation between layout, paint, and event dispatch. Targeted at
+developers who want the GPU story of `wgpu` without giving up the
+ergonomics of a retained-mode toolkit.
+
+**Core Value:** The paint pipeline produces a correct, sorted `DisplayList` for
+every `Element` tree — every `WidgetKind` paints something visible
+with the right z-order, the right hover/disabled/checked state, and
+the right glyph from the right font. If paint is wrong, nothing
+else matters; every other capability exists to make that output
+useful.
+
+### Constraints
+
+- **Tech stack**: Rust + `wgpu` + `taffy` + `glyphon`. The retained-mode model + Rust-native style system is non-negotiable (the design's whole point).
+- **Performance**: 60 fps for typical desktop UIs on integrated GPUs. Each frame's full pipeline (layout + paint + render) must fit in ~8ms of CPU budget on a modern laptop.
+- **Compatibility**: Must build and run on Windows / macOS / Linux. Mobile / WASM are not v1 targets but the lib must not preclude them.
+- **Backwards compatibility**: Public API changes need a deprecation alias in the same release. We don't have a 1.0 yet; pre-1.0 breaking changes need a CHANGELOG note and a migration entry in the docs.
+- **No runtime dependencies** outside the chosen stack. No `tokio`, no `serde` for the hot path (serde is allowed in debug dumps only).
+- **Test discipline**: Every interactive widget must be covered by the event dispatch integration test suite. No `unwrap()` in the runtime paint path under non-pathological inputs.
+
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:research/STACK.md -->
+
+## Technology Stack
 
 ## Recommended Stack
 
@@ -40,17 +69,11 @@
 
 ## Installation
 
-```bash
 # The stack is already pinned in Cargo.toml. To build:
-cargo build --features rml,bitmap-text-fallback
 
 # For tests (lib + visual goldens):
-cargo test --features rml,bitmap-text-fallback
 
 # For the examples:
-cargo run --example rml_showcase --features rml
-cargo run --example rml_widget_gallery --features rml
-```
 
 ## Alternatives Considered
 
@@ -75,17 +98,12 @@ cargo run --example rml_widget_gallery --features rml
 
 ## Stack Patterns by Variant
 
-**If targeting a small embedded display (no windowing):**
 - Drop `winit` + `arboard`
 - Render directly to an `OffscreenTarget` (already supported)
 - Skip the `accessibility` feature
-
-**If targeting multi-window:**
 - Add a `window_id` to `FrameInput` / `FrameOutput`
 - Route events per-window
 - The current single-window architecture needs a `Window` registry
-
-**If targeting WebGPU:**
 - `wgpu` 29 already supports WebGPU backend via `wgpu::Backends::BROWSER_WEBGPU`
 - The `taffy` and `kurbo` deps are already cross-platform
 - Glyphon's WebGPU support is improving but watch for font-loading gotchas
@@ -105,6 +123,48 @@ cargo run --example rml_widget_gallery --features rml
 - `feedback.md` (Mavis code review) — what NOT to use surfaced in the API design notes
 - `docs/public-api.md` — current public surface; pre-`3.8` / pre-`8.5` cleanup still pending
 
----
-*Stack research for: rsgui*
-*Researched: 2026-06-03*
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+
+## Project Skills
+
+No project skills found. Add skills to any of: `.Codex/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-Codex-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

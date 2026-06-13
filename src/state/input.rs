@@ -47,6 +47,13 @@ impl InputState {
     }
 
     pub fn delete_before(&mut self) {
+        // Bug fix RT-5: if a selection is active, delete the
+        // selection range first (standard text-editor behavior).
+        // Without this, Backspace with a multi-char selection
+        // only deletes one character before the cursor.
+        if self.delete_selection() {
+            return;
+        }
         if self.cursor > 0 {
             self.text.remove(self.cursor - 1);
             self.cursor -= 1;
@@ -55,10 +62,36 @@ impl InputState {
     }
 
     pub fn delete_after(&mut self) {
+        // Bug fix RT-5: same as above — delete the selection
+        // range first.
+        if self.delete_selection() {
+            return;
+        }
         if self.cursor < self.text.len() {
             self.text.remove(self.cursor);
             self.selection = TextSelection::caret(TextPosition::new(self.cursor));
         }
+    }
+
+    /// Delete the active selection (the text between the
+    /// selection's anchor and head). Returns `true` if a
+    /// non-empty selection was deleted, `false` if there was
+    /// no selection to delete.
+    ///
+    /// Bug fix RT-5: previously `delete_before` / `delete_after`
+    /// only deleted a single character even when a multi-char
+    /// selection was active. Standard text-editor behavior is to
+    /// delete the selection first; only when no selection is
+    /// active should the cursor-based delete fire.
+    pub fn delete_selection(&mut self) -> bool {
+        let range = self.selection.range();
+        if range.start >= range.end {
+            return false;
+        }
+        self.text.replace_range(range.start..range.end, "");
+        self.cursor = range.start;
+        self.selection = TextSelection::caret(TextPosition::new(range.start));
+        true
     }
 
     pub fn move_cursor_left(&mut self) {
@@ -94,3 +127,62 @@ impl WidgetState for InputState {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Bug fix RT-5: `delete_before` and `delete_after` must
+    // honor the active selection, not just the cursor.
+    #[test]
+    fn delete_before_removes_active_selection() {
+        let mut state = InputState::default();
+        state.text = "hello world".to_string();
+        // Select "world" (bytes 6..11)
+        state.cursor = 11;
+        state.selection = crate::core::TextSelection {
+            anchor: crate::core::TextPosition::new(6),
+            head: crate::core::TextPosition::new(11),
+        };
+        state.delete_before();
+        assert_eq!(state.text, "hello ");
+        assert_eq!(state.cursor, 6);
+    }
+
+    #[test]
+    fn delete_after_removes_active_selection() {
+        let mut state = InputState::default();
+        state.text = "hello world".to_string();
+        // Select "hello" (bytes 0..5)
+        state.cursor = 0;
+        state.selection = crate::core::TextSelection {
+            anchor: crate::core::TextPosition::new(0),
+            head: crate::core::TextPosition::new(5),
+        };
+        state.delete_after();
+        assert_eq!(state.text, " world");
+        assert_eq!(state.cursor, 0);
+    }
+
+    #[test]
+    fn delete_before_falls_back_to_single_char_when_no_selection() {
+        let mut state = InputState::default();
+        state.text = "abc".to_string();
+        state.cursor = 3;
+        state.delete_before();
+        assert_eq!(state.text, "ab");
+        assert_eq!(state.cursor, 2);
+    }
+
+    #[test]
+    fn delete_selection_returns_false_on_empty_selection() {
+        let mut state = InputState::default();
+        state.text = "abc".to_string();
+        state.cursor = 1;
+        state.selection =
+            crate::core::TextSelection::caret(crate::core::TextPosition::new(1));
+        assert!(!state.delete_selection());
+        assert_eq!(state.text, "abc");
+    }
+}
+

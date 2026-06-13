@@ -191,11 +191,22 @@ impl GlyphonTextBridge {
                             debug_text_area_line(&cmd.text, rect, clip, text_bounds(clip))
                         );
                     }
+                    // Bug fix R-2: bound the per-text-area shaping
+                    // to the *intersection* of the text rect and
+                    // the active clip. Previously `bounds` was
+                    // the full clip, which could let glyphs leak
+                    // past the rect when the rect was narrower
+                    // than the clip (e.g. text in a popover or
+                    // modal where the clip is the viewport).
+                    let shaping_bounds = rect
+                        .intersect(clip)
+                        .map(text_bounds)
+                        .unwrap_or_else(|| text_bounds(clip));
                     areas.push(PreparedTextArea {
                         buffer,
                         left: rect.origin.x,
                         top: rect.origin.y,
-                        bounds: text_bounds(clip),
+                        bounds: shaping_bounds,
                         color: to_glyphon_color(cmd.color),
                         clipped: !clip_stack.is_empty(),
                     });

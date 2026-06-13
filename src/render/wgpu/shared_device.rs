@@ -38,9 +38,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::core::SizeU32;
 
-use super::{
-    GpuAtlas, PipelineCache, RendererError, RendererOptions, RendererResult, context,
-};
+use super::{GpuAtlas, PipelineCache, RendererError, RendererOptions, RendererResult, context};
 
 /// Per-process wgpu state shared by every `WgpuRenderer`. Construct
 /// once via `SharedWgpuDevice::new().await`; clone the handle to pass

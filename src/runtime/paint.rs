@@ -476,7 +476,6 @@ static ICON_PAINTER: IconPainter = IconPainter;
 static DIVIDER_PAINTER: DividerPainter = DividerPainter;
 static CANVAS_PAINTER: CanvasPainter = CanvasPainter;
 static INVISIBLE_PAINTER: InvisiblePainter = InvisiblePainter;
-static TEXT_BACKGROUND_PAINTER: TextBackgroundPainter = TextBackgroundPainter;
 // Bug fix 2.2: previously these widget kinds fell through to
 // `GenericPainter` (background only, no foreground content). Each
 // now has a dedicated painter that reads its spec.
@@ -649,7 +648,7 @@ fn static_painter_for(kind: WidgetKind) -> &'static dyn WidgetPainter {
         WidgetKind::Divider      => &DIVIDER_PAINTER,
         WidgetKind::Canvas       => &CANVAS_PAINTER,
         WidgetKind::Modal | WidgetKind::Popover => &INVISIBLE_PAINTER,
-        WidgetKind::Text         => &TEXT_BACKGROUND_PAINTER,
+        WidgetKind::Text         => &INVISIBLE_PAINTER,
         WidgetKind::Card         => &CARD_PAINTER,
         WidgetKind::Badge        => &BADGE_PAINTER,
         WidgetKind::Link         => &LINK_PAINTER,
@@ -976,6 +975,7 @@ impl WidgetPainter for ButtonPainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 ctx.style.font_weight,
+                ctx.rect.size.width,
             ));
         }
     }
@@ -1047,6 +1047,10 @@ impl WidgetPainter for CheckboxPainter {
                 ctx.z_index + 3,
                 ctx.style.font_size,
                 ctx.style.font_weight,
+                // Bug fix R-1: pass the remaining width so
+                // the text command has a non-zero rect width.
+                (ctx.rect.size.width - (box_rect.max_x() - ctx.rect.origin.x))
+                    .max(0.0),
             ));
         }
         cmds
@@ -1098,6 +1102,10 @@ impl WidgetPainter for RadioPainter {
                 ctx.z_index + 3,
                 ctx.style.font_size,
                 ctx.style.font_weight,
+                // Bug fix R-1: pass the remaining width so
+                // the text command has a non-zero rect width.
+                (ctx.rect.size.width - (box_rect.max_x() - ctx.rect.origin.x))
+                    .max(0.0),
             ));
         }
         cmds
@@ -1120,6 +1128,9 @@ impl WidgetPainter for SelectPainter {
             ctx.style.text_color,
             ctx.z_index + 2,
             selected_weight,
+            // Bug fix R-1: pass the rect width so glyphon
+            // has a real budget.
+            ctx.rect.size.width,
         ));
         cmds.push(text_at(
             "v".to_string(),
@@ -1716,20 +1727,6 @@ impl WidgetPainter for InvisiblePainter {
     }
 }
 
-// ── Text background ───────────────────────────────────────────────────────────
-
-/// Renders only the theme background behind an inline text widget — no border, no content.
-struct TextBackgroundPainter;
-impl WidgetPainter for TextBackgroundPainter {
-    fn background_color(&self, ctx: &PaintCtx<'_>) -> Color {
-        ctx.theme.colors.background
-    }
-
-    fn has_border(&self) -> bool {
-        false
-    }
-}
-
 // ── (was: Generic fallback) ──────────────────────────────────────────────────
 // Bug fix 2.2 cont.: the `GenericPainter` and `GENERIC_PAINTER`
 // were the catch-all for `WidgetKind` variants without a
@@ -1791,6 +1788,8 @@ impl WidgetPainter for BadgePainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 ctx.style.font_weight,
+                // Bug fix R-1: pass the rect width.
+                ctx.rect.size.width,
             ));
         }
     }
@@ -1823,6 +1822,8 @@ impl WidgetPainter for LinkPainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 ctx.style.font_weight,
+                // Bug fix R-1: pass the rect width.
+                ctx.rect.size.width,
             ));
             // Underline: a thin rect beneath the text.
             let underline_y = text_y + ctx.style.font_size * 0.15;
@@ -1886,6 +1887,8 @@ impl WidgetPainter for AlertPainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 FontWeight::Semibold,
+                // Bug fix R-1: pass remaining width.
+                (ctx.rect.size.width - (text_x - ctx.rect.origin.x)).max(0.0),
             ));
         }
     }
@@ -2048,8 +2051,23 @@ impl WidgetPainter for SliderPainter {
     }
 
     fn paint(&self, ctx: &mut PaintCtx<'_>) -> Vec<PaintedCommand> {
-        // Sliders don't yet carry a value spec; default to mid.
-        let ratio = 0.5;
+        // Bug fix W-6: read the slider's value, min, max from
+        // the spec instead of hard-coding 0.5. The thumb
+        // position now reflects the actual value.
+        let (value, min, max) = ctx
+            .node
+            .widget_spec
+            .as_ref()
+            .and_then(|spec| match spec {
+                crate::widgets::WidgetSpec::Slider(s) => Some((s.value, s.min, s.max)),
+                _ => None,
+            })
+            .unwrap_or((0.0, 0.0, 1.0));
+        let ratio = if max > min {
+            ((value - min) / (max - min)).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         let track_height = 4.0;
         let track_y = ctx.rect.origin.y + (ctx.rect.size.height - track_height) * 0.5;
         let mut cmds = Vec::new();
@@ -2147,6 +2165,8 @@ impl WidgetPainter for AvatarPainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 ctx.style.font_weight,
+                // Bug fix R-1: pass the rect width.
+                ctx.rect.size.width,
             ));
         }
     }
@@ -2171,7 +2191,7 @@ pub(super) fn rect_command(rect: Rect, color: Color, radius: f32, z_index: i32) 
 }
 
 pub(super) fn text_at(text: String, origin: Point, color: Color, z_index: i32) -> PaintedCommand {
-    text_at_weight(text, origin, color, z_index, FontWeight::Normal)
+    text_at_weight(text, origin, color, z_index, FontWeight::Normal, f32::MAX)
 }
 
 pub(super) fn text_at_weight(
@@ -2180,8 +2200,17 @@ pub(super) fn text_at_weight(
     color: Color,
     z_index: i32,
     weight: FontWeight,
+    max_width: f32,
 ) -> PaintedCommand {
-    text_at_with_size_and_weight(text, origin, color, z_index, DEFAULT_TEXT_SIZE, weight)
+    text_at_with_size_and_weight(
+        text,
+        origin,
+        color,
+        z_index,
+        DEFAULT_TEXT_SIZE,
+        weight,
+        max_width,
+    )
 }
 
 pub(super) fn text_at_with_size_and_weight(
@@ -2191,6 +2220,7 @@ pub(super) fn text_at_with_size_and_weight(
     z_index: i32,
     size: f32,
     weight: FontWeight,
+    max_width: f32,
 ) -> PaintedCommand {
     let line_height = (size * 1.2).ceil();
     PaintedCommand {
@@ -2198,7 +2228,13 @@ pub(super) fn text_at_with_size_and_weight(
             text,
             rect: Rect::new(
                 Point::new(origin.x, origin.y - (size * 0.8).ceil()),
-                Size::new(0.0, line_height),
+                // Bug fix R-1: emit a non-zero `width` so the
+                // glyphon path uses a real width budget instead
+                // of the per-character fallback. `max_width` is
+                // the container's available width, falling back
+                // to a sensible default for the unit-tests that
+                // call this helper directly.
+                Size::new(max_width.max(1.0), line_height),
             ),
             color,
             size,

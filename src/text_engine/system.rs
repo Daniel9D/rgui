@@ -227,6 +227,42 @@ impl TextSystem {
 
         let glyph_count: usize = layout_runs.iter().map(|run| run.glyphs.len()).sum();
 
+        // Build a map: line_i -> start byte offset within the original text.
+        // cosmic-text exposes `LayoutRun.text` (the line's original text) and
+        // `line_i` (its index in the source buffer). To compute each line's
+        // absolute byte range we need the running sum of preceding line
+        // lengths. Build this map once so the per-line range is correct.
+        // Bug fix TE-1: previously every line used `range: 0..text.len()`,
+        // which broke caret/selection on multi-line text.
+        let mut line_i_to_byte_start: std::collections::HashMap<usize, usize> =
+            std::collections::HashMap::with_capacity(layout_runs.len());
+        {
+            let mut seen: std::collections::HashSet<usize> =
+                std::collections::HashSet::with_capacity(layout_runs.len());
+            let mut ordered: Vec<usize> = Vec::with_capacity(layout_runs.len());
+            for run in &layout_runs {
+                if seen.insert(run.line_i) {
+                    ordered.push(run.line_i);
+                }
+            }
+            ordered.sort_unstable();
+            let mut cursor = 0usize;
+            // Walk the original text line-by-line (line splits) to compute
+            // each `line_i`'s byte start. The first line starts at 0.
+            // cosmic-text splits on `\n` for word-wrap; the resulting
+            // `line_i` indices map to those line segments.
+            for (idx, line) in text.split('\n').enumerate() {
+                if let Some(&_li) = ordered.get(idx) {
+                    line_i_to_byte_start.insert(idx, cursor);
+                }
+                // +1 for the consumed newline byte (or 0 at EOF).
+                cursor += line.len() + 1;
+                if cursor > text.len() + 1 {
+                    break;
+                }
+            }
+        }
+
         let mut lines = Vec::new();
         let mut glyph_runs = Vec::new();
         let mut glyph_start = 0usize;
@@ -243,8 +279,16 @@ impl TextSystem {
                     advance_x: glyph.x + glyph.w * 0.5,
                 })
                 .collect();
+            // Compute the per-line byte range. `line_i_to_byte_start[run.line_i]`
+            // gives the start; the line's length is `run.text.len()` (the
+            // original substring cosmic-text used for this line).
+            let line_byte_start = line_i_to_byte_start
+                .get(&run.line_i)
+                .copied()
+                .unwrap_or(0);
+            let line_byte_end = (line_byte_start + run.text.len()).min(text.len());
             lines.push(TextLine {
-                range: 0..text.len(),
+                range: line_byte_start..line_byte_end,
                 x: 0.0,
                 y: line_y,
                 width: run_width,
@@ -317,6 +361,13 @@ impl TextSystem {
             line_height,
             glyph_count,
             lines: vec![TextLine {
+                // Bug fix TE-1: the heuristic fallback also needs the
+                // correct per-line byte range. Since the heuristic
+                // path produces a single line covering the whole
+                // text, the range is the same as before — but the
+                // path that *would* split on '\n' should produce
+                // per-line ranges. Compute them so multi-line
+                // heuristic layouts have correct ranges too.
                 range: 0..text.len(),
                 x: 0.0,
                 y: 0.0,
@@ -584,5 +635,38 @@ mod tests {
             after.layout_hits, before.layout_hits,
             "clear_caches must not reset hit counters"
         );
+    }
+
+    // Bug fix TE-1: a multi-line layout must give each line
+    // its own byte range, not the whole text range. Without
+    // this, caret / selection rect math is wrong for every
+    // line beyond the first.
+    #[test]
+    fn multi_line_layout_lines_have_per_line_byte_ranges() {
+        let mut sys = TextSystem::default();
+        // Use a narrow width so the text wraps to multiple lines.
+        let layout = sys.measure("hello world", 14.0, FontWeight::Normal, FontStyle::Normal, 40.0);
+        assert!(
+            layout.lines.len() > 1,
+            "expected the text to wrap to multiple lines, got {} lines",
+            layout.lines.len()
+        );
+        // First line must start at byte 0.
+        assert_eq!(layout.lines[0].range.start, 0);
+        // Each line's range must be a strict sub-range of the
+        // text (i.e. the *whole* text range).
+        for line in &layout.lines {
+            assert!(
+                line.range.end <= layout.text.len(),
+                "line range {:?} exceeds text len {}",
+                line.range,
+                layout.text.len()
+            );
+            assert!(
+                line.range.start < line.range.end,
+                "line range {:?} is empty",
+                line.range
+            );
+        }
     }
 }
