@@ -975,7 +975,7 @@ impl WidgetPainter for ButtonPainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 ctx.style.font_weight,
-                ctx.rect.size.width,
+                label_width,
             ));
         }
     }
@@ -1185,11 +1185,14 @@ impl WidgetPainter for TabsPainter {
             let text_x = tab_rect.origin.x + (tab_rect.size.width - label_width) / 2.0;
             let text_y =
                 tab_rect.origin.y + tab_rect.size.height * 0.5 + ctx.style.font_size * 0.3;
-            cmds.push(text_at(
+            cmds.push(text_at_with_size_and_weight(
                 tab_label.clone(),
                 Point::new(text_x, text_y),
                 ctx.style.text_color,
                 ctx.z_index + 3,
+                ctx.metrics.tab_text_size(),
+                FontWeight::Normal,
+                label_width,
             ));
         }
     }
@@ -1519,14 +1522,37 @@ impl WidgetPainter for MenuItemPainter {
         let baseline = ctx.rect.origin.y
             + (ctx.rect.size.height.max(item_height)) * 0.5
             + ctx.style.font_size * 0.3;
-        cmds.push(text_at(
+        let label_width = ctx
+            .text
+            .measure(
+                &label,
+                ctx.style.font_size,
+                ctx.style.font_weight,
+                FontStyle::Normal,
+                (ctx.rect.size.width - padding * 2.0).max(0.0),
+            )
+            .width;
+        cmds.push(text_at_with_size_and_weight(
             label,
             Point::new(ctx.rect.origin.x + padding, baseline),
             text_color,
             ctx.z_index + 2,
+            ctx.style.font_size,
+            ctx.style.font_weight,
+            label_width,
         ));
         if let Some(shortcut) = shortcut {
-            cmds.push(text_at(
+            let shortcut_width = ctx
+                .text
+                .measure(
+                    &shortcut,
+                    ctx.style.font_size,
+                    ctx.style.font_weight,
+                    FontStyle::Normal,
+                    (ctx.rect.size.width - padding * 2.0).max(0.0),
+                )
+                .width;
+            cmds.push(text_at_with_size_and_weight(
                 shortcut,
                 Point::new(
                     ctx.rect.max_x() - padding * 6.0,
@@ -1534,6 +1560,9 @@ impl WidgetPainter for MenuItemPainter {
                 ),
                 ctx.style.text_muted_color,
                 ctx.z_index + 2,
+                ctx.style.font_size,
+                ctx.style.font_weight,
+                shortcut_width,
             ));
         }
     }
@@ -1788,8 +1817,7 @@ impl WidgetPainter for BadgePainter {
                 ctx.z_index + 2,
                 ctx.style.font_size,
                 ctx.style.font_weight,
-                // Bug fix R-1: pass the rect width.
-                ctx.rect.size.width,
+                label_width,
             ));
         }
     }

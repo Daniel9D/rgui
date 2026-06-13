@@ -716,6 +716,14 @@ fn base_taffy_style(
     if matches!(node.kind, ElementKind::Widget(WidgetKind::Tabs)) {
         taffy_style.display = taffy::Display::Flex;
         taffy_style.flex_direction = taffy::FlexDirection::Column;
+        taffy_style.min_size.width = max_dimension(
+            taffy_style.min_size.width,
+            theme.metrics.tabs.min_size.width,
+        );
+        taffy_style.min_size.height = max_dimension(
+            taffy_style.min_size.height,
+            theme.metrics.tabs.min_size.height,
+        );
         taffy_style.padding.top = max_length_percentage(
             taffy_style.padding.top,
             theme.metrics.tabs.tab_height,
@@ -874,6 +882,21 @@ fn max_length_percentage(
         0.0
     };
     taffy::LengthPercentage::length(current_value.max(minimum))
+}
+
+fn max_dimension(current: taffy::Dimension, minimum: f32) -> taffy::Dimension {
+    let raw = current.into_raw();
+    if raw.tag() == taffy::style::CompactLength::PERCENT_TAG {
+        // SAFETY: A Dimension constructed from a PERCENT_TAG raw value is a
+        // valid Dimension.
+        return unsafe { taffy::Dimension::from_raw(raw) };
+    }
+    let current_value = if raw.tag() == taffy::style::CompactLength::LENGTH_TAG {
+        raw.value()
+    } else {
+        0.0
+    };
+    taffy::Dimension::length(current_value.max(minimum))
 }
 
 fn measure_context_for_node(
